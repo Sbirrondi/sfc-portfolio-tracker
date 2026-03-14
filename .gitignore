@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Temporary / generated
+performance_report.html
+data/sample_transactions.csv
+data/transactions.csv
+
+# Old Excel source (no longer needed)
+data/FONDO DEFINITIVO.xlsx

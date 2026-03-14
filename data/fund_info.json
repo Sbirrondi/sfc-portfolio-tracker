@@ -1,0 +1,12 @@
+{
+  "fund_name": "SFC Cattolica Investment Fund",
+  "inception_date": "2023-10-01",
+  "initial_nav": 10000000,
+  "currency": "EUR",
+  "benchmark": "S&P 500 Equal Weight",
+  "current_nav": 12444009.37,
+  "performance_since_inception": 0.24440093699999993,
+  "benchmark_performance": 0.32142857142857145,
+  "positions_count": 47,
+  "last_updated": "2026-03-14 21:04"
+}

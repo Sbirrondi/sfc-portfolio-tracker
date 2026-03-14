@@ -1,0 +1,50 @@
+date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees,notes,sector,asset_sub_type
+2023-10-01,DEPOSIT,,Conferimento iniziale,,10000000.0,1.0,EUR,1.0,0.0,migration_initial,,Stock
+2023-10-01,BUY,IE00BNGJJT35,Xtrackers S&P 500 Equal Weight,Equity,5500.0,44.955,EUR,1.0,0.0,migration_initial,S&P Equal Weight,ETF
+2023-10-01,BUY,IE00BLNMYC90,iShares S&P 500 Equal Weight,Equity,9100.0,80.5,EUR,1.0,0.0,migration_initial,S&P Equal Weight,ETF
+2023-10-01,BUY,IE00BFMXXD54,Vanguard S&P 500,Equity,2550.0,111.7,EUR,1.0,0.0,migration_initial,S&P 500 (Vanguard),ETF
+2023-10-01,BUY,IE00B53SZB19,iShares Nasdaq 100,Equity,250.0,954.67,EUR,1.0,0.0,migration_initial,Nasdaq,ETF
+2023-10-01,BUY,IE00B4KBBD01,iShares MSCI NA Utilities,Equity,22492.508324084352,9.01,EUR,1.0,0.0,migration_initial,Utilities US,ETF
+2023-10-01,BUY,LU0489337690,Amundi FTSE EPRA Real Estate,Equity,7500.0,22.89,EUR,1.0,0.0,migration_initial,Real Estate EU,ETF
+2023-10-01,BUY,IE00BM67HK77,Xtrackers MSCI World Health Care,Equity,2015.0,47.13,EUR,1.0,0.0,migration_initial,Healthcare,ETF
+2023-10-01,BUY,NL0010273215,ASML Holding,Equity,100.0,604.0,EUR,1.0,0.0,migration_initial,Azioni ASML,Stock
+2023-10-01,BUY,HK0000516697,China Healthcare Biotech Fund,Equity,4396.551912568306,9.15,USD,1.0,0.0,migration_initial,Healthcare Biotech Cina,ETF
+2023-10-01,BUY,IE00B4YBJ215,iShares Core S&P 500,Equity,2719.9121894858463,86.55,EUR,1.0,0.0,migration_initial,SPY4,ETF
+2023-10-01,BUY,IE00BYXG2H39,iShares Biotechnology,Equity,8186.0,7.33,EUR,1.0,0.0,migration_initial,Healthcare Biotech US,ETF
+2023-10-01,BUY,IE000NFR7C63,Amundi MSCI China Tech,Equity,75000.0,3.944,EUR,1.0,0.0,migration_initial,China Tech,ETF
+2023-10-01,BUY,IT0005282865,Reply,Equity,420.0,138.9,EUR,1.0,0.0,migration_initial,Azioni Reply,Stock
+2023-10-01,BUY,FR0000121014,LVMH,Equity,164.99985707226836,489.758,EUR,1.0,0.0,migration_initial,Azioni LVMH,Stock
+2023-10-01,BUY,IE00BJ38QD84,iShares MSCI USA Small Cap,Equity,4200.141843971631,59.22,EUR,1.0,0.0,migration_initial,Russell2000,ETF
+2023-10-01,BUY,GB00B082RF11,Rentokil Initial,Equity,24489.79523809524,4.2,GBP,1.0,0.0,migration_initial,Azioni Rentokil,Stock
+2023-10-01,BUY,IT0003549422,Sanlorenzo,Equity,3199.9999999999995,36.277,EUR,1.0,0.0,migration_initial,Azioni SanLorenzo,Stock
+2023-10-01,BUY,IE000P16KP52,iShares Digital Security,Equity,5750.0,25.69,EUR,1.0,0.0,migration_initial,CyberSecurity,ETF
+2023-10-01,BUY,LU1437017350,Amundi MSCI Emerging Markets,Equity,1850.0,82.15,EUR,1.0,0.0,migration_initial,Emerging Markets,ETF
+2023-10-01,BUY,IE00BQQP9F84,iShares Gold Producers,Equity,1800.0,63.6155,EUR,1.0,0.0,migration_initial,GDX,ETF
+2023-10-01,BUY,LU0908500753,Amundi Stoxx Europe 600,Equity,940.0,255.5,EUR,1.0,0.0,migration_initial,Europe Stoxx600,ETF
+2023-10-01,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,migration_initial,Azioni Moncler,Stock
+2023-10-01,BUY,IT0004176001,Prysmian,Equity,1200.0,35.007,EUR,1.0,0.0,migration_initial,Azioni Prysmian,Stock
+2023-10-01,BUY,DE0001141836,Bobl 0% Apr 2026,Fixed Income,4757.000050614972,98.785,EUR,1.0,0.0,migration_initial,Bobl Tf 0% Ap26 Eur,Bond
+2023-10-01,BUY,AU000000EMR4,Emerald Resources,Equity,8050.847744360903,5.32,AUD,1.0,0.0,migration_initial,Azioni Emerald Resources,Stock
+2023-10-01,BUY,US91324P1021,UnitedHealth Group,Equity,129.59511425189226,278.77,USD,1.0,0.0,migration_initial,Azioni UNH,Stock
+2023-10-01,BUY,US1273871087,Cadence Design Systems,Equity,296.0607175712971,293.49,USD,1.0,0.0,migration_initial,Azioni Cadence,Stock
+2023-10-01,BUY,US5949181045,Microsoft,Equity,186.6669007725494,398.68,USD,1.0,0.0,migration_initial,Azioni Microsoft,Stock
+2023-10-01,BUY,US58733R1023,MercadoLibre,Equity,52.27664957840268,1663.91,USD,1.0,0.0,migration_initial,Azioni MercadoLibre,Stock
+2023-10-01,BUY,US67066G1040,Nvidia,Equity,470.489811402558,184.52,USD,1.0,0.0,migration_initial,Azioni Nvidia,Stock
+2023-10-01,BUY,GB00BJYDH287,WisdomTree Bitcoin ETP,Alternative,28501.000633312226,7.895,EUR,1.0,0.0,migration_initial,Bitcoin,Crypto
+2023-10-01,BUY,GB00BLD4ZM24,WisdomTree Ethereum ETP,Alternative,654.9999999999999,76.34,EUR,1.0,0.0,migration_initial,Ethereum,Crypto
+2023-10-01,BUY,IE00B579F325,iShares Physical Gold,Alternative,600.0,176.78,EUR,1.0,0.0,migration_initial,Oro,Commodity
+2023-10-01,BUY,US37954Y8710,Global X Uranium ETF,Alternative,5045.523756906077,27.15,USD,1.0,0.0,migration_initial,Uranio,Commodity
+2023-10-01,BUY,GB00B15KXQ89,WisdomTree Copper,Alternative,2808.0,35.6,EUR,1.0,0.0,migration_initial,Copper,Commodity
+2023-10-01,BUY,US9123184098,United States Natural Gas Fund,Alternative,6886.666666666667,21.78,USD,1.0,0.0,migration_initial,Gas,Commodity
+2023-10-01,BUY,DE000A1E0HS6,Xtrackers Physical Silver,Alternative,430.0,280.8,EUR,1.0,0.0,migration_initial,Silver,Commodity
+2023-10-01,BUY,IE000M7V94E1,VanEck Uranium & Nuclear,Alternative,2400.0,50.74,EUR,1.0,0.0,migration_initial,Nucl,Commodity
+2023-10-01,BUY,IT0005433690,"BTP 0,25% Mar 2028",Fixed Income,5200.0,86.14,EUR,1.0,0.0,migration_initial,"Btp Tf 0,25% Mz28 Eur",Bond
+2023-10-01,BUY,IT0005436693,"BTP 0,6% Aug 2031",Fixed Income,7000.0,85.83,EUR,1.0,0.0,migration_initial,"Btp Tf 0,6% Ag31 Eur",Bond
+2023-10-01,BUY,AT0000A2HLC4,"Austria 0,85% Jun 2120",Fixed Income,11300.0,39.8,EUR,1.0,0.0,migration_initial,"Austria Tf 0,85% Gn2120 Eur",Bond
+2023-10-01,BUY,IT0005640666,BOT ZC Mar 2026,Fixed Income,5491.0,98.86,EUR,1.0,0.0,migration_initial,BOT Zc Mz26 A Eur,Bond
+2023-10-01,BUY,XS2262211076,Romania 1.375% Dec 2029,Fixed Income,5000.0,89.65,EUR,1.0,0.0,migration_initial,Romania Tf 1.375% Dec.29,Bond
+2023-10-01,BUY,XS2943818059,Iliad Holding 5.375% 2030,Fixed Income,4000.0,102.31,EUR,1.0,0.0,migration_initial,Iliad holding 5.375% 15/04/2030,Bond
+2023-10-01,BUY,AU000XCLWAX7,"Australia 2,75% Nov 2029",Fixed Income,5089.820358649789,94.8,AUD,1.0,0.0,migration_initial,"Australia Tf 2,75% Nv29 Aud",Bond
+2023-10-01,BUY,DE000A2QP4D2,iShares Brazil Govt Bond,Fixed Income,1685.630042758877,107.58,USD,1.0,0.0,migration_initial,iShares Brazil LTN BRL Govt Bond,ETF
+2023-10-01,BUY,NL0011585146,Ferrari,Equity,270.0,327.4,EUR,1.0,0.0,migration_initial,Azioni Ferrari,Stock
+2026-03-14,DEPOSIT,,Riconciliazione cassa (proventi realizzati e dividendi),,1320725.46,1.0,EUR,1.0,0.0,migration_initial,,
