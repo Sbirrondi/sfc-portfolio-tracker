@@ -223,7 +223,10 @@
     "country": "Italy",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
-    "classification": "Governativi Italia"
+    "classification": "Governativi Italia",
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   },
   "DE0001141836": {
     "name": "Bobl 0% Apr 2026",
