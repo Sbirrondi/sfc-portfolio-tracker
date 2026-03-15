@@ -225,8 +225,8 @@
     "macro_class": "Fixed Income",
     "classification": "Governativi Italia",
     "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "maturity_date": "2026-03-01",
+    "rating": "BBB+"
   },
   "DE0001141836": {
     "name": "Bobl 0% Apr 2026",
