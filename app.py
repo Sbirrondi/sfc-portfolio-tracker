@@ -180,7 +180,8 @@ with st.sidebar:
     page = st.radio(
         "Navigazione",
         ["🏠 Dashboard", "📋 Posizioni", "📈 Performance",
-         "📊 Analytics Avanzate", "🎯 Ottimizzazione PTF",
+         "📊 Analytics Avanzate", "🏆 Contribuzione P&L",
+         "🎯 Ottimizzazione PTF",
          "🔬 X-Ray Esposizioni", "💹 Multipli & Fondamentali",
          "📝 Operazioni & Import", "⚙️ Gestione Info Strumenti"],
         label_visibility="collapsed",
@@ -600,18 +601,27 @@ elif page == "📊 Analytics Avanzate":
             fig.add_trace(go.Scatter(
                 x=filtered["date"], y=filtered["nav_base100"],
                 name="SFC Fund", line=dict(color="#6c63ff", width=2.5),
-                fill="tozeroy", fillcolor="rgba(108,99,255,0.08)"))
+                fill="tonexty" if "bench_base100" in filtered.columns else None,
+                fillcolor="rgba(108,99,255,0.08)"))
             if "bench_base100" in filtered.columns:
                 fig.add_trace(go.Scatter(
                     x=filtered["date"], y=filtered["bench_base100"],
                     name="S&P 500 EW", line=dict(color="#00d97e", width=2, dash="dash")))
 
-            # Add zero line
+            # Add reference line at 100
             fig.add_hline(y=100, line=dict(color="gray", width=1, dash="dot"))
+
+            # Smart Y-axis range: pad min/max by 20% of range for readability
+            all_vals = filtered["nav_base100"].dropna().tolist()
+            if "bench_base100" in filtered.columns:
+                all_vals += filtered["bench_base100"].dropna().tolist()
+            y_min, y_max = min(all_vals), max(all_vals)
+            y_pad = max((y_max - y_min) * 0.15, 0.5)
             fig.update_layout(
                 height=450, margin=dict(t=20, b=40, l=50, r=20),
                 template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 yaxis_title="Base 100", hovermode="x unified",
+                yaxis_range=[y_min - y_pad, y_max + y_pad],
                 legend=dict(orientation="h", y=1.08))
             st.plotly_chart(fig, width="stretch")
 
@@ -734,6 +744,161 @@ elif page == "📊 Analytics Avanzate":
                     "text/html")
             else:
                 st.error(report_path)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: CONTRIBUZIONE P&L
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif page == "🏆 Contribuzione P&L":
+    st.markdown('<div class="section-header">Analisi Contribuzione alla Performance</div>', unsafe_allow_html=True)
+
+    if not has_data:
+        st.info("Nessun dato disponibile.")
+        st.stop()
+
+    # ── Contribution by single stock ────────────────────────────────────
+    st.markdown('<div class="section-header">Contributo per Singolo Titolo</div>', unsafe_allow_html=True)
+
+    contrib_pos = positions[["name", "isin", "macro_class", "sector", "invested_capital",
+                              "current_value", "pnl", "pnl_pct"]].copy()
+    contrib_pos["weight_ptf"] = contrib_pos["current_value"] / nav_total
+    # Contribution to portfolio P&L = weight × individual return
+    total_invested = contrib_pos["invested_capital"].sum()
+    contrib_pos["contrib_pnl_pct"] = contrib_pos["pnl"] / total_invested * 100  # contribution in pp
+
+    # Top gainers & losers
+    top_gain = contrib_pos.nlargest(10, "pnl")
+    top_loss = contrib_pos.nsmallest(10, "pnl")
+
+    col_g, col_l = st.columns(2)
+    with col_g:
+        st.markdown("**🟢 Top 10 Contributori Positivi**")
+        fig_g = go.Figure(go.Bar(
+            x=top_gain["pnl"].values,
+            y=top_gain["name"].values,
+            orientation="h", marker_color="#00d97e",
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_gain["pnl"]],
+            textposition="outside"))
+        fig_g.update_layout(
+            height=max(350, len(top_gain) * 35),
+            margin=dict(t=10, b=30, l=180, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_g, width="stretch")
+
+    with col_l:
+        st.markdown("**🔴 Top 10 Contributori Negativi**")
+        fig_l = go.Figure(go.Bar(
+            x=top_loss["pnl"].values,
+            y=top_loss["name"].values,
+            orientation="h", marker_color="#e63757",
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_loss["pnl"]],
+            textposition="outside"))
+        fig_l.update_layout(
+            height=max(350, len(top_loss) * 35),
+            margin=dict(t=10, b=30, l=180, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_l, width="stretch")
+
+    # Full contribution table
+    contrib_table = contrib_pos.sort_values("pnl", ascending=False).copy()
+    contrib_table["pnl_pct_d"] = (contrib_table["pnl_pct"] * 100).round(2)
+    contrib_table["contrib_pnl_pct"] = contrib_table["contrib_pnl_pct"].round(3)
+    contrib_table["weight_ptf_d"] = (contrib_table["weight_ptf"] * 100).round(2)
+    show_contrib = contrib_table[["name", "macro_class", "sector", "invested_capital",
+                                    "current_value", "pnl", "pnl_pct_d", "contrib_pnl_pct", "weight_ptf_d"]].copy()
+    show_contrib.columns = ["Nome", "Classe", "Settore", "Investito", "Controvalore",
+                             "P&L €", "P&L %", "Contrib. PTF (pp)", "Peso PTF %"]
+    show_contrib = format_table_numbers(show_contrib,
+                                         euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(show_contrib, width="stretch", hide_index=True, height=min(600, len(show_contrib) * 38 + 50))
+
+    st.divider()
+
+    # ── Contribution by Sector ──────────────────────────────────────────
+    st.markdown('<div class="section-header">Contributo per Settore</div>', unsafe_allow_html=True)
+
+    by_sector = contrib_pos.groupby("sector").agg(
+        invested=("invested_capital", "sum"),
+        value=("current_value", "sum"),
+        pnl=("pnl", "sum"),
+        positions=("name", "count")
+    ).reset_index()
+    by_sector["pnl_pct"] = ((by_sector["value"] / by_sector["invested"] - 1) * 100).round(2)
+    by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2)
+    by_sector = by_sector.sort_values("pnl", ascending=True)
+
+    colors_s = ["#e63757" if x < 0 else "#00d97e" for x in by_sector["pnl"]]
+    fig_sec = go.Figure(go.Bar(
+        x=by_sector["pnl"].values,
+        y=by_sector["sector"].values,
+        orientation="h", marker_color=colors_s,
+        text=[f"€{x:+,.0f}".replace(",", "'") for x in by_sector["pnl"]],
+        textposition="outside"))
+    fig_sec.update_layout(
+        height=max(400, len(by_sector) * 30),
+        margin=dict(t=10, b=30, l=200, r=80),
+        template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_sec, width="stretch")
+
+    sec_table = by_sector.sort_values("pnl", ascending=False)
+    sec_show = sec_table[["sector", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
+    sec_show.columns = ["Settore", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
+    sec_show = format_table_numbers(sec_show, euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(sec_show, width="stretch", hide_index=True)
+
+    st.divider()
+
+    # ── Contribution by Macro Class ─────────────────────────────────────
+    st.markdown('<div class="section-header">Contributo per Macro Classe</div>', unsafe_allow_html=True)
+
+    by_macro = contrib_pos.groupby("macro_class").agg(
+        invested=("invested_capital", "sum"),
+        value=("current_value", "sum"),
+        pnl=("pnl", "sum"),
+        positions=("name", "count")
+    ).reset_index()
+    by_macro["pnl_pct"] = ((by_macro["value"] / by_macro["invested"] - 1) * 100).round(2)
+    by_macro["weight"] = (by_macro["value"] / nav_total * 100).round(2)
+    # Add liquidità row
+    liq_row = pd.DataFrame([{"macro_class": "Liquidità", "invested": 0, "value": liquidita,
+                              "pnl": 0, "positions": 0, "pnl_pct": 0,
+                              "weight": round(liquidita / nav_total * 100, 2)}])
+    by_macro = pd.concat([by_macro, liq_row], ignore_index=True)
+
+    col_pie, col_bar = st.columns(2)
+    with col_pie:
+        fig_mp = px.pie(by_macro, values="value", names="macro_class", hole=0.5,
+                         color="macro_class",
+                         color_discrete_map={"Equity": "#6c63ff", "Fixed Income": "#00d97e",
+                                             "Alternative": "#ffc107", "Liquidità": "#8892b0"})
+        fig_mp.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
+                              template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                              title="Allocazione per Valore")
+        fig_mp.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
+        st.plotly_chart(fig_mp, width="stretch")
+
+    with col_bar:
+        by_macro_sorted = by_macro[by_macro["macro_class"] != "Liquidità"].sort_values("pnl")
+        colors_m = ["#e63757" if x < 0 else "#00d97e" for x in by_macro_sorted["pnl"]]
+        fig_mb = go.Figure(go.Bar(
+            x=by_macro_sorted["pnl"].values,
+            y=by_macro_sorted["macro_class"].values,
+            orientation="h", marker_color=colors_m,
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in by_macro_sorted["pnl"]],
+            textposition="outside"))
+        fig_mb.update_layout(
+            height=350, margin=dict(t=20, b=30, l=120, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            title="P&L per Macro Classe")
+        st.plotly_chart(fig_mb, width="stretch")
+
+    macro_show = by_macro[["macro_class", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
+    macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
+    macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(macro_show, width="stretch", hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1110,6 +1275,10 @@ elif page == "💹 Multipli & Fondamentali":
 
     if not fundamentals.empty:
         merged = equity_pos.merge(fundamentals, on="isin", how="left", suffixes=("", "_yf"))
+        # Normalize dividend_yield: yfinance sometimes returns it as % (e.g. 2.5) instead of decimal (0.025)
+        if "dividend_yield" in merged.columns:
+            merged["dividend_yield"] = merged["dividend_yield"].apply(
+                lambda x: x / 100 if pd.notna(x) and x > 1 else x)
         total_eq_value = merged["current_value"].sum()
         merged["w"] = merged["current_value"] / total_eq_value
 
@@ -1200,8 +1369,8 @@ elif page == "📝 Operazioni & Import":
         c4.metric("NAV", fmt_eur_full(nav_total))
         st.divider()
 
-    tab_new, tab_view, tab_prices = st.tabs(
-        ["➕ Nuova Operazione", "📋 Registro Operazioni", "🔄 Aggiorna Prezzi"])
+    tab_new, tab_view, tab_prices, tab_manual = st.tabs(
+        ["➕ Nuova Operazione", "📋 Registro Operazioni", "🔄 Aggiorna Prezzi", "✏️ Prezzi Manuali"])
 
     with tab_new:
         st.markdown("Registra una nuova operazione del fondo.")
@@ -1258,7 +1427,17 @@ elif page == "📝 Operazioni & Import":
                         sector=tx_sector,
                         asset_sub_type=tx_asset_sub,
                     )
+                    # Auto-register ISIN in isin_map if new BUY and not yet mapped
+                    if tx_type == "BUY" and tx_isin:
+                        current_map = get_isin_map()
+                        if tx_isin.strip() not in current_map:
+                            current_map[tx_isin.strip()] = None  # Placeholder — user maps ticker later
+                            save_isin_map(current_map)
                     st.success(f"✅ Operazione registrata: {tx_type} {tx_name or 'Cash'}")
+                    if tx_type == "BUY" and tx_isin and tx_isin.strip() not in isin_map:
+                        st.warning(f"⚠️ L'ISIN **{tx_isin}** non ha un ticker Yahoo Finance associato. "
+                                   f"Vai su **Gestione Info Strumenti → Mapping ISIN** per collegarlo, "
+                                   f"oppure usa il tab **Prezzi Manuali** per aggiornare il prezzo.")
                     st.cache_data.clear()
                     st.rerun()
 
@@ -1353,6 +1532,109 @@ elif page == "📝 Operazioni & Import":
             show_price = format_table_numbers(show_price, price_cols=["Prezzo Carico", "Prezzo Attuale"])
             st.dataframe(show_price, width="stretch", hide_index=True)
 
+    with tab_manual:
+        st.markdown("Inserisci manualmente i prezzi per strumenti **non mappati** su Yahoo Finance "
+                     "(es. obbligazioni, fondi, strumenti illiquidi).")
+
+        if has_data:
+            # Show only unmapped or all positions
+            unmapped_pos = positions[positions["isin"].apply(lambda x: not isin_map.get(x))].copy()
+            if unmapped_pos.empty:
+                st.success("✅ Tutti gli strumenti sono mappati su Yahoo Finance.")
+                st.caption("Se vuoi comunque aggiornare un prezzo manualmente, usa la tabella sotto.")
+                target_positions = positions.copy()
+            else:
+                st.warning(f"⚠️ {len(unmapped_pos)} strumenti senza ticker Yahoo Finance:")
+                for _, row in unmapped_pos.iterrows():
+                    st.caption(f"  ❌ {row['name']} ({row['isin']}) — Prezzo attuale: {row['current_price']:.4f}")
+                target_positions = unmapped_pos.copy()
+
+            st.divider()
+            st.markdown("**Aggiorna Prezzo Manuale**")
+
+            with st.form("manual_price_form", clear_on_submit=True):
+                mp_isin = st.selectbox(
+                    "Seleziona strumento",
+                    target_positions["isin"].tolist(),
+                    format_func=lambda x: f"{positions[positions['isin']==x]['name'].iloc[0]} ({x})" if not positions[positions['isin']==x].empty else x)
+                mp_price = st.number_input("Nuovo Prezzo", min_value=0.0, step=0.01,
+                                            help="Inserisci il prezzo corrente dello strumento")
+
+                if st.form_submit_button("💾 Aggiorna Prezzo", width="stretch"):
+                    if mp_isin and mp_price > 0:
+                        fresh_pos = load_positions()
+                        idx = fresh_pos[fresh_pos["isin"] == mp_isin].index
+                        if not idx.empty:
+                            old_price = fresh_pos.loc[idx[0], "current_price"]
+                            fresh_pos.loc[idx, "current_price"] = mp_price
+                            # Recalculate current_value and P&L
+                            for i in idx:
+                                qty = fresh_pos.loc[i, "quantity"]
+                                fx = fresh_pos.loc[i, "fx_rate"] if "fx_rate" in fresh_pos.columns else 1.0
+                                if pd.isna(fx) or fx == 0:
+                                    fx = 1.0
+                                fresh_pos.loc[i, "current_value"] = qty * mp_price * fx
+                                avg_cost = fresh_pos.loc[i, "avg_cost"]
+                                invested = fresh_pos.loc[i, "invested_capital"]
+                                fresh_pos.loc[i, "pnl"] = fresh_pos.loc[i, "current_value"] - invested
+                                if invested > 0:
+                                    fresh_pos.loc[i, "pnl_pct"] = fresh_pos.loc[i, "pnl"] / invested
+                            save_positions(fresh_pos)
+
+                            # Recalculate NAV
+                            cash = compute_cash_from_transactions()
+                            nav = calculate_nav(fresh_pos, cash)
+                            update_fund_info(nav, len(fresh_pos))
+
+                            name = positions[positions["isin"] == mp_isin]["name"].iloc[0]
+                            st.success(f"✅ Prezzo aggiornato: **{name}** — {old_price:.4f} → {mp_price:.4f}")
+                            st.cache_data.clear()
+                            st.rerun()
+                        else:
+                            st.error("Strumento non trovato nelle posizioni.")
+                    else:
+                        st.error("Inserisci un prezzo > 0")
+
+            # Bulk manual price update
+            st.divider()
+            st.markdown("**Aggiornamento Multiplo (CSV)**")
+            st.caption("Carica un CSV con colonne `isin` e `price` per aggiornare più prezzi contemporaneamente.")
+            uploaded_csv = st.file_uploader("Carica CSV prezzi", type=["csv"], key="manual_csv")
+            if uploaded_csv:
+                try:
+                    price_csv = pd.read_csv(uploaded_csv)
+                    if "isin" in price_csv.columns and "price" in price_csv.columns:
+                        fresh_pos = load_positions()
+                        updated_count = 0
+                        for _, row in price_csv.iterrows():
+                            idx = fresh_pos[fresh_pos["isin"] == row["isin"]].index
+                            if not idx.empty and row["price"] > 0:
+                                fresh_pos.loc[idx, "current_price"] = row["price"]
+                                for i in idx:
+                                    qty = fresh_pos.loc[i, "quantity"]
+                                    fx = fresh_pos.loc[i, "fx_rate"] if "fx_rate" in fresh_pos.columns else 1.0
+                                    if pd.isna(fx) or fx == 0:
+                                        fx = 1.0
+                                    fresh_pos.loc[i, "current_value"] = qty * row["price"] * fx
+                                    invested = fresh_pos.loc[i, "invested_capital"]
+                                    fresh_pos.loc[i, "pnl"] = fresh_pos.loc[i, "current_value"] - invested
+                                    if invested > 0:
+                                        fresh_pos.loc[i, "pnl_pct"] = fresh_pos.loc[i, "pnl"] / invested
+                                updated_count += 1
+                        save_positions(fresh_pos)
+                        cash = compute_cash_from_transactions()
+                        nav = calculate_nav(fresh_pos, cash)
+                        update_fund_info(nav, len(fresh_pos))
+                        st.success(f"✅ Aggiornati {updated_count} prezzi. NAV: {fmt_eur_full(nav)}")
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("Il CSV deve contenere le colonne `isin` e `price`.")
+                except Exception as e:
+                    st.error(f"Errore: {e}")
+        else:
+            st.info("Nessuna posizione. Aggiungi prima delle operazioni.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: GESTIONE INFO STRUMENTI
@@ -1407,6 +1689,11 @@ elif page == "⚙️ Gestione Info Strumenti":
 
     with tab_isin:
         st.markdown("**Mapping ISIN → Ticker Yahoo Finance**")
+        st.info("Quando aggiungi una nuova operazione BUY, l'ISIN viene registrato automaticamente. "
+                "Qui devi associare il **ticker Yahoo Finance** (es. AAPL, PRY.MI, ENEL.MI) "
+                "per abilitare l'aggiornamento automatico dei prezzi. "
+                "Per strumenti non presenti su Yahoo Finance (es. obbligazioni), "
+                "usa il tab **Prezzi Manuali** in Operazioni & Import.")
         current_map = get_isin_map()
         unmapped = {k: v for k, v in current_map.items() if v is None and k != "_comment"}
         if unmapped:
