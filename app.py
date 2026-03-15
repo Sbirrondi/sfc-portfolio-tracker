@@ -195,14 +195,20 @@ with st.sidebar:
         st.caption(f"💵 Liquidità: {fmt_eur_full(liquidita)}")
         st.caption(f"📅 Inception: {fund_info.get('inception_date', 'N/A')}")
 
+    # Last update timestamps
+    last_prices = fund_info.get("last_updated", "—")
+    last_manual = fund_info.get("last_manual_update", "—")
+    st.caption(f"📡 Prezzi live: {last_prices}")
+    st.caption(f"✏️ Prezzi manuali: {last_manual}")
+
     # GitHub sync status
     try:
         from github_sync import get_sync_status
         sync = get_sync_status()
         if sync["enabled"]:
-            st.caption(f"☁️ {sync['message']}")
+            st.caption(f"☁️ Sync attivo")
         else:
-            st.caption("⚠️ Dati solo locali (sync non configurato)")
+            st.caption("⚠️ Sync non configurato")
     except Exception:
         pass
 
@@ -1912,10 +1918,13 @@ elif page == "📝 Operazioni & Import":
                                     fresh_pos.loc[i, "pnl_pct"] = fresh_pos.loc[i, "pnl"] / invested
                             save_positions(fresh_pos)
 
-                            # Recalculate NAV
+                            # Recalculate NAV and mark manual update timestamp
                             cash = compute_cash_from_transactions()
                             nav = calculate_nav(fresh_pos, cash)
-                            update_fund_info(nav, len(fresh_pos))
+                            info = update_fund_info(nav, len(fresh_pos))
+                            from datetime import datetime as _dt
+                            info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M")
+                            save_fund_info(info)
 
                             name = positions[positions["isin"] == mp_isin]["name"].iloc[0]
                             st.success(f"✅ Prezzo aggiornato: **{name}** — {old_price:.4f} → {mp_price:.4f}")
@@ -1955,7 +1964,10 @@ elif page == "📝 Operazioni & Import":
                         save_positions(fresh_pos)
                         cash = compute_cash_from_transactions()
                         nav = calculate_nav(fresh_pos, cash)
-                        update_fund_info(nav, len(fresh_pos))
+                        info = update_fund_info(nav, len(fresh_pos))
+                        from datetime import datetime as _dt
+                        info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M")
+                        save_fund_info(info)
                         st.success(f"✅ Aggiornati {updated_count} prezzi. NAV: {fmt_eur_full(nav)}")
                         st.cache_data.clear()
                         st.rerun()
