@@ -236,8 +236,8 @@
     "macro_class": "Fixed Income",
     "classification": "Governativi Germania",
     "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "maturity_date": "2026-04-01",
+    "rating": "AAA"
   },
   "XS2262211076": {
     "name": "Romania 1.375% Dec 2029",
