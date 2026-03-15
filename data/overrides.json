@@ -234,7 +234,10 @@
     "country": "Germany",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
-    "classification": "Governativi Germania"
+    "classification": "Governativi Germania",
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   },
   "XS2262211076": {
     "name": "Romania 1.375% Dec 2029",
