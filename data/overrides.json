@@ -202,9 +202,9 @@
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
     "classification": "Governativi Italia",
-    "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "coupon_rate": 0.6,
+    "maturity_date": "2031-08-01",
+    "rating": "BBB+"
   },
   "AT0000A2HLC4": {
     "name": "Austria 0,85% Jun 2120",
