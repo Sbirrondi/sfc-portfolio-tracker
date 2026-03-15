@@ -256,7 +256,10 @@
     "country": "France",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
-    "classification": "Corporate Iliad"
+    "classification": "Corporate Iliad",
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   },
   "AU000XCLWAX7": {
     "name": "Australia 2,75% Nov 2029",
