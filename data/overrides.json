@@ -257,9 +257,9 @@
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
     "classification": "Corporate Iliad",
-    "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "coupon_rate": 5.375,
+    "maturity_date": "2030-04-15",
+    "rating": "BB-"
   },
   "AU000XCLWAX7": {
     "name": "Australia 2,75% Nov 2029",
