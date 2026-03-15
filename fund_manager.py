@@ -137,6 +137,7 @@ def compute_positions_from_transactions() -> pd.DataFrame:
 
         qty = 0.0
         total_cost_eur = 0.0  # Total invested in EUR
+        total_cost_local = 0.0  # Total cost in local currency (for FX decomposition)
         last_name = ""
         last_macro = ""
         last_currency = "EUR"
@@ -152,21 +153,33 @@ def compute_positions_from_transactions() -> pd.DataFrame:
             fx = row.get("fx_rate", 1.0) or 1.0
 
             if row["transaction_type"] == "BUY":
-                cost_in_eur = row["quantity"] * row["price"]
+                cost_local = row["quantity"] * row["price"]
+                cost_in_eur = cost_local
                 if last_currency != "EUR" and fx != 1.0:
-                    cost_in_eur = cost_in_eur / fx  # Convert to EUR
+                    cost_in_eur = cost_local / fx  # Convert to EUR using trade-date FX
+                total_cost_local += cost_local
                 total_cost_eur += cost_in_eur + (row.get("fees", 0) or 0)
                 qty += row["quantity"]
 
             elif row["transaction_type"] == "SELL":
                 if qty > 0:
                     avg_cost_per_unit = total_cost_eur / qty
+                    avg_cost_local_per_unit = total_cost_local / qty if total_cost_local > 0 else avg_cost_per_unit
                     sell_qty = min(row["quantity"], qty)
                     total_cost_eur -= sell_qty * avg_cost_per_unit
+                    total_cost_local -= sell_qty * avg_cost_local_per_unit
                     qty -= sell_qty
 
         if abs(qty) > 1e-8 and qty > 0:
             avg_cost = total_cost_eur / qty
+            # Compute avg local cost and avg FX for FX decomposition
+            if last_currency != "EUR" and total_cost_local > 0:
+                avg_cost_local = total_cost_local / qty
+                avg_fx = total_cost_eur / total_cost_local  # weighted avg FX at purchase
+            else:
+                avg_cost_local = avg_cost
+                avg_fx = 1.0
+
             positions.append({
                 "isin": isin,
                 "name": last_name,
@@ -175,11 +188,16 @@ def compute_positions_from_transactions() -> pd.DataFrame:
                 "currency": last_currency,
                 "quantity": round(qty, 6),
                 "avg_cost": round(avg_cost, 4),
+                "avg_cost_local": round(avg_cost_local, 4),
+                "avg_fx": round(avg_fx, 6),
                 "invested_capital": round(total_cost_eur, 2),
                 "current_value": 0,  # Will be filled by price update
                 "current_price": 0,
+                "fx_rate_current": avg_fx,
                 "pnl": 0,
                 "pnl_pct": 0,
+                "price_effect": 0,
+                "fx_effect": 0,
                 "weight_on_ptf": 0,
                 "asset_sub_type": last_asset_sub,
             })
@@ -203,7 +221,8 @@ def save_positions(df: pd.DataFrame):
 def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFrame:
     """
     Aggiorna i prezzi correnti delle posizioni usando yfinance.
-    Calcola P&L e pesi.
+    Calcola P&L totale e decompone in effetto prezzo + effetto cambio.
+    Il fondo è denominato in EUR.
     """
     if positions.empty:
         return positions
@@ -213,39 +232,83 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
     df = positions.copy()
 
     # Ensure numeric columns
-    for col in ["quantity", "avg_cost", "invested_capital", "current_value", "current_price", "pnl", "pnl_pct"]:
+    num_cols = ["quantity", "avg_cost", "invested_capital", "current_value",
+                "current_price", "pnl", "pnl_pct"]
+    for col in num_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    # Ensure FX/decomposition columns exist
+    for col in ["avg_cost_local", "avg_fx", "fx_rate_current", "price_effect", "fx_effect"]:
+        if col not in df.columns:
+            df[col] = 1.0 if "fx" in col else 0.0
+
+    df["avg_cost_local"] = pd.to_numeric(df["avg_cost_local"], errors="coerce").fillna(0)
+    df["avg_fx"] = pd.to_numeric(df["avg_fx"], errors="coerce").fillna(1.0)
+    df["avg_fx"] = df["avg_fx"].replace(0.0, 1.0)
+
+    # Fetch FX rates once per currency (avoid repeated API calls)
+    currencies_needed = df[df["currency"] != "EUR"]["currency"].unique()
+    fx_rates = {}
+    for ccy in currencies_needed:
+        try:
+            fx_rates[ccy] = get_fx_rate(ccy, "EUR")
+        except Exception:
+            fx_rates[ccy] = 1.0
 
     for idx, row in df.iterrows():
         isin = row.get("isin", "")
         ticker = isin_map.get(isin)
-        if not ticker:
-            continue
+        currency = row.get("currency", "EUR")
+        qty = float(row["quantity"])
 
-        try:
-            info = get_ticker_info(ticker)
-            live_price = info.get("current_price", 0)
-            if live_price and live_price > 0:
-                currency = row.get("currency", "EUR")
-                qty = row["quantity"]
+        # Get current FX rate
+        fx_now = fx_rates.get(currency, 1.0) if currency != "EUR" else 1.0
+        df.at[idx, "fx_rate_current"] = round(fx_now, 6)
 
-                # Calculate value in EUR
-                if currency != "EUR":
-                    fx_rate = get_fx_rate(currency, "EUR")
-                    value_eur = qty * live_price * fx_rate
+        live_price = None
+        if ticker:
+            try:
+                info = get_ticker_info(ticker)
+                lp = info.get("current_price", 0)
+                if lp and lp > 0:
+                    live_price = lp
                     df.at[idx, "current_price"] = round(live_price, 4)
+            except Exception:
+                pass
+
+        # Use existing price if no live price fetched
+        if live_price is None:
+            live_price = float(row.get("current_price", 0) or 0)
+
+        if live_price > 0:
+            # Current value in EUR
+            value_eur = qty * live_price * fx_now
+            df.at[idx, "current_value"] = round(value_eur, 2)
+
+            invested = float(row["invested_capital"])
+            pnl = value_eur - invested
+            df.at[idx, "pnl"] = round(pnl, 2)
+            df.at[idx, "pnl_pct"] = round(pnl / invested, 6) if invested > 0 else 0
+
+            # Decompose P&L for non-EUR positions:
+            # total_pnl = price_effect + fx_effect
+            # price_effect = qty * (live_price - avg_cost_local) * avg_fx_at_purchase
+            # fx_effect    = qty * live_price * (fx_now - avg_fx_at_purchase)
+            if currency != "EUR":
+                avg_fx_purchase = float(row.get("avg_fx", 1.0) or 1.0)
+                avg_local = float(row.get("avg_cost_local", 0) or 0)
+                if avg_fx_purchase > 0 and avg_local > 0:
+                    p_effect = qty * (live_price - avg_local) * avg_fx_purchase
+                    f_effect = qty * live_price * (fx_now - avg_fx_purchase)
+                    df.at[idx, "price_effect"] = round(p_effect, 2)
+                    df.at[idx, "fx_effect"] = round(f_effect, 2)
                 else:
-                    value_eur = qty * live_price
-                    df.at[idx, "current_price"] = round(live_price, 4)
-
-                df.at[idx, "current_value"] = round(value_eur, 2)
-                invested = row["invested_capital"]
-                pnl = value_eur - invested
-                df.at[idx, "pnl"] = round(pnl, 2)
-                df.at[idx, "pnl_pct"] = round(pnl / invested, 6) if invested > 0 else 0
-        except Exception:
-            pass
+                    df.at[idx, "price_effect"] = round(pnl, 2)
+                    df.at[idx, "fx_effect"] = 0.0
+            else:
+                df.at[idx, "price_effect"] = round(pnl, 2)
+                df.at[idx, "fx_effect"] = 0.0
 
     # Calculate weights
     total_value = df["current_value"].sum()

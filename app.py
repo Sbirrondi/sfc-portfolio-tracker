@@ -343,19 +343,34 @@ elif page == "📋 Posizioni":
         cc.metric("P&L Classe", fmt_eur_full(class_pnl))
         cd.metric("P&L %", f"{class_pnl_pct:+.2f}%")
 
-        display = df[["isin", "name", "sector", "currency", "avg_cost", "current_price",
-                       "invested_capital", "current_value", "pnl", "pnl_pct"]].copy()
+        base_cols = ["isin", "name", "sector", "currency", "avg_cost", "current_price",
+                     "invested_capital", "current_value", "pnl", "pnl_pct"]
+        # Add FX columns if present
+        has_fx_cols = "fx_effect" in df.columns and "price_effect" in df.columns
+        if has_fx_cols:
+            base_cols += ["price_effect", "fx_effect"]
+        display = df[[c for c in base_cols if c in df.columns]].copy()
         # Weight on asset class (not on total ptf)
         display["weight_class"] = (display["current_value"] / class_value * 100).round(2)
         display["pnl_pct_d"] = (display["pnl_pct"] * 100).round(2)
         display = display.sort_values("current_value", ascending=False)
 
-        show = display[["isin", "name", "sector", "currency", "avg_cost", "current_price",
-                         "invested_capital", "current_value", "pnl", "pnl_pct_d", "weight_class"]].copy()
-        show.columns = ["ISIN", "Nome", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
-                         "Investito €", "Controvalore €", "P&L €", "P&L %", f"Peso su {title} %"]
-        show = format_table_numbers(show,
-                                     euro_cols=["Investito €", "Controvalore €", "P&L €"],
+        show_cols = ["isin", "name", "sector", "currency", "avg_cost", "current_price",
+                     "invested_capital", "current_value", "pnl", "pnl_pct_d"]
+        col_names = ["ISIN", "Nome", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
+                      "Investito €", "Controvalore €", "P&L €", "P&L %"]
+        if has_fx_cols:
+            show_cols += ["price_effect", "fx_effect"]
+            col_names += ["Eff. Prezzo €", "Eff. Cambio €"]
+        show_cols.append("weight_class")
+        col_names.append(f"Peso su {title} %")
+
+        show = display[[c for c in show_cols if c in display.columns]].copy()
+        show.columns = col_names
+        fx_euro_cols = ["Investito €", "Controvalore €", "P&L €"]
+        if has_fx_cols:
+            fx_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
+        show = format_table_numbers(show, euro_cols=fx_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
         st.dataframe(show, width="stretch", hide_index=True,
                      height=min(500, len(show) * 38 + 50))
@@ -379,18 +394,32 @@ elif page == "📋 Posizioni":
     st.divider()
     st.markdown('<div class="section-header">Tutte le Posizioni (Peso su Portafoglio)</div>', unsafe_allow_html=True)
 
-    all_disp = positions[["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
-                           "invested_capital", "current_value", "pnl", "pnl_pct"]].copy()
+    all_base_cols = ["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
+                      "invested_capital", "current_value", "pnl", "pnl_pct"]
+    has_fx = "fx_effect" in positions.columns and "price_effect" in positions.columns
+    if has_fx:
+        all_base_cols += ["price_effect", "fx_effect"]
+    all_disp = positions[[c for c in all_base_cols if c in positions.columns]].copy()
     all_disp["weight_ptf"] = (all_disp["current_value"] / nav_total * 100).round(2)
     all_disp["pnl_pct_d"] = (all_disp["pnl_pct"] * 100).round(2)
     all_disp = all_disp.sort_values("current_value", ascending=False)
 
-    show_all = all_disp[["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
-                          "invested_capital", "current_value", "pnl", "pnl_pct_d", "weight_ptf"]].copy()
-    show_all.columns = ["ISIN", "Nome", "Classe", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
-                         "Investito €", "Controvalore €", "P&L €", "P&L %", "Peso PTF %"]
-    show_all = format_table_numbers(show_all,
-                                     euro_cols=["Investito €", "Controvalore €", "P&L €"],
+    all_show_cols = ["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
+                      "invested_capital", "current_value", "pnl", "pnl_pct_d"]
+    all_col_names = ["ISIN", "Nome", "Classe", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
+                      "Investito €", "Controvalore €", "P&L €", "P&L %"]
+    if has_fx:
+        all_show_cols += ["price_effect", "fx_effect"]
+        all_col_names += ["Eff. Prezzo €", "Eff. Cambio €"]
+    all_show_cols.append("weight_ptf")
+    all_col_names.append("Peso PTF %")
+
+    show_all = all_disp[[c for c in all_show_cols if c in all_disp.columns]].copy()
+    show_all.columns = all_col_names
+    all_euro_cols = ["Investito €", "Controvalore €", "P&L €"]
+    if has_fx:
+        all_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
+    show_all = format_table_numbers(show_all, euro_cols=all_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
     st.dataframe(show_all, width="stretch", hide_index=True,
                  height=min(800, len(show_all) * 38 + 50))
@@ -1375,6 +1404,16 @@ elif page == "📝 Operazioni & Import":
     with tab_new:
         st.markdown("Registra una nuova operazione del fondo.")
 
+        # Pre-fetch live FX rates for display
+        from data_fetcher import get_fx_rate
+        _fx_cache = {}
+        def _get_live_fx(ccy):
+            if ccy == "EUR":
+                return 1.0
+            if ccy not in _fx_cache:
+                _fx_cache[ccy] = get_fx_rate(ccy, "EUR")
+            return _fx_cache[ccy]
+
         with st.form("new_transaction", clear_on_submit=True):
             c1, c2 = st.columns(2)
             with c1:
@@ -1392,8 +1431,10 @@ elif page == "📝 Operazioni & Import":
                 tx_price = st.number_input("Prezzo Unitario", min_value=0.0, step=0.01,
                                            help="Per DEPOSIT/WITHDRAWAL: lascia 1.0")
                 tx_currency = st.selectbox("Valuta", ["EUR", "USD", "GBP", "CHF", "AUD", "NOK", "HKD", "BRL"])
-                tx_fx = st.number_input("Cambio FX (vs EUR)", min_value=0.0, value=1.0, step=0.001,
-                                         help="1.0 per EUR. Per USD: inserisci USDEUR rate.")
+                tx_fx_auto = st.checkbox("Cambio FX automatico", value=True,
+                                          help="Scarica il tasso di cambio corrente da Yahoo Finance")
+                tx_fx = st.number_input("Cambio FX manuale (override)", min_value=0.0, value=0.0, step=0.001,
+                                         help="Lascia 0 per usare il cambio automatico. Compila solo se vuoi forzare un tasso specifico.")
 
             c3, c4 = st.columns(2)
             with c3:
@@ -1414,6 +1455,14 @@ elif page == "📝 Operazioni & Import":
                 elif tx_type in ["DEPOSIT", "WITHDRAWAL"] and tx_qty <= 0:
                     st.error("Inserisci un importo > 0")
                 else:
+                    # Resolve FX rate: manual override > auto-fetch > 1.0
+                    if tx_fx > 0:
+                        resolved_fx = tx_fx
+                    elif tx_fx_auto and tx_currency != "EUR":
+                        resolved_fx = _get_live_fx(tx_currency)
+                    else:
+                        resolved_fx = 1.0
+
                     add_transaction(
                         date_str=str(tx_date),
                         transaction_type=tx_type,
@@ -1423,7 +1472,7 @@ elif page == "📝 Operazioni & Import":
                         quantity=tx_qty,
                         price=tx_price if tx_price > 0 else 1.0,
                         currency=tx_currency,
-                        fx_rate=tx_fx,
+                        fx_rate=resolved_fx,
                         fees=tx_fees,
                         notes=tx_notes,
                         sector=tx_sector,
@@ -1437,7 +1486,8 @@ elif page == "📝 Operazioni & Import":
                             ticker_val = tx_ticker.strip() if tx_ticker and tx_ticker.strip() else None
                             current_map[isin_key] = ticker_val
                             save_isin_map(current_map)
-                    st.success(f"✅ Operazione registrata: {tx_type} {tx_name or 'Cash'}")
+                    fx_msg = f" (FX: {resolved_fx:.4f} {tx_currency}/EUR)" if tx_currency != "EUR" else ""
+                    st.success(f"✅ Operazione registrata: {tx_type} {tx_name or 'Cash'}{fx_msg}")
                     if tx_type == "BUY" and tx_isin and not tx_ticker.strip():
                         st.warning(f"⚠️ Non hai inserito il ticker per **{tx_isin}**. "
                                    f"I prezzi non si aggiorneranno automaticamente. "
