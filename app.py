@@ -235,44 +235,32 @@ if page == "🏠 Dashboard":
         st.info("👋 Benvenuto! Vai su **Operazioni & Import** per caricare i dati.")
         st.stop()
 
-    # ── KPI Cards using st.columns + st.metric (no raw HTML) ─────────────
+    # ── KPI Cards ─────────────────────────────────────────────────────
     nav = fund_info.get("current_nav", nav_total)
     inception_perf = fund_info.get("performance_since_inception", total_pnl_pct)
     bench_perf = fund_info.get("benchmark_performance", 0)
     diff_perf = (inception_perf or 0) - (bench_perf or 0)
 
-    k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("NAV Corrente", fmt_eur_full(nav))
-    k2.metric("Perf. Since Inception", fmt_pct(inception_perf))
-    k3.metric("Benchmark (S&P 500 EW)", fmt_pct(bench_perf))
-    k4.metric("Scostamento", fmt_pct(diff_perf))
-    k5.metric("Posizioni Attive", str(len(positions)))
-
-    # ── P&L Breakdown: Unrealized / Realized / Dividends ──────────────
+    # Compute P&L breakdown
     unrealized_total = positions["unrealized_pnl"].sum() if "unrealized_pnl" in positions.columns else total_pnl
     realized_total = positions["realized_pnl"].sum() if "realized_pnl" in positions.columns else 0
     dividends_total = positions["dividends_received"].sum() if "dividends_received" in positions.columns else 0
     total_return_all = unrealized_total + realized_total + dividends_total
+    cash_pct = liquidita / nav_total if nav_total > 0 else 0
 
-    p1, p2, p3, p4 = st.columns(4)
-    p1.metric("P&L Non Realizzato", fmt_eur_full(unrealized_total))
-    p2.metric("P&L Realizzato", fmt_eur_full(realized_total))
-    p3.metric("Dividendi Incassati", fmt_eur_full(dividends_total))
-    p4.metric("Total Return", fmt_eur_full(total_return_all))
+    # Row 1: NAV, Performance, Benchmark, Scostamento
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("NAV Corrente", fmt_eur_full(nav))
+    k2.metric("Performance", fmt_pct(inception_perf))
+    k3.metric("Benchmark", fmt_pct(bench_perf))
+    k4.metric("Scostamento", fmt_pct(diff_perf))
 
-    # ── Cash Drag indicator ───────────────────────────────────────────
-    if liquidita > 0 and nav_total > 0:
-        cash_pct = liquidita / nav_total
-        invested_perf = total_pnl / total_invested if total_invested > 0 else 0
-        # Cash drag = performance loss from holding cash instead of investing
-        # If invested part returned X%, holding cash at 0% cost us: cash_weight * invested_return
-        cash_drag = cash_pct * invested_perf
-        cd1, cd2, cd3 = st.columns(3)
-        cd1.metric("Cash Weight", f"{cash_pct:.1%}")
-        cd2.metric("Perf. Investito", f"{invested_perf:.2%}")
-        cd3.metric("Cash Drag Stimato", f"{cash_drag:+.2%}",
-                    help="Impatto stimato del cash sulla performance totale. "
-                         "Positivo = il cash ha protetto dal ribasso, Negativo = ha penalizzato.")
+    # Row 2: Total Return, P&L breakdown, Cash
+    r1, r2, r3, r4 = st.columns(4)
+    r1.metric("Total Return", fmt_eur_full(total_return_all))
+    r2.metric("di cui Non Realizzato", fmt_eur_full(unrealized_total))
+    r3.metric("di cui Realizzato + Div.", fmt_eur_full(realized_total + dividends_total))
+    r4.metric("Liquidità", f"{fmt_eur_short(liquidita)} ({cash_pct:.0%})")
 
     st.divider()
 
