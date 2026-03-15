@@ -278,7 +278,10 @@
     "country": "Brazil",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
-    "classification": "Governativi Brasile"
+    "classification": "Governativi Brasile",
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   },
   "GB00BJYDH287": {
     "name": "WisdomTree Bitcoin ETP",
