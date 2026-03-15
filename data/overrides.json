@@ -247,8 +247,8 @@
     "macro_class": "Fixed Income",
     "classification": "Governativi Romania",
     "coupon_rate": 1.375,
-    "maturity_date": "",
-    "rating": "NR"
+    "maturity_date": "2029-12-01",
+    "rating": "BBB-"
   },
   "XS2943818059": {
     "name": "Iliad Holding 5.375% 2030",
