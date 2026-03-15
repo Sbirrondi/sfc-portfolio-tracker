@@ -245,7 +245,10 @@
     "country": "Romania",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
-    "classification": "Governativi Romania"
+    "classification": "Governativi Romania",
+    "coupon_rate": 1.375,
+    "maturity_date": "",
+    "rating": "NR"
   },
   "XS2943818059": {
     "name": "Iliad Holding 5.375% 2030",
