@@ -268,9 +268,9 @@
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
     "classification": "Governativi Australia",
-    "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "coupon_rate": 2.75,
+    "maturity_date": "2029-11-01",
+    "rating": "AAA"
   },
   "DE000A2QP4D2": {
     "name": "iShares Brazil Govt Bond",
