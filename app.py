@@ -1383,6 +1383,8 @@ elif page == "📝 Operazioni & Import":
                 tx_date = st.date_input("Data", value=pd.Timestamp.today())
                 tx_isin = st.text_input("ISIN", placeholder="es. US0378331005")
                 tx_name = st.text_input("Nome Strumento", placeholder="es. Apple Inc.")
+                tx_ticker = st.text_input("Ticker Yahoo Finance", placeholder="es. AAPL, ENEL.MI, PRY.MI",
+                                           help="Per aggiornamento prezzi automatico. Lascia vuoto se non presente su Yahoo Finance.")
 
             with c2:
                 tx_qty = st.number_input("Quantità / Importo", min_value=0.0, step=1.0,
@@ -1427,17 +1429,20 @@ elif page == "📝 Operazioni & Import":
                         sector=tx_sector,
                         asset_sub_type=tx_asset_sub,
                     )
-                    # Auto-register ISIN in isin_map if new BUY and not yet mapped
-                    if tx_type == "BUY" and tx_isin:
+                    # Auto-register ISIN → Ticker in isin_map
+                    if tx_type in ["BUY", "SELL"] and tx_isin:
                         current_map = get_isin_map()
-                        if tx_isin.strip() not in current_map:
-                            current_map[tx_isin.strip()] = None  # Placeholder — user maps ticker later
+                        isin_key = tx_isin.strip()
+                        if isin_key not in current_map or not current_map.get(isin_key):
+                            ticker_val = tx_ticker.strip() if tx_ticker and tx_ticker.strip() else None
+                            current_map[isin_key] = ticker_val
                             save_isin_map(current_map)
                     st.success(f"✅ Operazione registrata: {tx_type} {tx_name or 'Cash'}")
-                    if tx_type == "BUY" and tx_isin and tx_isin.strip() not in isin_map:
-                        st.warning(f"⚠️ L'ISIN **{tx_isin}** non ha un ticker Yahoo Finance associato. "
-                                   f"Vai su **Gestione Info Strumenti → Mapping ISIN** per collegarlo, "
-                                   f"oppure usa il tab **Prezzi Manuali** per aggiornare il prezzo.")
+                    if tx_type == "BUY" and tx_isin and not tx_ticker.strip():
+                        st.warning(f"⚠️ Non hai inserito il ticker per **{tx_isin}**. "
+                                   f"I prezzi non si aggiorneranno automaticamente. "
+                                   f"Puoi aggiungerlo dopo in **Gestione Info Strumenti → Mapping ISIN** "
+                                   f"oppure aggiornare il prezzo manualmente nel tab **Prezzi Manuali**.")
                     st.cache_data.clear()
                     st.rerun()
 
