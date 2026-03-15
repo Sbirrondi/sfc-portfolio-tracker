@@ -280,8 +280,8 @@
     "macro_class": "Fixed Income",
     "classification": "Governativi Brasile",
     "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "maturity_date": "2029-01-01",
+    "rating": "BB"
   },
   "GB00BJYDH287": {
     "name": "WisdomTree Bitcoin ETP",
