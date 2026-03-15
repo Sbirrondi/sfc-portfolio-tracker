@@ -181,6 +181,7 @@ with st.sidebar:
         "Navigazione",
         ["🏠 Dashboard", "📋 Posizioni", "📈 Performance",
          "📊 Analytics Avanzate", "🏆 Contribuzione P&L",
+         "🏛️ Analisi Fixed Income",
          "🎯 Ottimizzazione PTF",
          "🔬 X-Ray Esposizioni", "💹 Multipli & Fondamentali",
          "📝 Operazioni & Import", "⚙️ Gestione Info Strumenti"],
@@ -193,6 +194,17 @@ with st.sidebar:
         st.caption(f"💰 NAV: {fmt_eur_full(nav_total)}")
         st.caption(f"💵 Liquidità: {fmt_eur_full(liquidita)}")
         st.caption(f"📅 Inception: {fund_info.get('inception_date', 'N/A')}")
+
+    # GitHub sync status
+    try:
+        from github_sync import get_sync_status
+        sync = get_sync_status()
+        if sync["enabled"]:
+            st.caption(f"☁️ {sync['message']}")
+        else:
+            st.caption("⚠️ Dati solo locali (sync non configurato)")
+    except Exception:
+        pass
 
     if st.button("🔄 Ricarica Dati", width="stretch"):
         st.cache_data.clear()
@@ -235,6 +247,32 @@ if page == "🏠 Dashboard":
     k3.metric("Benchmark (S&P 500 EW)", fmt_pct(bench_perf))
     k4.metric("Scostamento", fmt_pct(diff_perf))
     k5.metric("Posizioni Attive", str(len(positions)))
+
+    # ── P&L Breakdown: Unrealized / Realized / Dividends ──────────────
+    unrealized_total = positions["unrealized_pnl"].sum() if "unrealized_pnl" in positions.columns else total_pnl
+    realized_total = positions["realized_pnl"].sum() if "realized_pnl" in positions.columns else 0
+    dividends_total = positions["dividends_received"].sum() if "dividends_received" in positions.columns else 0
+    total_return_all = unrealized_total + realized_total + dividends_total
+
+    p1, p2, p3, p4 = st.columns(4)
+    p1.metric("P&L Non Realizzato", fmt_eur_full(unrealized_total))
+    p2.metric("P&L Realizzato", fmt_eur_full(realized_total))
+    p3.metric("Dividendi Incassati", fmt_eur_full(dividends_total))
+    p4.metric("Total Return", fmt_eur_full(total_return_all))
+
+    # ── Cash Drag indicator ───────────────────────────────────────────
+    if liquidita > 0 and nav_total > 0:
+        cash_pct = liquidita / nav_total
+        invested_perf = total_pnl / total_invested if total_invested > 0 else 0
+        # Cash drag = performance loss from holding cash instead of investing
+        # If invested part returned X%, holding cash at 0% cost us: cash_weight * invested_return
+        cash_drag = cash_pct * invested_perf
+        cd1, cd2, cd3 = st.columns(3)
+        cd1.metric("Cash Weight", f"{cash_pct:.1%}")
+        cd2.metric("Perf. Investito", f"{invested_perf:.2%}")
+        cd3.metric("Cash Drag Stimato", f"{cash_drag:+.2%}",
+                    help="Impatto stimato del cash sulla performance totale. "
+                         "Positivo = il cash ha protetto dal ribasso, Negativo = ha penalizzato.")
 
     st.divider()
 
@@ -928,6 +966,256 @@ elif page == "🏆 Contribuzione P&L":
     macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
     macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
     st.dataframe(macro_show, width="stretch", hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: ANALISI FIXED INCOME
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif page == "🏛️ Analisi Fixed Income":
+    st.markdown('<div class="section-header">Analisi Portafoglio Fixed Income</div>', unsafe_allow_html=True)
+
+    if not has_data:
+        st.info("Nessun dato disponibile.")
+        st.stop()
+
+    fi_positions = positions[positions["macro_class"] == "Fixed Income"].copy()
+    if fi_positions.empty:
+        st.warning("Nessuna posizione Fixed Income nel portafoglio.")
+        st.stop()
+
+    fi_value = fi_positions["current_value"].sum()
+    fi_invested = fi_positions["invested_capital"].sum()
+    fi_pnl = fi_value - fi_invested
+    fi_weight = fi_value / nav_total * 100
+
+    # ── KPIs ──────────────────────────────────────────────────────────
+    f1, f2, f3, f4, f5 = st.columns(5)
+    f1.metric("Valore FI", fmt_eur_full(fi_value))
+    f2.metric("Peso su NAV", f"{fi_weight:.1f}%")
+    f3.metric("Posizioni", str(len(fi_positions)))
+    f4.metric("P&L", fmt_eur_full(fi_pnl))
+    f5.metric("P&L %", f"{fi_pnl/fi_invested*100:+.2f}%" if fi_invested > 0 else "N/A")
+
+    st.divider()
+
+    # ── Manual bond data input ────────────────────────────────────────
+    st.markdown('<div class="section-header">Dati Obbligazionari</div>', unsafe_allow_html=True)
+    st.info("Inserisci cedola (%), scadenza e rating per ogni bond. "
+            "Questi dati permettono di calcolare duration, YTM e analisi di sensitivity.")
+
+    # Load bond metadata from overrides
+    bond_data = []
+    for _, row in fi_positions.iterrows():
+        isin = row["isin"]
+        ov = overrides.get(isin, {})
+        bond_data.append({
+            "ISIN": isin,
+            "Nome": row["name"],
+            "Cedola %": ov.get("coupon_rate", 0.0),
+            "Scadenza": ov.get("maturity_date", ""),
+            "Rating": ov.get("rating", "NR"),
+            "Prezzo": row["current_price"],
+            "Quantità": row["quantity"],
+            "Controvalore €": row["current_value"],
+        })
+    bond_df = pd.DataFrame(bond_data)
+
+    # Editable form for bond-specific data
+    with st.expander("✏️ Modifica dati obbligazionari", expanded=False):
+        with st.form("bond_data_form"):
+            bond_isin = st.selectbox("Seleziona bond",
+                                      fi_positions["isin"].tolist(),
+                                      format_func=lambda x: f"{fi_positions[fi_positions['isin']==x]['name'].iloc[0]} ({x})")
+            bc1, bc2, bc3 = st.columns(3)
+            with bc1:
+                coupon = st.number_input("Cedola annuale (%)", min_value=0.0, max_value=20.0, step=0.125,
+                                          value=float(overrides.get(bond_isin, {}).get("coupon_rate", 0.0)))
+            with bc2:
+                maturity = st.text_input("Data scadenza (YYYY-MM-DD)",
+                                          value=overrides.get(bond_isin, {}).get("maturity_date", ""))
+            with bc3:
+                rating = st.text_input("Rating (es. BBB+, A-)",
+                                        value=overrides.get(bond_isin, {}).get("rating", "NR"))
+
+            if st.form_submit_button("💾 Salva", width="stretch"):
+                current_ov = get_overrides()
+                if bond_isin not in current_ov:
+                    current_ov[bond_isin] = {}
+                current_ov[bond_isin]["coupon_rate"] = coupon
+                current_ov[bond_isin]["maturity_date"] = maturity
+                current_ov[bond_isin]["rating"] = rating
+                save_overrides(current_ov)
+                st.success(f"✅ Dati aggiornati per {bond_isin}")
+                st.cache_data.clear()
+                st.rerun()
+
+    # ── Bond analysis table ───────────────────────────────────────────
+    st.markdown('<div class="section-header">Analisi Posizioni Fixed Income</div>', unsafe_allow_html=True)
+
+    from datetime import datetime as dt
+    today = dt.now()
+
+    analysis_rows = []
+    total_weighted_duration = 0
+    total_weighted_ytm = 0
+    total_weighted_coupon = 0
+
+    for _, row in fi_positions.iterrows():
+        isin = row["isin"]
+        ov = overrides.get(isin, {})
+        coupon_rate = float(ov.get("coupon_rate", 0))
+        maturity_str = ov.get("maturity_date", "")
+        rating = ov.get("rating", "NR")
+        price = float(row["current_price"])
+        qty = float(row["quantity"])
+        value = float(row["current_value"])
+
+        years_to_maturity = None
+        ytm = None
+        modified_duration = None
+        annual_income = 0
+
+        if maturity_str:
+            try:
+                mat_date = dt.strptime(maturity_str, "%Y-%m-%d")
+                years_to_maturity = max((mat_date - today).days / 365.25, 0.01)
+            except Exception:
+                years_to_maturity = None
+
+        if years_to_maturity and price > 0:
+            face_value = 100  # Standard bond face value
+
+            # Annual coupon income (EUR)
+            annual_income = qty * face_value * coupon_rate / 100
+
+            # Approximate YTM: (coupon + (face - price) / years) / ((face + price) / 2)
+            coupon_payment = face_value * coupon_rate / 100
+            ytm = (coupon_payment + (face_value - price) / years_to_maturity) / ((face_value + price) / 2)
+
+            # Macaulay Duration (simplified for annual coupon bond)
+            if ytm and ytm > -0.99:
+                y = ytm
+                n = years_to_maturity
+                c = coupon_rate / 100
+                if abs(y) > 1e-6:
+                    mac_dur = ((1 + y) / y) - ((1 + y + n * (c - y)) / (c * ((1 + y)**n - 1) + y))
+                    # Clamp to reasonable range
+                    mac_dur = max(0, min(mac_dur, years_to_maturity))
+                else:
+                    mac_dur = years_to_maturity * 0.9  # Zero coupon approximation
+                modified_duration = mac_dur / (1 + y)
+            else:
+                modified_duration = years_to_maturity * 0.9
+
+            # Accumulate for weighted averages
+            weight = value / fi_value if fi_value > 0 else 0
+            if modified_duration:
+                total_weighted_duration += modified_duration * weight
+            if ytm:
+                total_weighted_ytm += ytm * weight
+            total_weighted_coupon += (coupon_rate / 100) * weight
+
+        analysis_rows.append({
+            "Nome": row["name"],
+            "ISIN": isin,
+            "Rating": rating,
+            "Cedola %": f"{coupon_rate:.3f}" if coupon_rate else "N/A",
+            "Scadenza": maturity_str or "N/A",
+            "Anni a Scad.": f"{years_to_maturity:.1f}" if years_to_maturity else "N/A",
+            "Prezzo": f"{price:.2f}" if price else "N/A",
+            "YTM": f"{ytm:.2%}" if ytm else "N/A",
+            "Mod. Duration": f"{modified_duration:.2f}" if modified_duration else "N/A",
+            "Reddito Ann. €": fmt_eur_full(annual_income) if annual_income else "N/A",
+            "Controvalore €": fmt_eur_full(value),
+            "Peso FI %": f"{value/fi_value*100:.1f}" if fi_value > 0 else "N/A",
+        })
+
+    # Portfolio-level FI metrics
+    st.markdown('<div class="section-header">Metriche Aggregate Fixed Income</div>', unsafe_allow_html=True)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Duration Media (mod.)", f"{total_weighted_duration:.2f}" if total_weighted_duration else "N/A",
+              help="Duration modificata media ponderata. Misura la sensibilità del portafoglio FI ai tassi.")
+    m2.metric("YTM Medio", f"{total_weighted_ytm:.2%}" if total_weighted_ytm else "N/A",
+              help="Yield to Maturity medio ponderato del portafoglio FI.")
+    m3.metric("Cedola Media", f"{total_weighted_coupon:.2%}" if total_weighted_coupon else "N/A")
+    total_annual_income = 0
+    for _, row in fi_positions.iterrows():
+        ov = overrides.get(row["isin"], {})
+        c = float(ov.get("coupon_rate", 0))
+        total_annual_income += float(row["quantity"]) * 100 * c / 100
+    m4.metric("Reddito Annuo Stimato", fmt_eur_full(total_annual_income))
+
+    # Detail table
+    if analysis_rows:
+        st.dataframe(pd.DataFrame(analysis_rows), width="stretch", hide_index=True,
+                     height=min(500, len(analysis_rows) * 38 + 50))
+
+    # ── Interest Rate Sensitivity ─────────────────────────────────────
+    if total_weighted_duration > 0:
+        st.divider()
+        st.markdown('<div class="section-header">Sensitivity ai Tassi di Interesse</div>', unsafe_allow_html=True)
+        st.caption("Impatto stimato sul valore del portafoglio FI per variazione dei tassi.")
+
+        rate_changes = [-1.00, -0.75, -0.50, -0.25, -0.10, 0, 0.10, 0.25, 0.50, 0.75, 1.00]
+        impacts = []
+        for dr in rate_changes:
+            # ΔValue ≈ -Duration × ΔRate × Value
+            dv = -total_weighted_duration * (dr / 100) * fi_value
+            new_val = fi_value + dv
+            impacts.append({
+                "Variazione Tassi (bp)": f"{dr*100:+.0f}",
+                "Impatto €": dv,
+                "Nuovo Valore FI": new_val,
+                "Impatto %": dv / fi_value * 100 if fi_value else 0,
+            })
+
+        impact_df = pd.DataFrame(impacts)
+
+        # Bar chart of impacts
+        colors = ["#00d97e" if x >= 0 else "#e63757" for x in impact_df["Impatto €"]]
+        fig_sens = go.Figure(go.Bar(
+            x=[f"{r*100:+.0f}bp" for r in rate_changes],
+            y=impact_df["Impatto €"].values,
+            marker_color=colors,
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in impact_df["Impatto €"]],
+            textposition="outside"))
+        fig_sens.update_layout(
+            height=400, margin=dict(t=20, b=40, l=60, r=20),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Variazione Tassi", yaxis_title="Impatto sul Valore FI (€)")
+        st.plotly_chart(fig_sens, width="stretch")
+
+        # Table
+        show_impact = impact_df.copy()
+        show_impact["Impatto €"] = show_impact["Impatto €"].apply(lambda x: f"€{x:+,.0f}".replace(",", "'"))
+        show_impact["Nuovo Valore FI"] = show_impact["Nuovo Valore FI"].apply(lambda x: fmt_eur_full(x))
+        show_impact["Impatto %"] = show_impact["Impatto %"].apply(lambda x: f"{x:+.2f}%")
+        st.dataframe(show_impact, width="stretch", hide_index=True)
+
+    # ── Rating Distribution ───────────────────────────────────────────
+    st.divider()
+    st.markdown('<div class="section-header">Distribuzione per Rating</div>', unsafe_allow_html=True)
+    rating_data = []
+    for _, row in fi_positions.iterrows():
+        ov = overrides.get(row["isin"], {})
+        rating_data.append({
+            "rating": ov.get("rating", "NR"),
+            "value": row["current_value"]
+        })
+    rating_df = pd.DataFrame(rating_data)
+    if not rating_df.empty:
+        by_rating = rating_df.groupby("rating")["value"].sum().reset_index()
+        by_rating["pct"] = (by_rating["value"] / fi_value * 100).round(1)
+        by_rating = by_rating.sort_values("value", ascending=False)
+
+        fig_rat = px.pie(by_rating, values="value", names="rating", hole=0.4,
+                          color_discrete_sequence=px.colors.qualitative.Set2)
+        fig_rat.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
+                               template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                               title="Distribuzione per Rating")
+        fig_rat.update_traces(textposition="inside", textinfo="percent+label")
+        st.plotly_chart(fig_rat, width="stretch")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

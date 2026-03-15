@@ -29,6 +29,16 @@ def ensure_data_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _sync_to_github(filename: str, message: str = None):
+    """Sync a data file to GitHub (non-blocking, fails silently)."""
+    try:
+        from github_sync import sync_data_file, is_enabled
+        if is_enabled():
+            sync_data_file(filename, message)
+    except Exception:
+        pass  # Never break the app for sync issues
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # TRANSACTIONS
 # ══════════════════════════════════════════════════════════════════════════════
@@ -51,6 +61,7 @@ def save_transactions(df: pd.DataFrame):
     """Salva le transazioni su CSV."""
     ensure_data_dir()
     df.to_csv(TRANSACTIONS_FILE, index=False)
+    _sync_to_github("fund_transactions.csv", "Update transactions")
 
 
 def add_transaction(
@@ -120,31 +131,38 @@ def compute_positions_from_transactions() -> pd.DataFrame:
     """
     Calcola le posizioni correnti dal registro transazioni.
     Usa il metodo del costo medio ponderato (weighted average cost).
+    Traccia anche: dividendi ricevuti, P&L realizzato, total return.
     """
     df = load_transactions()
     if df.empty:
         return pd.DataFrame()
 
-    trades = df[df["transaction_type"].isin(["BUY", "SELL"])].copy()
-    if trades.empty:
+    # Get all ISINs from trades AND dividends
+    relevant = df[df["transaction_type"].isin(["BUY", "SELL", "DIVIDEND"])].copy()
+    if relevant.empty:
         return pd.DataFrame()
 
+    all_isins = relevant["isin"].dropna().unique()
+
     positions = []
-    for isin in trades["isin"].unique():
+    for isin in all_isins:
         if not isin:
             continue
-        isin_trades = trades[trades["isin"] == isin].sort_values("date")
+        isin_tx = df[df["isin"] == isin].sort_values("date")
 
         qty = 0.0
-        total_cost_eur = 0.0  # Total invested in EUR
-        total_cost_local = 0.0  # Total cost in local currency (for FX decomposition)
+        total_cost_eur = 0.0
+        total_cost_local = 0.0
+        realized_pnl = 0.0
+        dividends_received = 0.0
         last_name = ""
         last_macro = ""
         last_currency = "EUR"
         last_sector = ""
         last_asset_sub = "Stock"
 
-        for _, row in isin_trades.iterrows():
+        for _, row in isin_tx.iterrows():
+            tx_type = row.get("transaction_type", "")
             last_name = row.get("name", "") or last_name
             last_macro = row.get("macro_class", "") or last_macro
             last_currency = row.get("currency", "EUR") or last_currency
@@ -152,30 +170,44 @@ def compute_positions_from_transactions() -> pd.DataFrame:
             last_asset_sub = row.get("asset_sub_type", "Stock") or last_asset_sub
             fx = row.get("fx_rate", 1.0) or 1.0
 
-            if row["transaction_type"] == "BUY":
+            if tx_type == "BUY":
                 cost_local = row["quantity"] * row["price"]
                 cost_in_eur = cost_local
                 if last_currency != "EUR" and fx != 1.0:
-                    cost_in_eur = cost_local / fx  # Convert to EUR using trade-date FX
+                    cost_in_eur = cost_local / fx
                 total_cost_local += cost_local
                 total_cost_eur += cost_in_eur + (row.get("fees", 0) or 0)
                 qty += row["quantity"]
 
-            elif row["transaction_type"] == "SELL":
+            elif tx_type == "SELL":
                 if qty > 0:
                     avg_cost_per_unit = total_cost_eur / qty
                     avg_cost_local_per_unit = total_cost_local / qty if total_cost_local > 0 else avg_cost_per_unit
                     sell_qty = min(row["quantity"], qty)
+
+                    # Calculate realized P&L on this sale
+                    sell_proceeds_local = sell_qty * row["price"]
+                    sell_proceeds_eur = sell_proceeds_local
+                    if last_currency != "EUR" and fx != 1.0:
+                        sell_proceeds_eur = sell_proceeds_local / fx
+                    sell_proceeds_eur -= (row.get("fees", 0) or 0)
+                    realized_pnl += sell_proceeds_eur - (sell_qty * avg_cost_per_unit)
+
                     total_cost_eur -= sell_qty * avg_cost_per_unit
                     total_cost_local -= sell_qty * avg_cost_local_per_unit
                     qty -= sell_qty
 
+            elif tx_type == "DIVIDEND":
+                div_amount = row["quantity"] * (row["price"] if row["price"] > 0 else 1.0)
+                if last_currency != "EUR" and fx != 1.0:
+                    div_amount = div_amount / fx
+                dividends_received += div_amount
+
         if abs(qty) > 1e-8 and qty > 0:
             avg_cost = total_cost_eur / qty
-            # Compute avg local cost and avg FX for FX decomposition
             if last_currency != "EUR" and total_cost_local > 0:
                 avg_cost_local = total_cost_local / qty
-                avg_fx = total_cost_eur / total_cost_local  # weighted avg FX at purchase
+                avg_fx = total_cost_eur / total_cost_local
             else:
                 avg_cost_local = avg_cost
                 avg_fx = 1.0
@@ -191,11 +223,15 @@ def compute_positions_from_transactions() -> pd.DataFrame:
                 "avg_cost_local": round(avg_cost_local, 4),
                 "avg_fx": round(avg_fx, 6),
                 "invested_capital": round(total_cost_eur, 2),
-                "current_value": 0,  # Will be filled by price update
+                "current_value": 0,
                 "current_price": 0,
                 "fx_rate_current": avg_fx,
                 "pnl": 0,
                 "pnl_pct": 0,
+                "unrealized_pnl": 0,
+                "realized_pnl": round(realized_pnl, 2),
+                "dividends_received": round(dividends_received, 2),
+                "total_return": 0,  # unrealized + realized + dividends
                 "price_effect": 0,
                 "fx_effect": 0,
                 "weight_on_ptf": 0,
@@ -216,6 +252,7 @@ def save_positions(df: pd.DataFrame):
     """Salva le posizioni su file CSV."""
     ensure_data_dir()
     df.to_csv(POSITIONS_FILE, index=False)
+    _sync_to_github("fund_positions.csv", "Update positions")
 
 
 def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFrame:
@@ -287,12 +324,19 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
             df.at[idx, "current_value"] = round(value_eur, 2)
 
             invested = float(row["invested_capital"])
-            pnl = value_eur - invested
-            df.at[idx, "pnl"] = round(pnl, 2)
-            df.at[idx, "pnl_pct"] = round(pnl / invested, 6) if invested > 0 else 0
+            unrealized = value_eur - invested
+            df.at[idx, "pnl"] = round(unrealized, 2)
+            df.at[idx, "unrealized_pnl"] = round(unrealized, 2)
+            df.at[idx, "pnl_pct"] = round(unrealized / invested, 6) if invested > 0 else 0
 
-            # Decompose P&L for non-EUR positions:
-            # total_pnl = price_effect + fx_effect
+            # Total return = unrealized + realized + dividends
+            realized = float(row.get("realized_pnl", 0) or 0)
+            dividends = float(row.get("dividends_received", 0) or 0)
+            total_ret = unrealized + realized + dividends
+            df.at[idx, "total_return"] = round(total_ret, 2)
+
+            # Decompose unrealized P&L for non-EUR positions:
+            # unrealized_pnl = price_effect + fx_effect
             # price_effect = qty * (live_price - avg_cost_local) * avg_fx_at_purchase
             # fx_effect    = qty * live_price * (fx_now - avg_fx_at_purchase)
             if currency != "EUR":
@@ -304,10 +348,10 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
                     df.at[idx, "price_effect"] = round(p_effect, 2)
                     df.at[idx, "fx_effect"] = round(f_effect, 2)
                 else:
-                    df.at[idx, "price_effect"] = round(pnl, 2)
+                    df.at[idx, "price_effect"] = round(unrealized, 2)
                     df.at[idx, "fx_effect"] = 0.0
             else:
-                df.at[idx, "price_effect"] = round(pnl, 2)
+                df.at[idx, "price_effect"] = round(unrealized, 2)
                 df.at[idx, "fx_effect"] = 0.0
 
     # Calculate weights
@@ -335,6 +379,7 @@ def save_cash(cash_data: dict):
     ensure_data_dir()
     with open(CASH_FILE, "w") as f:
         json.dump(cash_data, f, indent=2, default=str)
+    _sync_to_github("fund_cash.json", "Update cash")
 
 
 def compute_cash_from_transactions() -> float:
@@ -417,6 +462,7 @@ def snapshot_nav(nav: float, benchmark_value: float = None):
 
     history = history.sort_values("date").reset_index(drop=True)
     history.to_csv(NAV_HISTORY_FILE, index=False)
+    _sync_to_github("fund_nav_history.csv", "Update NAV history")
     return history
 
 
@@ -451,6 +497,7 @@ def save_fund_info(info: dict):
     ensure_data_dir()
     with open(FUND_INFO_FILE, "w") as f:
         json.dump(info, f, indent=2, default=str)
+    _sync_to_github("fund_info.json", "Update fund info")
 
 
 def update_fund_info(nav: float, positions_count: int):
@@ -483,6 +530,7 @@ def save_isin_map(isin_map: dict):
     ensure_data_dir()
     with open(ISIN_MAP_FILE, "w") as f:
         json.dump(isin_map, f, indent=4)
+    _sync_to_github("isin_map.json", "Update ISIN mapping")
 
 
 def get_overrides() -> dict:
@@ -498,6 +546,7 @@ def save_overrides(overrides: dict):
     ensure_data_dir()
     with open(OVERRIDES_FILE, "w") as f:
         json.dump(overrides, f, indent=2, ensure_ascii=False)
+    _sync_to_github("overrides.json", "Update overrides")
 
 
 def enrich_positions(pos_df: pd.DataFrame, overrides: dict) -> pd.DataFrame:
