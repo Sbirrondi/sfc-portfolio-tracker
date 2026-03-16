@@ -1726,7 +1726,7 @@ elif page == "📝 Operazioni & Import":
                                           help="Per BUY/SELL: numero di titoli. Per DEPOSIT/WITHDRAWAL: importo €.")
                 tx_price = st.number_input("Prezzo Unitario", min_value=0.0, step=0.01,
                                            help="Per DEPOSIT/WITHDRAWAL: lascia 1.0")
-                tx_currency = st.selectbox("Valuta", ["EUR", "USD", "GBP", "CHF", "AUD", "NOK", "HKD", "BRL"])
+                tx_currency = st.selectbox("Valuta", ["EUR", "USD", "GBP", "CHF", "JPY", "AUD", "CAD", "NOK", "SEK", "DKK", "HKD", "SGD", "NZD", "BRL", "ZAR", "PLN", "CZK", "TRY"])
                 tx_fx_auto = st.checkbox("Cambio FX automatico", value=True,
                                           help="Scarica il tasso di cambio corrente da Yahoo Finance")
                 tx_fx = st.number_input("Cambio FX manuale (override)", min_value=0.0, value=0.0, step=0.001,
@@ -1880,7 +1880,7 @@ elif page == "📝 Operazioni & Import":
                     sum_cols[3].markdown(f"**Prezzo:** {row['price']}")
 
                 tx_types = ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"]
-                currencies = ["EUR", "USD", "GBP", "CHF", "JPY"]
+                currencies = ["EUR", "USD", "GBP", "CHF", "JPY", "AUD", "CAD", "NOK", "SEK", "DKK", "HKD", "SGD", "NZD", "BRL", "ZAR", "PLN", "CZK", "TRY"]
 
                 with st.form(f"edit_transaction_form{k}", clear_on_submit=False):
                     ec1, ec2 = st.columns(2)
