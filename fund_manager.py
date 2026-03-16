@@ -193,7 +193,7 @@ def compute_positions_from_transactions() -> pd.DataFrame:
             if tx_type == "BUY":
                 cost_local = row["quantity"] * row["price"]
                 cost_in_eur = cost_local
-                if last_currency != "EUR" and fx != 1.0:
+                if last_currency != "EUR" and fx > 0:
                     cost_in_eur = cost_local / fx
                 total_cost_local += cost_local
                 total_cost_eur += cost_in_eur + (row.get("fees", 0) or 0)
@@ -208,7 +208,7 @@ def compute_positions_from_transactions() -> pd.DataFrame:
                     # Calculate realized P&L on this sale
                     sell_proceeds_local = sell_qty * row["price"]
                     sell_proceeds_eur = sell_proceeds_local
-                    if last_currency != "EUR" and fx != 1.0:
+                    if last_currency != "EUR" and fx > 0:
                         sell_proceeds_eur = sell_proceeds_local / fx
                     sell_proceeds_eur -= (row.get("fees", 0) or 0)
                     realized_pnl += sell_proceeds_eur - (sell_qty * avg_cost_per_unit)
@@ -219,7 +219,7 @@ def compute_positions_from_transactions() -> pd.DataFrame:
 
             elif tx_type == "DIVIDEND":
                 div_amount = row["quantity"] * (row["price"] if row["price"] > 0 else 1.0)
-                if last_currency != "EUR" and fx != 1.0:
+                if last_currency != "EUR" and fx > 0 and fx != 1.0:
                     div_amount = div_amount / fx
                 dividends_received += div_amount
 

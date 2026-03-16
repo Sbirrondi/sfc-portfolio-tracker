@@ -327,13 +327,23 @@ if page == "🏠 Dashboard":
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
-                                  line=dict(color="#6c63ff", width=3), fill="tozeroy", fillcolor="rgba(108,99,255,0.1)"))
+                                  line=dict(color="#6c63ff", width=3)))
         if "bench_index" in nav_df.columns:
             fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["bench_index"], name="S&P 500 EW",
                                       line=dict(color="#00d97e", width=2, dash="dash")))
+        # Auto-scale Y axis to data range
+        all_nav_vals = nav_df["nav_index"].dropna().tolist()
+        if "bench_index" in nav_df.columns:
+            all_nav_vals += nav_df["bench_index"].dropna().tolist()
+        if all_nav_vals:
+            y_min, y_max = min(all_nav_vals), max(all_nav_vals)
+            y_pad = max((y_max - y_min) * 0.15, 0.5)
+        else:
+            y_min, y_max, y_pad = 95, 105, 1
         fig.update_layout(height=400, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
                           plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                          yaxis_title="Base 100", hovermode="x unified", legend=dict(orientation="h", y=1.08))
+                          yaxis_title="Base 100", yaxis_range=[y_min - y_pad, y_max + y_pad],
+                          hovermode="x unified", legend=dict(orientation="h", y=1.08))
         st.plotly_chart(fig, width="stretch")
 
     # ── Top 10 Holdings ──────────────────────────────────────────────────
