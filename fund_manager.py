@@ -457,6 +457,14 @@ def snapshot_nav(nav: float, benchmark_value: float = None):
     """Salva un punto NAV nello storico."""
     ensure_data_dir()
 
+    # Sanity check: NAV should be within reasonable range (50% to 500% of initial)
+    fund_info = load_fund_info()
+    initial_nav = fund_info.get("initial_nav", 10_000_000)
+    if initial_nav > 0:
+        ratio = nav / initial_nav
+        if ratio > 5.0 or ratio < 0.1 or nav <= 0:
+            return None  # Reject obviously wrong NAV values
+
     today = datetime.now().strftime("%Y-%m-%d")
 
     # Load existing history
@@ -620,17 +628,46 @@ def recalculate_all():
 
     # Save positions (prices will be updated separately via live fetch)
     if not positions.empty:
-        # Merge with existing positions to preserve current_price/current_value
-        # if they were already fetched
+        # Merge with existing positions to preserve current_price
+        # (current_value/pnl will be recalculated from current_price + new position data)
         existing = load_positions()
         if not existing.empty:
-            price_cols = ["current_price", "current_value", "pnl", "pnl_pct"]
-            existing_prices = existing[["isin"] + [c for c in price_cols if c in existing.columns]]
-            positions = positions.drop(columns=[c for c in price_cols if c in positions.columns], errors="ignore")
+            # Only preserve current_price and fx_rate_current from old positions
+            preserve_cols = ["current_price", "fx_rate_current"]
+            existing_prices = existing[["isin"] + [c for c in preserve_cols if c in existing.columns]].copy()
+            # Rename to avoid conflicts
+            existing_prices = existing_prices.rename(columns={
+                "current_price": "_old_current_price",
+                "fx_rate_current": "_old_fx_rate_current",
+            })
             positions = positions.merge(existing_prices, on="isin", how="left")
-            for col in price_cols:
-                if col in positions.columns:
-                    positions[col] = pd.to_numeric(positions[col], errors="coerce").fillna(0)
+
+            # Use old current_price if we don't have a new one
+            if "_old_current_price" in positions.columns:
+                old_price = pd.to_numeric(positions["_old_current_price"], errors="coerce").fillna(0)
+                positions["current_price"] = old_price
+                positions.drop(columns=["_old_current_price"], inplace=True)
+            if "_old_fx_rate_current" in positions.columns:
+                old_fx = pd.to_numeric(positions["_old_fx_rate_current"], errors="coerce").fillna(1.0)
+                old_fx = old_fx.replace(0.0, 1.0)
+                positions["fx_rate_current"] = old_fx
+                positions.drop(columns=["_old_fx_rate_current"], inplace=True)
+
+            # Recalculate current_value and P&L from current_price + new position data
+            for idx, row in positions.iterrows():
+                cp = float(row.get("current_price", 0) or 0)
+                qty = float(row.get("quantity", 0) or 0)
+                ccy = row.get("currency", "EUR")
+                fx_now = float(row.get("fx_rate_current", 1.0) or 1.0)
+
+                if cp > 0 and qty > 0:
+                    value_eur = qty * cp * fx_now
+                    invested = float(row.get("invested_capital", 0) or 0)
+                    unrealized = value_eur - invested
+                    positions.at[idx, "current_value"] = round(value_eur, 2)
+                    positions.at[idx, "pnl"] = round(unrealized, 2)
+                    positions.at[idx, "unrealized_pnl"] = round(unrealized, 2)
+                    positions.at[idx, "pnl_pct"] = round(unrealized / invested, 6) if invested > 0 else 0
 
         save_positions(positions)
 

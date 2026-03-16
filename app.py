@@ -319,6 +319,11 @@ if page == "🏠 Dashboard":
     if not nav_history.empty:
         st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
         nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+        # Filter out obviously wrong NAV values (>5x or <10% of initial)
+        initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
+        if initial_nav_val > 0:
+            nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
+            nav_df = nav_df.reset_index(drop=True)
         nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
         if "benchmark" in nav_df.columns:
             bench_vals = pd.to_numeric(nav_df["benchmark"], errors="coerce")
