@@ -1,6 +1,6 @@
 {
     "_comment": "Mapping ISIN -> yfinance ticker. Aggiungi qui nuovi strumenti.",
-    "IE00BNGJJT35": "XDEW.MI",
+    "IE00BNGJJT35": "SPEQ.L",
     "IE00BLNMYC90": "XDEW.L",
     "IE00BFMXXD54": "VUSA.MI",
     "IE00B53SZB19": "SXRV.DE",
