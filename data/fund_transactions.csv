@@ -83,18 +83,18 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-07-11,SELL,IE00BLNMYC90,SP Equal Weight,Equity,1840.0,86.57,EUR,1.0,0.0,,SP Equal Weight,Stock
 2025-07-11,SELL,IE00B53SZB19,Nasdaq,Equity,90.0,1116.82,EUR,1.0,0.0,,Nasdaq,Stock
 2025-07-23,SELL,US8716071076,Synopsys,Equity,135.0,617.61,USD,1.17,0.0,,Synopsys,Stock
-2025-07-23,BUY,IT0005282865,Reply,Equity,420.0,138.9,EUR,1.0,0.0,,Reply,Stock
-2025-07-23,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,,Moncler,Stock
-2025-07-23,BUY,SE0012673267,Evolution AB,Equity,765.0,847.0,SEK,11.16,0.0,,Evolution AB,Stock
 2025-07-23,SELL,IT0004176001,Prysmian,Equity,926.0,64.34,EUR,1.0,0.0,,Prysmian,Stock
+2025-07-23,BUY,IT0005282865,Reply,Equity,420.0,138.9,EUR,1.0,0.0,,Reply,Stock
+2025-07-23,BUY,SE0012673267,Evolution AB,Equity,765.0,847.0,SEK,11.16,0.0,,Evolution AB,Stock
+2025-07-23,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,,Moncler,Stock
 2025-07-25,BUY,NL0010273215,ASML,Equity,132.0,604.0,EUR,1.0,0.0,,ASML,Stock
 2025-07-25,SELL,IE00B1TXK627,Water,Equity,1577.0,62.53,EUR,1.0,0.0,,Water,Stock
 2025-07-28,SELL,IT0004176001,Prysmian,Equity,400.0,66.68,EUR,1.0,0.0,,Prysmian,Stock
 2025-08-13,BUY,DE0001141836,Bobl Tf0% Ap26,Fixed Income,4757.0,98.785,EUR,1.0,0.0,,Bobl Tf0% Ap26,Bond
 2025-08-13,BUY,IT0005640666,BOT Mz26,Fixed Income,5491.0,98.86,EUR,1.0,0.0,,BOT Mz26,Bond
+2025-09-16,BUY,IE00B4YBJ215,SPY400,Equity,1000.0,85.82,EUR,1.0,0.0,,SPY400,Stock
 2025-09-16,BUY,IE00BJ38QD84,Russell 2000,Equity,2520.0,59.11,EUR,1.0,0.0,,Russell 2000,Stock
 2025-09-16,SELL,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,8500000.0,97.25,NOK,0.08627,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
-2025-09-16,BUY,IE00B4YBJ215,SPY400,Equity,1000.0,85.82,EUR,1.0,0.0,,SPY400,Stock
 2025-10-08,BUY,FR0000121014,LVMH,Equity,39.0,563.0,EUR,1.0,0.0,,LVMH,Stock
 2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
 2025-10-08,SELL,GB00B082RF11,Rentokil,Equity,9524.0,4.1204,GBP,0.8661,0.0,,Rentokil,Stock
@@ -112,7 +112,7 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-11-28,SELL,LU0489337690,Real Estate EU,Equity,14344.0,24.1,EUR,1.0,0.0,,Real Estate EU,Stock
 2025-11-28,SELL,IE00BM67HK77,Healthcare,Equity,2133.0,51.24,EUR,1.0,0.0,,Healthcare,Stock
 2025-12-01,BUY,AU000000EMR4,EMR,Equity,14250.0,5.23,AUD,1.77,0.0,,EMR,Stock
-2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,9.15,USD,1.16,0.0,,Biotech Cina,Stock
+2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,9.15,HKD,1.16,0.0,nan,Biotech Cina,Stock
 2025-12-05,BUY,IE000M7V94E1,Nucl,Alternative,2400.0,50.74,EUR,1.0,0.0,,Nucl,Commodity
 2025-12-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Cedola mensile ILIAD,Bond
 2026-01-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Cedola mensile ILIAD,Bond
@@ -127,11 +127,11 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-02-04,BUY,US91324P1021,UNH,Equity,153.0,278.77,USD,1.1802,0.0,,UNH,Stock
 2026-02-04,BUY,IE00BQQP9F84,GDX,Alternative,300.0,93.74,EUR,1.0,0.0,,GDX,Commodity
 2026-02-04,SELL,IT0003549422,Sanlorenzo,Equity,1581.0,31.65,EUR,1.0,0.0,,Sanlorenzo,Stock
-2026-02-09,SELL,IE00BFMXXD54,Vanguard S&P500,Equity,950.0,112.53,EUR,1.0,0.0,,Vanguard S&P500,Stock
-2026-02-09,SELL,IE00B53SZB19,Nasdaq,Equity,130.0,1214.93,EUR,1.0,0.0,,Nasdaq,Stock
 2026-02-09,BUY,LU1437017350,EM,Equity,600.0,87.994,EUR,1.0,0.0,,EM,Stock
+2026-02-09,SELL,IE00BFMXXD54,Vanguard S&P500,Equity,950.0,112.53,EUR,1.0,0.0,,Vanguard S&P500,Stock
 2026-02-09,BUY,IE00B4KBBD01,Utilities US,Equity,22500.0,9.007,EUR,1.0,0.0,,Utilities US,Stock
 2026-02-09,BUY,DE000A2QP4D2,Brasile Bond,Fixed Income,2000.0,107.58,USD,1.1865,0.0,,Brasile Bond,Bond
+2026-02-09,SELL,IE00B53SZB19,Nasdaq,Equity,130.0,1214.93,EUR,1.0,0.0,,Nasdaq,Stock
 2026-02-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Cedola mensile ILIAD,Bond
 2026-02-17,BUY,IE000P16KP52,CyberSecurity,Equity,5750.0,25.69,EUR,1.0,0.0,,CyberSecurity,Stock
 2026-02-17,SELL,SE0012673267,Evolution AB,Equity,765.0,529.6,SEK,10.65,0.0,,Evolution AB,Stock
