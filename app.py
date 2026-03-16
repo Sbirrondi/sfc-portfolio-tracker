@@ -254,8 +254,10 @@ if page == "🏠 Dashboard":
         st.stop()
 
     # ── KPI Cards ─────────────────────────────────────────────────────
-    nav = fund_info.get("current_nav", nav_total)
-    inception_perf = fund_info.get("performance_since_inception", total_pnl_pct)
+    # Usa nav_total calcolato live dalle posizioni (più affidabile del valore salvato in JSON)
+    nav = nav_total
+    initial_nav = fund_info.get("initial_nav", 10_000_000)
+    inception_perf = (nav - initial_nav) / initial_nav if initial_nav > 0 else total_pnl_pct
     bench_perf = fund_info.get("benchmark_performance", 0)
     diff_perf = (inception_perf or 0) - (bench_perf or 0)
 
@@ -1863,37 +1865,48 @@ elif page == "📝 Operazioni & Import":
             if selected_label:
                 sel_idx = int(selected_label.split("|")[0].replace("#", "").strip())
                 row = transactions.loc[sel_idx]
+                # Chiave dinamica basata sull'indice: forza il refresh dei widget
+                k = f"_{sel_idx}"
 
                 st.divider()
-                st.markdown(f"**Modifica operazione #{sel_idx}**")
+                st.markdown(f"**Modifica operazione #{sel_idx}** — *{row.get('name', '')}*")
 
-                with st.form("edit_transaction_form", clear_on_submit=False):
+                # Riepilogo attuale
+                with st.expander("📋 Valori attuali", expanded=False):
+                    sum_cols = st.columns(4)
+                    sum_cols[0].markdown(f"**Data:** {str(row['date'])[:10]}")
+                    sum_cols[1].markdown(f"**Tipo:** {row['transaction_type']}")
+                    sum_cols[2].markdown(f"**Quantità:** {row['quantity']}")
+                    sum_cols[3].markdown(f"**Prezzo:** {row['price']}")
+
+                tx_types = ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"]
+                currencies = ["EUR", "USD", "GBP", "CHF", "JPY"]
+
+                with st.form(f"edit_transaction_form{k}", clear_on_submit=False):
                     ec1, ec2 = st.columns(2)
                     with ec1:
-                        edit_date = st.date_input("Data", value=pd.to_datetime(row["date"]).date(), key="edit_date")
+                        edit_date = st.date_input("Data", value=pd.to_datetime(row["date"]).date(), key=f"edit_date{k}")
                         edit_type = st.selectbox(
-                            "Tipo Operazione",
-                            ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"],
-                            index=["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"].index(row["transaction_type"]) if row["transaction_type"] in ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"] else 0,
-                            key="edit_type"
+                            "Tipo Operazione", tx_types,
+                            index=tx_types.index(row["transaction_type"]) if row["transaction_type"] in tx_types else 0,
+                            key=f"edit_type{k}"
                         )
-                        edit_name = st.text_input("Nome Strumento", value=str(row.get("name", "")), key="edit_name")
-                        edit_isin = st.text_input("ISIN", value=str(row.get("isin", "")), key="edit_isin")
-                        edit_macro = st.text_input("Macro Classe", value=str(row.get("macro_class", "")), key="edit_macro")
-                        edit_sector = st.text_input("Settore", value=str(row.get("sector", "")), key="edit_sector")
+                        edit_name = st.text_input("Nome Strumento", value=str(row.get("name", "")), key=f"edit_name{k}")
+                        edit_isin = st.text_input("ISIN", value=str(row.get("isin", "")), key=f"edit_isin{k}")
+                        edit_macro = st.text_input("Macro Classe", value=str(row.get("macro_class", "")), key=f"edit_macro{k}")
+                        edit_sector = st.text_input("Settore", value=str(row.get("sector", "")), key=f"edit_sector{k}")
 
                     with ec2:
-                        edit_qty = st.number_input("Quantità", value=float(row["quantity"]), step=1.0, key="edit_qty")
-                        edit_price = st.number_input("Prezzo", value=float(row["price"]), step=0.01, format="%.4f", key="edit_price")
+                        edit_qty = st.number_input("Quantità", value=float(row["quantity"]), step=1.0, key=f"edit_qty{k}")
+                        edit_price = st.number_input("Prezzo", value=float(row["price"]), step=0.01, format="%.4f", key=f"edit_price{k}")
                         edit_currency = st.selectbox(
-                            "Valuta",
-                            ["EUR", "USD", "GBP", "CHF", "JPY"],
-                            index=["EUR", "USD", "GBP", "CHF", "JPY"].index(row.get("currency", "EUR")) if row.get("currency", "EUR") in ["EUR", "USD", "GBP", "CHF", "JPY"] else 0,
-                            key="edit_currency"
+                            "Valuta", currencies,
+                            index=currencies.index(row.get("currency", "EUR")) if row.get("currency", "EUR") in currencies else 0,
+                            key=f"edit_currency{k}"
                         )
-                        edit_fx = st.number_input("FX Rate", value=float(row.get("fx_rate", 1.0)), step=0.0001, format="%.4f", key="edit_fx")
-                        edit_fees = st.number_input("Commissioni", value=float(row.get("fees", 0.0)), step=0.01, key="edit_fees")
-                        edit_notes = st.text_input("Note", value=str(row.get("notes", "")), key="edit_notes")
+                        edit_fx = st.number_input("FX Rate", value=float(row.get("fx_rate", 1.0)), step=0.0001, format="%.4f", key=f"edit_fx{k}")
+                        edit_fees = st.number_input("Commissioni", value=float(row.get("fees", 0.0)), step=0.01, key=f"edit_fees{k}")
+                        edit_notes = st.text_input("Note", value=str(row.get("notes", "")), key=f"edit_notes{k}")
 
                     submit_col, delete_col = st.columns([3, 1])
                     with submit_col:
@@ -1917,7 +1930,7 @@ elif page == "📝 Operazioni & Import":
                         "notes": edit_notes.strip(),
                     }
                     update_transaction(sel_idx, updates)
-                    st.success(f"✅ Operazione #{sel_idx} aggiornata con successo!")
+                    st.success(f"✅ Operazione #{sel_idx} aggiornata!")
                     st.cache_data.clear()
                     st.rerun()
 
