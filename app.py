@@ -16,7 +16,7 @@ import base64
 
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
-    delete_transaction, load_nav_history, load_fund_info, save_fund_info,
+    delete_transaction, update_transaction, load_nav_history, load_fund_info, save_fund_info,
     get_isin_map, save_isin_map, get_overrides, save_overrides,
     enrich_positions, load_cash, compute_cash_from_transactions,
     calculate_nav, snapshot_nav, update_fund_info,
@@ -212,7 +212,19 @@ with st.sidebar:
     except Exception:
         pass
 
-    if st.button("🔄 Ricarica Dati", width="stretch"):
+    if st.button("🔄 Ricarica Dati", use_container_width=True):
+        with st.spinner("Aggiornando prezzi e ricalcolando..."):
+            try:
+                fresh_pos = load_positions()
+                if not fresh_pos.empty:
+                    updated = update_position_prices(fresh_pos, get_isin_map())
+                    save_positions(updated)
+                    cash = compute_cash_from_transactions()
+                    nav = calculate_nav(updated, cash)
+                    update_fund_info(nav, len(updated))
+                    snapshot_nav(nav)
+            except Exception as e:
+                st.warning(f"Errore aggiornamento prezzi: {e}")
         st.cache_data.clear()
         st.rerun()
 
@@ -1680,8 +1692,8 @@ elif page == "📝 Operazioni & Import":
         c4.metric("NAV", fmt_eur_full(nav_total))
         st.divider()
 
-    tab_new, tab_view, tab_prices, tab_manual = st.tabs(
-        ["➕ Nuova Operazione", "📋 Registro Operazioni", "🔄 Aggiorna Prezzi", "✏️ Prezzi Manuali"])
+    tab_new, tab_view, tab_edit, tab_prices, tab_manual = st.tabs(
+        ["➕ Nuova Operazione", "📋 Registro Operazioni", "✏️ Modifica Eseguiti", "🔄 Aggiorna Prezzi", "✏️ Prezzi Manuali"])
 
     with tab_new:
         st.markdown("Registra una nuova operazione del fondo.")
@@ -1832,11 +1844,96 @@ elif page == "📝 Operazioni & Import":
         else:
             st.info("Nessuna transazione registrata. Usa il tab **Nuova Operazione** per iniziare.")
 
+    with tab_edit:
+        st.markdown("Seleziona un'operazione eseguita per modificarne i dettagli.")
+        if not transactions.empty:
+            # Build display for selection
+            edit_tx = transactions.copy()
+            edit_tx["_idx"] = edit_tx.index
+            edit_tx["_label"] = edit_tx.apply(
+                lambda r: f"#{r['_idx']} | {str(r['date'])[:10]} | {r['transaction_type']} | {r.get('name', '')} | {r.get('isin', '')} | Qty: {r['quantity']} | Px: {r['price']}", axis=1
+            )
+
+            selected_label = st.selectbox(
+                "Seleziona operazione da modificare",
+                edit_tx["_label"].tolist()[::-1],  # Most recent first
+                key="edit_tx_select"
+            )
+
+            if selected_label:
+                sel_idx = int(selected_label.split("|")[0].replace("#", "").strip())
+                row = transactions.loc[sel_idx]
+
+                st.divider()
+                st.markdown(f"**Modifica operazione #{sel_idx}**")
+
+                with st.form("edit_transaction_form", clear_on_submit=False):
+                    ec1, ec2 = st.columns(2)
+                    with ec1:
+                        edit_date = st.date_input("Data", value=pd.to_datetime(row["date"]).date(), key="edit_date")
+                        edit_type = st.selectbox(
+                            "Tipo Operazione",
+                            ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"],
+                            index=["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"].index(row["transaction_type"]) if row["transaction_type"] in ["BUY", "SELL", "DIVIDEND", "DEPOSIT", "WITHDRAWAL", "FEE"] else 0,
+                            key="edit_type"
+                        )
+                        edit_name = st.text_input("Nome Strumento", value=str(row.get("name", "")), key="edit_name")
+                        edit_isin = st.text_input("ISIN", value=str(row.get("isin", "")), key="edit_isin")
+                        edit_macro = st.text_input("Macro Classe", value=str(row.get("macro_class", "")), key="edit_macro")
+                        edit_sector = st.text_input("Settore", value=str(row.get("sector", "")), key="edit_sector")
+
+                    with ec2:
+                        edit_qty = st.number_input("Quantità", value=float(row["quantity"]), step=1.0, key="edit_qty")
+                        edit_price = st.number_input("Prezzo", value=float(row["price"]), step=0.01, format="%.4f", key="edit_price")
+                        edit_currency = st.selectbox(
+                            "Valuta",
+                            ["EUR", "USD", "GBP", "CHF", "JPY"],
+                            index=["EUR", "USD", "GBP", "CHF", "JPY"].index(row.get("currency", "EUR")) if row.get("currency", "EUR") in ["EUR", "USD", "GBP", "CHF", "JPY"] else 0,
+                            key="edit_currency"
+                        )
+                        edit_fx = st.number_input("FX Rate", value=float(row.get("fx_rate", 1.0)), step=0.0001, format="%.4f", key="edit_fx")
+                        edit_fees = st.number_input("Commissioni", value=float(row.get("fees", 0.0)), step=0.01, key="edit_fees")
+                        edit_notes = st.text_input("Note", value=str(row.get("notes", "")), key="edit_notes")
+
+                    submit_col, delete_col = st.columns([3, 1])
+                    with submit_col:
+                        submitted = st.form_submit_button("💾 Salva Modifiche", use_container_width=True)
+                    with delete_col:
+                        deleted = st.form_submit_button("🗑️ Elimina", use_container_width=True)
+
+                if submitted:
+                    updates = {
+                        "date": str(edit_date),
+                        "transaction_type": edit_type,
+                        "name": edit_name.strip(),
+                        "isin": edit_isin.strip(),
+                        "macro_class": edit_macro.strip(),
+                        "sector": edit_sector.strip(),
+                        "quantity": float(edit_qty),
+                        "price": float(edit_price),
+                        "currency": edit_currency,
+                        "fx_rate": float(edit_fx),
+                        "fees": float(edit_fees),
+                        "notes": edit_notes.strip(),
+                    }
+                    update_transaction(sel_idx, updates)
+                    st.success(f"✅ Operazione #{sel_idx} aggiornata con successo!")
+                    st.cache_data.clear()
+                    st.rerun()
+
+                if deleted:
+                    delete_transaction(sel_idx)
+                    st.success(f"🗑️ Operazione #{sel_idx} eliminata!")
+                    st.cache_data.clear()
+                    st.rerun()
+        else:
+            st.info("Nessuna operazione da modificare.")
+
     with tab_prices:
         st.markdown("Aggiorna i prezzi di mercato e ricalcola NAV, P&L e pesi.")
         st.info("**Nota:** I prezzi vengono recuperati live da Yahoo Finance tramite il mapping ISIN → Ticker.")
 
-        if st.button("🔄 Aggiorna Prezzi Live", width="stretch"):
+        if st.button("🔄 Aggiorna Prezzi Live", use_container_width=True):
             with st.spinner("Recuperando prezzi da Yahoo Finance..."):
                 fresh_positions = load_positions()
                 if not fresh_positions.empty:

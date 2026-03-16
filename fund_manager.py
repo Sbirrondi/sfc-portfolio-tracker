@@ -123,6 +123,26 @@ def delete_transaction(index: int) -> pd.DataFrame:
     return df
 
 
+def update_transaction(index: int, updates: dict) -> pd.DataFrame:
+    """
+    Modifica una transazione esistente per indice.
+    updates: dict con le colonne da aggiornare (es. {"price": 105.5, "quantity": 200}).
+    Dopo la modifica ricalcola posizioni, cash e NAV.
+    """
+    df = load_transactions()
+    if 0 <= index < len(df):
+        for col, val in updates.items():
+            if col in df.columns:
+                if col == "date":
+                    df.at[index, col] = pd.to_datetime(val)
+                else:
+                    df.at[index, col] = val
+        df = df.sort_values("date").reset_index(drop=True)
+        save_transactions(df)
+        recalculate_all()
+    return df
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # POSITIONS - Calcolate dalle transazioni
 # ══════════════════════════════════════════════════════════════════════════════
