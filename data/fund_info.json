@@ -3,10 +3,11 @@
   "inception_date": "2023-10-01",
   "initial_nav": 10000000,
   "currency": "EUR",
-  "benchmark": "S&P 500 Equal Weight",
-  "current_nav": -118603153.71,
-  "performance_since_inception": -12.860315370999999,
-  "benchmark_performance": 0.32142857142857145,
+  "benchmark": "FTSE All-World",
+  "benchmark_ticker": "VWCE.DE",
+  "current_nav": 12112945.15,
+  "performance_since_inception": 0.2113,
+  "benchmark_performance": 0,
   "positions_count": 47,
-  "last_updated": "2026-03-16 09:19"
+  "last_updated": "2026-03-25 10:00"
 }

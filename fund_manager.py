@@ -536,7 +536,7 @@ def update_fund_info(nav: float, positions_count: int):
     info["positions_count"] = positions_count
     if initial_nav > 0:
         info["performance_since_inception"] = (nav - initial_nav) / initial_nav
-    info["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    info["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_fund_info(info)
     return info
 

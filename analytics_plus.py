@@ -71,7 +71,7 @@ def build_daily_nav_series(
         return pd.DataFrame(columns=["date", "nav", "benchmark"])
 
     tickers = list(set(h["ticker"] for h in holdings))
-    tickers.append("RSP")  # Benchmark: S&P 500 Equal Weight
+    tickers.append("VWCE.DE")  # Benchmark: Vanguard FTSE All-World UCITS ETF
 
     # Download all historical prices in one batch
     start = inception_date
@@ -148,8 +148,8 @@ def build_daily_nav_series(
     })
 
     # Add benchmark
-    if "RSP" in close.columns:
-        bench = close["RSP"].dropna()
+    if "VWCE.DE" in close.columns:
+        bench = close["VWCE.DE"].dropna()
         if not bench.empty:
             # Rebase benchmark to initial_nav
             bench_rebased = bench / bench.iloc[0] * initial_nav

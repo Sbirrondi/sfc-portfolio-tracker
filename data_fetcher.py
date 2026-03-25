@@ -207,6 +207,7 @@ def get_current_prices(tickers: list) -> dict:
 # ── Benchmark Data ───────────────────────────────────────────────────────────
 
 BENCHMARKS = {
+    "FTSE All-World": "VWCE.DE",     # Vanguard FTSE All-World UCITS ETF (EUR)
     "S&P 500 Equal Weight": "RSP",   # Invesco S&P 500 Equal Weight ETF
     "S&P 500": "^GSPC",
     "MSCI World": "URTH",

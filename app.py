@@ -284,6 +284,121 @@ if page == "🏠 Dashboard":
 
     st.divider()
 
+    # ── Performance Comparison Table ──────────────────────────────────────
+    if not nav_history.empty:
+        st.markdown('<div class="section-header">Performance Overview</div>', unsafe_allow_html=True)
+
+        nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+        # Filter out obviously wrong NAV values
+        initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
+        if initial_nav_val > 0:
+            nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
+            nav_df = nav_df.reset_index(drop=True)
+
+        # Calculate performance over different timeframes
+        nav_df["date"] = pd.to_datetime(nav_df["date"])
+        latest_nav = nav_df["nav"].iloc[-1]
+        latest_date = nav_df["date"].iloc[-1]
+
+        bench_vals = pd.to_numeric(nav_df.get("benchmark", pd.Series(dtype=float)), errors="coerce")
+
+        perf_rows = []
+        timeframes = {
+            "YTD": pd.Timestamp(latest_date.year, 1, 1),
+            "1M": latest_date - pd.DateOffset(months=1),
+            "3M": latest_date - pd.DateOffset(months=3),
+            "6M": latest_date - pd.DateOffset(months=6),
+            "1Y": latest_date - pd.DateOffset(years=1),
+            "Since Inception": nav_df["date"].iloc[0],
+        }
+        for label, start_dt in timeframes.items():
+            mask = nav_df["date"] >= start_dt
+            subset = nav_df[mask]
+            if len(subset) >= 1:
+                start_nav = subset["nav"].iloc[0]
+                fund_perf = (latest_nav / start_nav - 1) if start_nav > 0 else 0
+
+                bench_perf_val = None
+                bench_subset = bench_vals[mask].dropna()
+                if len(bench_subset) >= 1:
+                    bench_start = bench_subset.iloc[0]
+                    bench_end = bench_subset.iloc[-1]
+                    bench_perf_val = (bench_end / bench_start - 1) if bench_start > 0 else None
+
+                row = {"Periodo": label, "Fondo SFC": f"{fund_perf:+.2%}"}
+                if bench_perf_val is not None:
+                    row["FTSE All-World"] = f"{bench_perf_val:+.2%}"
+                    row["Differenza"] = f"{(fund_perf - bench_perf_val):+.2%}"
+                else:
+                    row["FTSE All-World"] = "N/A"
+                    row["Differenza"] = "N/A"
+                perf_rows.append(row)
+
+        if perf_rows:
+            perf_table = pd.DataFrame(perf_rows)
+            st.dataframe(perf_table, width="stretch", hide_index=True, height=280)
+
+    # ── NAV vs Benchmark Chart ────────────────────────────────────────────
+    if not nav_history.empty and len(nav_df) > 1:
+        st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
+        nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
+        if "benchmark" in nav_df.columns:
+            bench_plot = pd.to_numeric(nav_df["benchmark"], errors="coerce")
+            first_valid = bench_plot.dropna().iloc[0] if not bench_plot.dropna().empty else 1
+            nav_df["bench_index"] = bench_plot / first_valid * 100
+
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
+                                  line=dict(color="#6c63ff", width=3)))
+        if "bench_index" in nav_df.columns:
+            fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["bench_index"], name="FTSE All-World",
+                                      line=dict(color="#00d97e", width=2, dash="dash")))
+        all_nav_vals = nav_df["nav_index"].dropna().tolist()
+        if "bench_index" in nav_df.columns:
+            all_nav_vals += nav_df["bench_index"].dropna().tolist()
+        if all_nav_vals:
+            y_min, y_max = min(all_nav_vals), max(all_nav_vals)
+            y_pad = max((y_max - y_min) * 0.15, 0.5)
+        else:
+            y_min, y_max, y_pad = 95, 105, 1
+        fig.update_layout(height=400, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
+                          plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                          yaxis_title="Base 100", yaxis_range=[y_min - y_pad, y_max + y_pad],
+                          hovermode="x unified", legend=dict(orientation="h", y=1.08))
+        st.plotly_chart(fig, width="stretch")
+
+    # ── TradingView Widget - FTSE All-World (Benchmark) ──────────────────
+    import streamlit.components.v1 as components
+    st.markdown('<div class="section-header">FTSE All-World (VWCE) - TradingView</div>', unsafe_allow_html=True)
+    tv_html = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript"
+        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
+        async>
+        {
+          "symbol": "XETR:VWCE",
+          "interval": "D",
+          "timezone": "Europe/Rome",
+          "theme": "dark",
+          "style": "1",
+          "locale": "it_IT",
+          "toolbar_bg": "#0a0a0a",
+          "enable_publishing": false,
+          "allow_symbol_change": true,
+          "save_image": true,
+          "hide_volume": false,
+          "backgroundColor": "rgba(0,0,0,0)",
+          "gridColor": "rgba(42, 42, 74, 0.3)",
+          "width": "100%",
+          "height": "450",
+          "studies": ["MASimple@tv-basicstudies"]
+        }
+      </script>
+    </div>
+    """
+    components.html(tv_html, height=470)
+
     # ── Asset Allocation ─────────────────────────────────────────────────
     col1, col2 = st.columns([1, 1])
 
@@ -313,42 +428,6 @@ if page == "🏠 Dashboard":
         fig.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
                           template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
         fig.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
-        st.plotly_chart(fig, width="stretch")
-
-    # ── NAV Chart ────────────────────────────────────────────────────────
-    if not nav_history.empty:
-        st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
-        nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
-        # Filter out obviously wrong NAV values (>5x or <10% of initial)
-        initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
-        if initial_nav_val > 0:
-            nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
-            nav_df = nav_df.reset_index(drop=True)
-        nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
-        if "benchmark" in nav_df.columns:
-            bench_vals = pd.to_numeric(nav_df["benchmark"], errors="coerce")
-            first_valid = bench_vals.dropna().iloc[0] if not bench_vals.dropna().empty else 1
-            nav_df["bench_index"] = bench_vals / first_valid * 100
-
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
-                                  line=dict(color="#6c63ff", width=3)))
-        if "bench_index" in nav_df.columns:
-            fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["bench_index"], name="S&P 500 EW",
-                                      line=dict(color="#00d97e", width=2, dash="dash")))
-        # Auto-scale Y axis to data range
-        all_nav_vals = nav_df["nav_index"].dropna().tolist()
-        if "bench_index" in nav_df.columns:
-            all_nav_vals += nav_df["bench_index"].dropna().tolist()
-        if all_nav_vals:
-            y_min, y_max = min(all_nav_vals), max(all_nav_vals)
-            y_pad = max((y_max - y_min) * 0.15, 0.5)
-        else:
-            y_min, y_max, y_pad = 95, 105, 1
-        fig.update_layout(height=400, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
-                          plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                          yaxis_title="Base 100", yaxis_range=[y_min - y_pad, y_max + y_pad],
-                          hovermode="x unified", legend=dict(orientation="h", y=1.08))
         st.plotly_chart(fig, width="stretch")
 
     # ── Top 10 Holdings ──────────────────────────────────────────────────
@@ -528,7 +607,7 @@ elif page == "📈 Performance":
     if bench_series is not None and len(bench_series) > 1:
         bench_returns = calculate_returns(bench_series)
         bench_cum = cumulative_returns(bench_returns)
-        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.values * 100, name="S&P 500 EW",
+        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.values * 100, name="FTSE All-World",
                                   line=dict(color="#00d97e", width=2, dash="dash")))
     fig.update_layout(height=450, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
                       plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
@@ -655,7 +734,7 @@ elif page == "📊 Analytics Avanzate":
          "📊 Drawdown Analysis", "📄 Report HTML"])
 
     with tab_perf:
-        st.markdown('<div class="section-header">NAV Giornaliero vs Benchmark (S&P 500 EW)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">NAV Giornaliero vs Benchmark (FTSE All-World)</div>', unsafe_allow_html=True)
 
         # Period selector
         period = st.selectbox("Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"], index=0)
@@ -696,7 +775,7 @@ elif page == "📊 Analytics Avanzate":
             if "bench_base100" in filtered.columns:
                 fig.add_trace(go.Scatter(
                     x=filtered["date"], y=filtered["bench_base100"],
-                    name="S&P 500 EW", line=dict(color="#00d97e", width=2, dash="dash")))
+                    name="FTSE All-World", line=dict(color="#00d97e", width=2, dash="dash")))
 
             # Add reference line at 100
             fig.add_hline(y=100, line=dict(color="gray", width=1, dash="dot"))
@@ -2048,7 +2127,7 @@ elif page == "📝 Operazioni & Import":
                             nav = calculate_nav(fresh_pos, cash)
                             info = update_fund_info(nav, len(fresh_pos))
                             from datetime import datetime as _dt
-                            info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M")
+                            info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
                             save_fund_info(info)
 
                             name = positions[positions["isin"] == mp_isin]["name"].iloc[0]
@@ -2091,7 +2170,7 @@ elif page == "📝 Operazioni & Import":
                         nav = calculate_nav(fresh_pos, cash)
                         info = update_fund_info(nav, len(fresh_pos))
                         from datetime import datetime as _dt
-                        info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M")
+                        info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
                         save_fund_info(info)
                         st.success(f"✅ Aggiornati {updated_count} prezzi. NAV: {fmt_eur_full(nav)}")
                         st.cache_data.clear()
