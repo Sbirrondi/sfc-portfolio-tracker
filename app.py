@@ -369,7 +369,7 @@ if page == "🏠 Dashboard":
 
     # ── TradingView Widget - FTSE All-World (Benchmark) ──────────────────
     import streamlit.components.v1 as components
-    st.markdown('<div class="section-header">FTSE All-World (VWCE) - TradingView</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Vanguard LifeStrategy 60% (VNGA60) - TradingView</div>', unsafe_allow_html=True)
     tv_html = """
     <div class="tradingview-widget-container">
       <div class="tradingview-widget-container__widget"></div>
@@ -377,7 +377,7 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
         async>
         {
-          "symbol": "XETR:VWCE",
+          "symbol": "MIL:VNGA60",
           "interval": "D",
           "timezone": "Europe/Rome",
           "theme": "dark",

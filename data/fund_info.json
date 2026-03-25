@@ -4,7 +4,7 @@
   "initial_nav": 10000000,
   "currency": "EUR",
   "benchmark": "FTSE All-World",
-  "benchmark_ticker": "VWCE.DE",
+  "benchmark_ticker": "VNGA60.MI",
   "current_nav": 12112945.15,
   "performance_since_inception": 0.2113,
   "benchmark_performance": 0,
