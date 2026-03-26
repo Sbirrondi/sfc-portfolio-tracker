@@ -373,8 +373,10 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
             # unrealized_pnl = price_effect + fx_effect
             # price_effect = qty * (live_price - avg_cost_local) * avg_fx_at_purchase
             # fx_effect    = qty * live_price * (fx_now - avg_fx_at_purchase)
+            # NOTE: decomposition only valid when yfinance currency matches transaction currency
             effective_ccy = yf_currency if yf_currency != currency else currency
-            if effective_ccy != "EUR":
+            currencies_match = (yf_currency == currency) or (yf_currency == "EUR" and currency == "EUR")
+            if effective_ccy != "EUR" and currencies_match:
                 avg_fx_purchase = float(row.get("avg_fx", 1.0) or 1.0)
                 avg_local = float(row.get("avg_cost_local", 0) or 0)
                 if avg_fx_purchase > 0 and avg_fx_purchase != 1.0 and avg_local > 0:
@@ -386,6 +388,7 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
                     df.at[idx, "price_effect"] = round(unrealized, 2)
                     df.at[idx, "fx_effect"] = 0.0
             else:
+                # Cannot decompose when yfinance and transaction currencies differ
                 df.at[idx, "price_effect"] = round(unrealized, 2)
                 df.at[idx, "fx_effect"] = 0.0
 
@@ -515,6 +518,74 @@ def load_nav_history() -> pd.DataFrame:
         df = pd.read_csv(NAV_HISTORY_FILE, parse_dates=["date"])
         return df.sort_values("date").reset_index(drop=True)
     return pd.DataFrame(columns=["date", "nav", "benchmark"])
+
+
+def rebuild_daily_nav() -> pd.DataFrame:
+    """
+    Ricostruisce uno storico NAV giornaliero interpolando i punti mensili
+    e scaricando i valori giornalieri del benchmark (VNGA60.MI) da yfinance.
+    I punti NAV mensili vengono interpolati linearmente per avere un valore al giorno.
+    Il benchmark viene preso dai prezzi di chiusura effettivi.
+    """
+    from data_fetcher import get_benchmark_prices
+
+    history = load_nav_history()
+    if history.empty or len(history) < 2:
+        return history
+
+    history = history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+    history["date"] = pd.to_datetime(history["date"])
+    history["nav"] = pd.to_numeric(history["nav"], errors="coerce")
+
+    # Remove obviously wrong entries
+    initial_nav = history["nav"].iloc[0]
+    if initial_nav > 0:
+        history = history[(history["nav"] > initial_nav * 0.1) & (history["nav"] < initial_nav * 5.0)]
+        history = history.reset_index(drop=True)
+
+    if len(history) < 2:
+        return history
+
+    # Create daily date range
+    start = history["date"].iloc[0]
+    end = history["date"].iloc[-1]
+    daily_dates = pd.date_range(start=start, end=end, freq="B")  # Business days
+
+    # Interpolate NAV to daily
+    history_indexed = history.set_index("date")["nav"]
+    daily_nav = history_indexed.reindex(daily_dates).interpolate(method="linear")
+    daily_nav = daily_nav.ffill().bfill()
+
+    # Fetch benchmark daily prices
+    benchmark_daily = None
+    try:
+        bench_prices = get_benchmark_prices("VNGA60", start=start.strftime("%Y-%m-%d"))
+        if bench_prices is not None and len(bench_prices) > 0:
+            benchmark_daily = bench_prices.reindex(daily_dates).ffill().bfill()
+    except Exception:
+        pass
+
+    # Build result DataFrame
+    result = pd.DataFrame({
+        "date": daily_dates,
+        "nav": daily_nav.values,
+    })
+
+    if benchmark_daily is not None and len(benchmark_daily) > 0:
+        result["benchmark"] = benchmark_daily.values
+    else:
+        # Interpolate existing benchmark values
+        if "benchmark" in history.columns:
+            bench_indexed = pd.to_numeric(
+                history.set_index("date")["benchmark"], errors="coerce"
+            )
+            daily_bench = bench_indexed.reindex(daily_dates).interpolate(method="linear")
+            result["benchmark"] = daily_bench.ffill().bfill().values
+
+    # Save
+    result.to_csv(NAV_HISTORY_FILE, index=False)
+    _sync_to_github("fund_nav_history.csv", "Rebuild daily NAV history")
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════════════════

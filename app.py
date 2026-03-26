@@ -22,7 +22,7 @@ from fund_manager import (
     enrich_positions, load_cash, save_cash, compute_cash_from_transactions,
     calculate_nav, snapshot_nav, update_fund_info,
     update_position_prices, compute_positions_from_transactions,
-    recalculate_all, get_portfolio_summary,
+    recalculate_all, get_portfolio_summary, rebuild_daily_nav,
 )
 from analytics import (
     calculate_returns, cumulative_returns, total_return,
@@ -435,15 +435,16 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
         {
           "symbols": [
-            {"proName": "MIL:VNGA60", "title": "VNGA60"},
-            {"proName": "MIL:FTSEMIB", "title": "FTSE MIB"},
-            {"proName": "SP:SPX", "title": "S&P 500"},
-            {"proName": "TVC:SX5E", "title": "Euro Stoxx 50"},
-            {"proName": "NASDAQ:NDX", "title": "Nasdaq 100"},
+            {"proName": "OANDA:IT40EUR", "title": "FTSE MIB"},
+            {"proName": "OANDA:SPX500USD", "title": "S&P 500"},
+            {"proName": "OANDA:EU50EUR", "title": "Euro Stoxx 50"},
+            {"proName": "OANDA:NAS100USD", "title": "Nasdaq 100"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
+            {"proName": "FX:EURHKD", "title": "EUR/HKD"},
             {"proName": "TVC:GOLD", "title": "Gold"},
-            {"proName": "TVC:US10Y", "title": "US 10Y"}
+            {"proName": "TVC:US10Y", "title": "US 10Y"},
+            {"proName": "TVC:DE10Y", "title": "Bund 10Y"}
           ],
           "showSymbolLogo": true,
           "isTransparent": true,
@@ -572,7 +573,7 @@ if page == "🏠 Dashboard":
 
             # Period performance summary
             _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
-            _cp = st.columns(3)
+            _cp = st.columns([1, 1, 1, 1])
             _cp[0].metric(f"SFC Fund ({dash_period})", f"{_fund_p:+.2%}")
             if "benchmark" in nav_df_filtered.columns:
                 _bclean = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce").dropna()
@@ -580,6 +581,15 @@ if page == "🏠 Dashboard":
                     _bp = _bclean.iloc[-1] / _bclean.iloc[0] - 1
                     _cp[1].metric(f"Benchmark ({dash_period})", f"{_bp:+.2%}")
                     _cp[2].metric("Alpha", f"{_fund_p - _bp:+.2%}")
+            with _cp[3]:
+                _nav_points = len(nav_df)
+                _nav_label = f"📊 {_nav_points} punti NAV"
+                if st.button(f"🔄 Ricostruisci NAV Giornaliero", help="Interpola i punti NAV mensili e scarica benchmark giornaliero da yfinance"):
+                    with st.spinner("Ricostruzione NAV giornaliero..."):
+                        rebuild_daily_nav()
+                        st.cache_data.clear()
+                    st.success("NAV giornaliero ricostruito!")
+                    st.rerun()
 
     # ── Two Columns: Perf Table + Allocation ──────────────────────────
     col_left, col_right = st.columns([1.15, 0.85])
@@ -721,7 +731,7 @@ if page == "🏠 Dashboard":
           <div class="tradingview-widget-container__widget"></div>
           <script type="text/javascript"
             src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-            { "symbol": "MIL:VNGA60", "interval": "D", "timezone": "Europe/Rome",
+            { "symbol": "OANDA:EU50EUR", "interval": "D", "timezone": "Europe/Rome",
               "theme": "dark", "style": "1", "locale": "it_IT",
               "enable_publishing": false, "allow_symbol_change": true,
               "save_image": true, "hide_volume": false,
@@ -752,12 +762,12 @@ if page == "🏠 Dashboard":
               "symbolActiveColor": "rgba(99,102,241,0.12)",
               "tabs": [
                 { "title": "Indici", "symbols": [
-                    {"s": "MIL:FTSEMIB", "d": "FTSE MIB"},
-                    {"s": "SP:SPX", "d": "S&P 500"},
-                    {"s": "TVC:SX5E", "d": "Euro Stoxx 50"},
-                    {"s": "TVC:NI225", "d": "Nikkei 225"},
-                    {"s": "XETR:DAX", "d": "DAX 40"},
-                    {"s": "NASDAQ:NDX", "d": "Nasdaq 100"} ]},
+                    {"s": "OANDA:IT40EUR", "d": "FTSE MIB"},
+                    {"s": "OANDA:SPX500USD", "d": "S&P 500"},
+                    {"s": "OANDA:EU50EUR", "d": "Euro Stoxx 50"},
+                    {"s": "OANDA:JP225USD", "d": "Nikkei 225"},
+                    {"s": "OANDA:DE30EUR", "d": "DAX 40"},
+                    {"s": "OANDA:NAS100USD", "d": "Nasdaq 100"} ]},
                 { "title": "Bond", "symbols": [
                     {"s": "TVC:US10Y", "d": "US 10Y Yield"},
                     {"s": "TVC:US02Y", "d": "US 2Y Yield"},
@@ -2357,7 +2367,9 @@ elif page == "📝 Operazioni & Import":
         st.info("**Nota:** I prezzi vengono recuperati live da Yahoo Finance tramite il mapping ISIN → Ticker.")
 
         if st.button("🔄 Aggiorna Prezzi Live", use_container_width=True):
-            with st.spinner("Recuperando prezzi da Yahoo Finance..."):
+            with st.spinner("Ricalcolo posizioni e recupero prezzi da Yahoo Finance..."):
+                # First recalculate positions from transactions to pick up any new ones
+                recalculate_all()
                 fresh_positions = load_positions()
                 if not fresh_positions.empty:
                     updated = update_position_prices(fresh_positions, get_isin_map())
@@ -2368,8 +2380,15 @@ elif page == "📝 Operazioni & Import":
                     nav = calculate_nav(updated, cash)
                     update_fund_info(nav, len(updated))
 
-                    # Save NAV snapshot
-                    snapshot_nav(nav)
+                    # Save NAV snapshot with benchmark
+                    try:
+                        from data_fetcher import get_current_prices
+                        bench_ticker = load_fund_info().get("benchmark_ticker", "VNGA60.MI")
+                        bp = get_current_prices([bench_ticker])
+                        bench_val = bp.get(bench_ticker, None)
+                    except Exception:
+                        bench_val = None
+                    snapshot_nav(nav, bench_val)
 
                     st.success(f"✅ Prezzi aggiornati! NAV: {fmt_eur_full(nav)}")
                     st.cache_data.clear()

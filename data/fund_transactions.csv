@@ -112,7 +112,7 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-11-28,SELL,LU0489337690,Real Estate EU,Equity,14344.0,24.1,EUR,1.0,0.0,,Real Estate EU,Stock
 2025-11-28,SELL,IE00BM67HK77,Healthcare,Equity,2133.0,51.24,EUR,1.0,0.0,,Healthcare,Stock
 2025-12-01,BUY,AU000000EMR4,EMR,Equity,14250.0,5.23,AUD,1.77,0.0,,EMR,Stock
-2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,9.15,HKD,8.16,0.0,,Biotech Cina,Stock
+2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,9.15,USD,1.16,0.0,,Biotech Cina,Stock
 2025-12-05,BUY,IE000M7V94E1,Nucl,Alternative,2400.0,50.74,EUR,1.0,0.0,,Nucl,Commodity
 2025-12-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Cedola mensile ILIAD,Bond
 2026-01-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Cedola mensile ILIAD,Bond

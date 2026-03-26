@@ -407,5 +407,62 @@
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
+  },
+  "IT0000072170": {
+    "name": "FinecoBank",
+    "sector": "Financials",
+    "industry": "Banking",
+    "country": "Italy",
+    "asset_type": "Stock",
+    "macro_class": "Equity"
+  },
+  "US91282CMN82": {
+    "name": "US Treasury 4.25% Feb 2028",
+    "sector": "Government Bond",
+    "country": "United States",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "Governativi USA",
+    "coupon_rate": 4.25,
+    "maturity_date": "2028-02-15",
+    "rating": "AA+"
+  },
+  "GB00BSQNRC93": {
+    "name": "UK Gilt 4.375% Sep 2028",
+    "sector": "Government Bond",
+    "country": "United Kingdom",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "Governativi UK",
+    "coupon_rate": 4.375,
+    "maturity_date": "2028-09-07",
+    "rating": "AA"
+  },
+  "IE00B4L60045": {
+    "name": "iShares € Corp Bond 1-5yr UCITS ETF",
+    "sector": "Corporate Bond",
+    "country": "Europe",
+    "asset_type": "ETF",
+    "macro_class": "Fixed Income",
+    "classification": "Corporate Bond EUR"
+  },
+  "US912810PV44": {
+    "name": "US TIPS 1.75% Jan 2028",
+    "sector": "Government Bond",
+    "country": "United States",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "TIPS USA",
+    "coupon_rate": 1.75,
+    "maturity_date": "2028-01-15",
+    "rating": "AA+"
+  },
+  "LU1681041114": {
+    "name": "Amundi EUR FRN Corporate Bond ESG ETF",
+    "sector": "Corporate Bond",
+    "country": "Europe",
+    "asset_type": "ETF",
+    "macro_class": "Fixed Income",
+    "classification": "FRN Corporate EUR"
   }
 }
