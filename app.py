@@ -19,7 +19,7 @@ from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
     delete_transaction, update_transaction, load_nav_history, load_fund_info, save_fund_info,
     get_isin_map, save_isin_map, get_overrides, save_overrides,
-    enrich_positions, load_cash, compute_cash_from_transactions,
+    enrich_positions, load_cash, save_cash, compute_cash_from_transactions,
     calculate_nav, snapshot_nav, update_fund_info,
     update_position_prices, compute_positions_from_transactions,
     recalculate_all, get_portfolio_summary,
@@ -400,13 +400,17 @@ with st.sidebar:
 
     st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
     if st.button("🔄 Ricarica Dati", use_container_width=True):
-        with st.spinner("Aggiornando prezzi e ricalcolando..."):
+        with st.spinner("Ricalcolando posizioni da transazioni e aggiornando prezzi..."):
             try:
-                fresh_pos = load_positions()
+                # Step 1: Recompute positions from transactions (fixes qty, avg_cost_local, avg_fx)
+                fresh_pos = compute_positions_from_transactions()
                 if not fresh_pos.empty:
+                    # Step 2: Update live prices and FX rates
                     updated = update_position_prices(fresh_pos, get_isin_map())
                     save_positions(updated)
+                    # Step 3: Recompute cash and NAV
                     cash = compute_cash_from_transactions()
+                    save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
                     update_fund_info(nav, len(updated))
                     snapshot_nav(nav)
@@ -432,13 +436,14 @@ if page == "🏠 Dashboard":
         {
           "symbols": [
             {"proName": "MIL:VNGA60", "title": "VNGA60"},
-            {"proName": "FTSE:FTSEMIB", "title": "FTSE MIB"},
-            {"proName": "FOREXCOM:SPX500", "title": "S&P 500"},
+            {"proName": "MIL:FTSEMIB", "title": "FTSE MIB"},
+            {"proName": "SP:SPX", "title": "S&P 500"},
             {"proName": "TVC:SX5E", "title": "Euro Stoxx 50"},
+            {"proName": "NASDAQ:NDX", "title": "Nasdaq 100"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
             {"proName": "TVC:GOLD", "title": "Gold"},
-            {"proName": "CBOT:ZN1!", "title": "US 10Y"}
+            {"proName": "TVC:US10Y", "title": "US 10Y"}
           ],
           "showSymbolLogo": true,
           "isTransparent": true,
@@ -528,18 +533,53 @@ if page == "🏠 Dashboard":
 
         if len(nav_df) > 1:
             st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
-            nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
-            if "benchmark" in nav_df.columns:
-                bp = pd.to_numeric(nav_df["benchmark"], errors="coerce")
-                fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
-                nav_df["bench_index"] = bp / fv * 100
 
-            _series = [{"dates": nav_df["date"], "values": nav_df["nav_index"],
+            # Timeframe selector
+            dash_period = st.selectbox(
+                "Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"],
+                index=5, key="dash_period_sel",
+            )
+            _today = pd.Timestamp.today()
+            if dash_period == "YTD":
+                _dash_start = pd.Timestamp(_today.year, 1, 1)
+            elif dash_period == "1M":
+                _dash_start = _today - pd.DateOffset(months=1)
+            elif dash_period == "3M":
+                _dash_start = _today - pd.DateOffset(months=3)
+            elif dash_period == "6M":
+                _dash_start = _today - pd.DateOffset(months=6)
+            elif dash_period == "1Y":
+                _dash_start = _today - pd.DateOffset(years=1)
+            else:
+                _dash_start = nav_df["date"].iloc[0]
+
+            nav_df_filtered = nav_df[nav_df["date"] >= _dash_start].copy()
+            if len(nav_df_filtered) < 2:
+                nav_df_filtered = nav_df.copy()
+
+            nav_df_filtered["nav_index"] = nav_df_filtered["nav"] / nav_df_filtered["nav"].iloc[0] * 100
+            if "benchmark" in nav_df_filtered.columns:
+                bp = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce")
+                fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
+                nav_df_filtered["bench_index"] = bp / fv * 100
+
+            _series = [{"dates": nav_df_filtered["date"], "values": nav_df_filtered["nav_index"],
                          "color": "#6366f1", "type": "Area", "lineWidth": 2}]
-            if "bench_index" in nav_df.columns:
-                _series.append({"dates": nav_df["date"], "values": nav_df["bench_index"],
+            if "bench_index" in nav_df_filtered.columns:
+                _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
                                 "color": "#22c55e", "type": "Line", "lineWidth": 2})
-            tv_line_chart(_series, height=370, key="dash_nav")
+            tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
+
+            # Period performance summary
+            _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
+            _cp = st.columns(3)
+            _cp[0].metric(f"SFC Fund ({dash_period})", f"{_fund_p:+.2%}")
+            if "benchmark" in nav_df_filtered.columns:
+                _bclean = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce").dropna()
+                if len(_bclean) >= 2:
+                    _bp = _bclean.iloc[-1] / _bclean.iloc[0] - 1
+                    _cp[1].metric(f"Benchmark ({dash_period})", f"{_bp:+.2%}")
+                    _cp[2].metric("Alpha", f"{_fund_p - _bp:+.2%}")
 
     # ── Two Columns: Perf Table + Allocation ──────────────────────────
     col_left, col_right = st.columns([1.15, 0.85])
@@ -712,25 +752,29 @@ if page == "🏠 Dashboard":
               "symbolActiveColor": "rgba(99,102,241,0.12)",
               "tabs": [
                 { "title": "Indici", "symbols": [
-                    {"s": "INDEX:FTSEMIB", "d": "FTSE MIB"},
-                    {"s": "FOREXCOM:SPXUSD", "d": "S&P 500"},
+                    {"s": "MIL:FTSEMIB", "d": "FTSE MIB"},
+                    {"s": "SP:SPX", "d": "S&P 500"},
                     {"s": "TVC:SX5E", "d": "Euro Stoxx 50"},
                     {"s": "TVC:NI225", "d": "Nikkei 225"},
-                    {"s": "TVC:DEU40", "d": "DAX 40"} ]},
+                    {"s": "XETR:DAX", "d": "DAX 40"},
+                    {"s": "NASDAQ:NDX", "d": "Nasdaq 100"} ]},
                 { "title": "Bond", "symbols": [
-                    {"s": "CBOT:ZN1!", "d": "US 10Y Treasury"},
-                    {"s": "CBOT:ZB1!", "d": "US 30Y Treasury"},
+                    {"s": "TVC:US10Y", "d": "US 10Y Yield"},
+                    {"s": "TVC:US02Y", "d": "US 2Y Yield"},
                     {"s": "EUREX:FGBL1!", "d": "Euro Bund"},
-                    {"s": "EUREX:FBTP1!", "d": "BTP Future"} ]},
+                    {"s": "EUREX:FBTP1!", "d": "BTP Future"},
+                    {"s": "TVC:DE10Y", "d": "Bund 10Y Yield"} ]},
                 { "title": "Forex", "symbols": [
                     {"s": "FX:EURUSD", "d": "EUR/USD"},
                     {"s": "FX:EURGBP", "d": "EUR/GBP"},
                     {"s": "FX:EURJPY", "d": "EUR/JPY"},
-                    {"s": "FX:EURCHF", "d": "EUR/CHF"} ]},
+                    {"s": "FX:EURCHF", "d": "EUR/CHF"},
+                    {"s": "FX:EURHKD", "d": "EUR/HKD"} ]},
                 { "title": "Commodities", "symbols": [
                     {"s": "TVC:GOLD", "d": "Gold"},
                     {"s": "TVC:SILVER", "d": "Silver"},
-                    {"s": "TVC:USOIL", "d": "WTI Crude"} ]}
+                    {"s": "TVC:USOIL", "d": "WTI Crude"},
+                    {"s": "TVC:UKOIL", "d": "Brent Crude"} ]}
               ] }
           </script>
         </div>"""
