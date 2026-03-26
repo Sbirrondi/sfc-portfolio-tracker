@@ -319,11 +319,8 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
         currency = row.get("currency", "EUR")
         qty = float(row["quantity"])
 
-        # Get current FX rate
-        fx_now = fx_rates.get(currency, 1.0) if currency != "EUR" else 1.0
-        df.at[idx, "fx_rate_current"] = round(fx_now, 6)
-
         live_price = None
+        yf_currency = currency  # Will be updated from yfinance if available
         if ticker:
             try:
                 info = get_ticker_info(ticker)
@@ -331,8 +328,25 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
                 if lp and lp > 0:
                     live_price = lp
                     df.at[idx, "current_price"] = round(live_price, 4)
+                # Use the actual trading currency from yfinance for FX conversion
+                # This ensures correct conversion even if transaction currency was wrong
+                reported_ccy = info.get("currency", "")
+                if reported_ccy and reported_ccy != "":
+                    yf_currency = reported_ccy
             except Exception:
                 pass
+
+        # Get current FX rate based on actual trading currency
+        if yf_currency != "EUR":
+            if yf_currency not in fx_rates:
+                try:
+                    fx_rates[yf_currency] = get_fx_rate(yf_currency, "EUR")
+                except Exception:
+                    fx_rates[yf_currency] = 1.0
+            fx_now = fx_rates.get(yf_currency, 1.0)
+        else:
+            fx_now = 1.0
+        df.at[idx, "fx_rate_current"] = round(fx_now, 6)
 
         # Use existing price if no live price fetched
         if live_price is None:
@@ -359,10 +373,11 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
             # unrealized_pnl = price_effect + fx_effect
             # price_effect = qty * (live_price - avg_cost_local) * avg_fx_at_purchase
             # fx_effect    = qty * live_price * (fx_now - avg_fx_at_purchase)
-            if currency != "EUR":
+            effective_ccy = yf_currency if yf_currency != currency else currency
+            if effective_ccy != "EUR":
                 avg_fx_purchase = float(row.get("avg_fx", 1.0) or 1.0)
                 avg_local = float(row.get("avg_cost_local", 0) or 0)
-                if avg_fx_purchase > 0 and avg_local > 0:
+                if avg_fx_purchase > 0 and avg_fx_purchase != 1.0 and avg_local > 0:
                     p_effect = qty * (live_price - avg_local) * avg_fx_purchase
                     f_effect = qty * live_price * (fx_now - avg_fx_purchase)
                     df.at[idx, "price_effect"] = round(p_effect, 2)
