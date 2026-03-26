@@ -8,3 +8,4 @@ quantstats>=0.0.62
 pyportfolioopt>=1.5.5
 scipy>=1.10.0
 matplotlib>=3.7.0
+streamlit-lightweight-charts>=0.7.0

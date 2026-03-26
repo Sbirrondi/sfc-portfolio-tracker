@@ -13,6 +13,7 @@ from pathlib import Path
 import json
 import io
 import base64
+from streamlit_lightweight_charts import renderLightweightCharts
 
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
@@ -157,6 +158,79 @@ st.markdown("""
 
 
 # ── Helper Functions ─────────────────────────────────────────────────────────
+
+# ── TradingView Lightweight Charts Helpers ────────────────────────────────
+
+TV_DARK = {
+    "layout": {
+        "textColor": "#94a3b8",
+        "background": {"type": "solid", "color": "rgba(0,0,0,0)"},
+        "fontFamily": "'Inter', sans-serif",
+        "fontSize": 11,
+    },
+    "grid": {
+        "vertLines": {"color": "rgba(99,102,241,0.05)"},
+        "horzLines": {"color": "rgba(99,102,241,0.05)"},
+    },
+    "crosshair": {"mode": 0},
+    "timeScale": {"borderColor": "rgba(99,102,241,0.1)"},
+    "rightPriceScale": {"borderColor": "rgba(99,102,241,0.1)"},
+}
+
+
+def _tv_opts(height=400, **extra):
+    """Build chart options with dark theme + custom height."""
+    opts = {**TV_DARK, "height": height}
+    opts.update(extra)
+    return opts
+
+
+def _ts_data(dates, values):
+    """Convert dates + values to TradingView [{time, value}] format."""
+    out = []
+    for d, v in zip(dates, values):
+        if pd.notna(v):
+            t = pd.Timestamp(d)
+            out.append({"time": t.strftime("%Y-%m-%d"), "value": round(float(v), 4)})
+    return out
+
+
+def tv_line_chart(series_list, height=400, key=None):
+    """Render one or more line/area series via TradingView Lightweight Charts.
+
+    series_list: list of dicts with keys:
+        dates, values, name, color, type ("Area"|"Line"|"Baseline"|"Histogram"),
+        Optional: lineWidth, topColor, bottomColor
+    """
+    tv_series = []
+    for s in series_list:
+        stype = s.get("type", "Area")
+        data = _ts_data(s["dates"], s["values"])
+        if not data:
+            continue
+        opts = {"color": s.get("color", "#6366f1"), "lineWidth": s.get("lineWidth", 2)}
+        if stype == "Area":
+            opts["topColor"] = s.get("topColor", s.get("color", "#6366f1") + "18")
+            opts["bottomColor"] = s.get("bottomColor", "rgba(0,0,0,0)")
+            opts["lineColor"] = s.get("color", "#6366f1")
+            opts["lineWidth"] = s.get("lineWidth", 2)
+        if stype == "Histogram":
+            opts["color"] = s.get("color", "#6366f1")
+        if stype == "Baseline":
+            opts["topLineColor"] = s.get("topColor", "#22c55e")
+            opts["topFillColor1"] = s.get("topColor", "#22c55e") + "18"
+            opts["topFillColor2"] = "rgba(0,0,0,0)"
+            opts["bottomLineColor"] = s.get("bottomColor", "#ef4444")
+            opts["bottomFillColor1"] = "rgba(0,0,0,0)"
+            opts["bottomFillColor2"] = s.get("bottomColor", "#ef4444") + "18"
+            opts["baseValue"] = {"type": "price", "price": s.get("baseValue", 0)}
+        entry = {"type": stype, "data": data, "options": opts}
+        if s.get("priceScale"):
+            entry["priceScale"] = s["priceScale"]
+        tv_series.append(entry)
+    if tv_series:
+        renderLightweightCharts([{"chart": _tv_opts(height), "series": tv_series}], key=key)
+
 
 def fmt_num(n, decimals=2):
     """Format number with thousands separator (apostrophe) and decimals."""
@@ -460,33 +534,12 @@ if page == "🏠 Dashboard":
                 fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
                 nav_df["bench_index"] = bp / fv * 100
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
-                line=dict(color="#6366f1", width=2.5),
-                fill="tozeroy", fillcolor="rgba(99,102,241,0.06)"))
+            _series = [{"dates": nav_df["date"], "values": nav_df["nav_index"],
+                         "color": "#6366f1", "type": "Area", "lineWidth": 2}]
             if "bench_index" in nav_df.columns:
-                fig.add_trace(go.Scatter(
-                    x=nav_df["date"], y=nav_df["bench_index"], name="Benchmark (VNGA60)",
-                    line=dict(color="#22c55e", width=2, dash="dot")))
-
-            av = nav_df["nav_index"].dropna().tolist()
-            if "bench_index" in nav_df.columns:
-                av += nav_df["bench_index"].dropna().tolist()
-            ym, yx = (min(av), max(av)) if av else (95, 105)
-            yp = max((yx - ym) * 0.15, 0.5)
-
-            fig.update_layout(
-                height=370, margin=dict(t=10, b=35, l=50, r=20),
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                yaxis_title="Base 100", yaxis_range=[ym - yp, yx + yp],
-                hovermode="x unified",
-                legend=dict(orientation="h", y=1.05, x=0, font=dict(size=11)),
-                xaxis=dict(gridcolor="rgba(99,102,241,0.05)"),
-                yaxis=dict(gridcolor="rgba(99,102,241,0.05)"),
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                _series.append({"dates": nav_df["date"], "values": nav_df["bench_index"],
+                                "color": "#22c55e", "type": "Line", "lineWidth": 2})
+            tv_line_chart(_series, height=370, key="dash_nav")
 
     # ── Two Columns: Perf Table + Allocation ──────────────────────────
     col_left, col_right = st.columns([1.15, 0.85])
@@ -850,22 +903,18 @@ elif page == "📈 Performance":
     periods_per_year, freq_label = detect_frequency(nav_series)
     st.caption(f"📊 Frequenza dati: **{freq_label}** ({len(nav_series)} osservazioni, {periods_per_year} periodi/anno)")
 
-    # Cumulative chart
+    # Cumulative chart (TradingView)
     nav_returns = calculate_returns(nav_series)
     nav_cum = cumulative_returns(nav_returns)
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(x=nav_cum.index, y=nav_cum.values * 100, name="SFC Fund",
-                              line=dict(color="#6366f1", width=3), fill="tozeroy", fillcolor="rgba(108,99,255,0.1)"))
+    _perf_series = [{"dates": nav_cum.index, "values": nav_cum.values * 100,
+                     "color": "#6366f1", "type": "Area", "lineWidth": 2}]
     if bench_series is not None and len(bench_series) > 1:
         bench_returns = calculate_returns(bench_series)
         bench_cum = cumulative_returns(bench_returns)
-        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.values * 100, name="VNGA60",
-                                  line=dict(color="#22c55e", width=2, dash="dash")))
-    fig.update_layout(height=450, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
-                      plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                      yaxis_title="Rendimento Cumulativo (%)", hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+        _perf_series.append({"dates": bench_cum.index, "values": bench_cum.values * 100,
+                             "color": "#22c55e", "type": "Line", "lineWidth": 2})
+    tv_line_chart(_perf_series, height=420, key="perf_cum")
 
     # Key Metrics
     st.markdown('<div class="section-header">Metriche Chiave</div>', unsafe_allow_html=True)
@@ -875,15 +924,13 @@ elif page == "📈 Performance":
         with cols[i % 4]:
             st.metric(key, val)
 
-    # Drawdown
+    # Drawdown (TradingView)
     st.markdown('<div class="section-header">Drawdown</div>', unsafe_allow_html=True)
     dd = drawdown_series(nav_series) * 100
-    fig_dd = go.Figure()
-    fig_dd.add_trace(go.Scatter(x=dd.index, y=dd.values, fill="tozeroy", fillcolor="rgba(230,55,87,0.3)",
-                                 line=dict(color="#ef4444", width=2), name="Drawdown"))
-    fig_dd.update_layout(height=250, margin=dict(t=10, b=30, l=50, r=20), yaxis_title="Drawdown (%)",
-                         template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_dd, use_container_width=True)
+    tv_line_chart([{"dates": dd.index, "values": dd.values, "color": "#ef4444",
+                    "type": "Area", "lineWidth": 2,
+                    "topColor": "rgba(0,0,0,0)", "bottomColor": "rgba(239,68,68,0.25)"}],
+                  height=230, key="perf_dd")
 
     # Monthly heatmap
     st.markdown('<div class="section-header">Performance Mensile</div>', unsafe_allow_html=True)
@@ -1019,33 +1066,12 @@ elif page == "📊 Analytics Avanzate":
                     first_bench = bench_f.iloc[0]
                     filtered["bench_base100"] = filtered["benchmark"] / first_bench * 100
 
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=filtered["date"], y=filtered["nav_base100"],
-                name="SFC Fund", line=dict(color="#6366f1", width=2.5),
-                fill="tonexty" if "bench_base100" in filtered.columns else None,
-                fillcolor="rgba(108,99,255,0.08)"))
+            _an_series = [{"dates": filtered["date"], "values": filtered["nav_base100"],
+                          "color": "#6366f1", "type": "Area", "lineWidth": 2}]
             if "bench_base100" in filtered.columns:
-                fig.add_trace(go.Scatter(
-                    x=filtered["date"], y=filtered["bench_base100"],
-                    name="VNGA60", line=dict(color="#22c55e", width=2, dash="dash")))
-
-            # Add reference line at 100
-            fig.add_hline(y=100, line=dict(color="gray", width=1, dash="dot"))
-
-            # Smart Y-axis range: pad min/max by 20% of range for readability
-            all_vals = filtered["nav_base100"].dropna().tolist()
-            if "bench_base100" in filtered.columns:
-                all_vals += filtered["bench_base100"].dropna().tolist()
-            y_min, y_max = min(all_vals), max(all_vals)
-            y_pad = max((y_max - y_min) * 0.15, 0.5)
-            fig.update_layout(
-                height=450, margin=dict(t=20, b=40, l=50, r=20),
-                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                yaxis_title="Base 100", hovermode="x unified",
-                yaxis_range=[y_min - y_pad, y_max + y_pad],
-                legend=dict(orientation="h", y=1.08))
-            st.plotly_chart(fig, use_container_width=True)
+                _an_series.append({"dates": filtered["date"], "values": filtered["bench_base100"],
+                                   "color": "#22c55e", "type": "Line", "lineWidth": 2})
+            tv_line_chart(_an_series, height=420, key=f"analytics_nav_{period}")
 
             # Period performance
             fund_perf = (filtered["nav"].iloc[-1] / filtered["nav"].iloc[0] - 1)
@@ -1105,38 +1131,31 @@ elif page == "📊 Analytics Avanzate":
         else:
             for col_name, color in [("Rolling Sharpe", "#6366f1"), ("Rolling Sortino", "#22c55e"), ("Rolling Volatility", "#f59e0b")]:
                 if col_name in rolling.columns:
-                    fig = go.Figure()
-                    fig.add_trace(go.Scatter(
-                        x=rolling.index, y=rolling[col_name],
-                        name=col_name, line=dict(color=color, width=2),
-                        fill="tozeroy", fillcolor=f"rgba({','.join(str(int(color.lstrip('#')[i:i+2], 16)) for i in (0, 2, 4))},0.1)"))
-                    if "Sharpe" in col_name or "Sortino" in col_name:
-                        fig.add_hline(y=0, line=dict(color="gray", width=1, dash="dot"))
-                    fig.update_layout(
-                        height=250, margin=dict(t=10, b=30, l=50, r=20),
-                        template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                        yaxis_title=col_name, showlegend=False)
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.caption(col_name)
+                    _bv = 0 if "Sharpe" in col_name or "Sortino" in col_name else None
+                    if _bv is not None:
+                        tv_line_chart([{"dates": rolling.index, "values": rolling[col_name],
+                                        "color": color, "type": "Baseline", "baseValue": _bv,
+                                        "topColor": "#22c55e", "bottomColor": "#ef4444"}],
+                                      height=220, key=f"roll_{col_name}")
+                    else:
+                        tv_line_chart([{"dates": rolling.index, "values": rolling[col_name],
+                                        "color": color, "type": "Area", "lineWidth": 2}],
+                                      height=220, key=f"roll_{col_name}")
 
     with tab_dd:
         st.markdown('<div class="section-header">Dettaglio Drawdown</div>', unsafe_allow_html=True)
 
-        # Drawdown series chart
+        # Drawdown series chart (TradingView)
         dd_series = nav_returns.copy()
         cum = (1 + dd_series).cumprod()
         running_max = cum.cummax()
         dd_pct = (cum / running_max - 1) * 100
 
-        fig_dd = go.Figure()
-        fig_dd.add_trace(go.Scatter(
-            x=dd_pct.index, y=dd_pct.values,
-            fill="tozeroy", fillcolor="rgba(230,55,87,0.3)",
-            line=dict(color="#ef4444", width=2), name="Drawdown"))
-        fig_dd.update_layout(
-            height=300, margin=dict(t=10, b=30, l=50, r=20),
-            yaxis_title="Drawdown %", template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_dd, use_container_width=True)
+        tv_line_chart([{"dates": dd_pct.index, "values": dd_pct.values, "color": "#ef4444",
+                        "type": "Area", "lineWidth": 2,
+                        "topColor": "rgba(0,0,0,0)", "bottomColor": "rgba(239,68,68,0.25)"}],
+                      height=280, key="analytics_dd")
 
         # Drawdown details table
         dd_detail = drawdown_details(nav_returns)
