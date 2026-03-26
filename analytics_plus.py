@@ -71,7 +71,7 @@ def build_daily_nav_series(
         return pd.DataFrame(columns=["date", "nav", "benchmark"])
 
     tickers = list(set(h["ticker"] for h in holdings))
-    tickers.append("VNGA60.MI")  # Benchmark: Vanguard FTSE All-World UCITS ETF
+    tickers.append("VNGA60.MI")  # Benchmark: Vanguard LifeStrategy 60% Equity UCITS ETF
 
     # Download all historical prices in one batch
     start = inception_date

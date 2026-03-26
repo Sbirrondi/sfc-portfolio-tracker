@@ -207,8 +207,8 @@ def get_logo_base64():
 
 def color_pnl(val):
     if isinstance(val, (int, float)):
-        if val > 0: return "color: #00d97e"
-        elif val < 0: return "color: #e63757"
+        if val > 0: return "color: #22c55e"
+        elif val < 0: return "color: #ef4444"
     return ""
 
 
@@ -357,9 +357,9 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
         {
           "symbols": [
-            {"proName": "MIL:VNGA60", "title": "VNGA60 Benchmark"},
-            {"proName": "INDEX:FTSEMIB", "title": "FTSE MIB"},
-            {"proName": "FOREXCOM:SPXUSD", "title": "S&P 500"},
+            {"proName": "MIL:VNGA60", "title": "VNGA60"},
+            {"proName": "FTSE:FTSEMIB", "title": "FTSE MIB"},
+            {"proName": "FOREXCOM:SPX500", "title": "S&P 500"},
             {"proName": "TVC:SX5E", "title": "Euro Stoxx 50"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
@@ -399,7 +399,13 @@ if page == "🏠 Dashboard":
     nav = nav_total
     initial_nav = fund_info.get("initial_nav", 10_000_000)
     inception_perf = (nav - initial_nav) / initial_nav if initial_nav > 0 else total_pnl_pct
-    bench_perf_val = fund_info.get("benchmark_performance", 0) or 0
+
+    # Compute benchmark performance from nav_history (live, not from stale JSON)
+    bench_perf_val = 0
+    if not nav_history.empty and "benchmark" in nav_history.columns:
+        _bv = pd.to_numeric(nav_history["benchmark"], errors="coerce").dropna()
+        if len(_bv) >= 2:
+            bench_perf_val = (_bv.iloc[-1] / _bv.iloc[0] - 1) if _bv.iloc[0] > 0 else 0
     alpha = inception_perf - bench_perf_val
 
     unrealized_total = positions["unrealized_pnl"].sum() if "unrealized_pnl" in positions.columns else total_pnl
@@ -416,12 +422,12 @@ if page == "🏠 Dashboard":
     <div class="kpi-grid">
         <div class="kpi-card accent-purple">
             <div class="kpi-label">NAV Corrente</div>
-            <div class="kpi-value">{fmt_eur_short(nav)}</div>
+            <div class="kpi-value">{fmt_eur_full(nav)}</div>
             <div class="kpi-delta"><span class="{_pc(inception_perf)}">{_pf(inception_perf)}</span> since inception</div>
         </div>
         <div class="kpi-card accent-green">
             <div class="kpi-label">Total Return</div>
-            <div class="kpi-value">{fmt_eur_short(total_return_all)}</div>
+            <div class="kpi-value">{fmt_eur_full(total_return_all)}</div>
             <div class="kpi-delta">Unreal. {fmt_eur_short(unrealized_total)} &middot; Real. {fmt_eur_short(realized_total + dividends_total)}</div>
         </div>
         <div class="kpi-card accent-blue">
@@ -431,7 +437,7 @@ if page == "🏠 Dashboard":
         </div>
         <div class="kpi-card accent-amber">
             <div class="kpi-label">Cash &amp; Positions</div>
-            <div class="kpi-value">{fmt_eur_short(liquidita)}</div>
+            <div class="kpi-value">{fmt_eur_full(liquidita)}</div>
             <div class="kpi-delta">{cash_pct:.1%} del NAV &middot; {len(positions)} posizioni attive</div>
         </div>
     </div>""", unsafe_allow_html=True)
@@ -657,7 +663,7 @@ if page == "🏠 Dashboard":
                     {"s": "FOREXCOM:SPXUSD", "d": "S&P 500"},
                     {"s": "TVC:SX5E", "d": "Euro Stoxx 50"},
                     {"s": "TVC:NI225", "d": "Nikkei 225"},
-                    {"s": "TVC:DAX", "d": "DAX"} ]},
+                    {"s": "TVC:DEU40", "d": "DAX 40"} ]},
                 { "title": "Bond", "symbols": [
                     {"s": "CBOT:ZN1!", "d": "US 10Y Treasury"},
                     {"s": "CBOT:ZB1!", "d": "US 30Y Treasury"},
@@ -759,7 +765,7 @@ elif page == "📋 Posizioni":
             fx_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
         show = format_table_numbers(show, euro_cols=fx_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
-        st.dataframe(show, width="stretch", hide_index=True,
+        st.dataframe(show, use_container_width=True, hide_index=True,
                      height=min(500, len(show) * 38 + 50))
 
     # Equity
@@ -808,7 +814,7 @@ elif page == "📋 Posizioni":
         all_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
     show_all = format_table_numbers(show_all, euro_cols=all_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
-    st.dataframe(show_all, width="stretch", hide_index=True,
+    st.dataframe(show_all, use_container_width=True, hide_index=True,
                  height=min(800, len(show_all) * 38 + 50))
 
     csv_buf = io.StringIO()
@@ -850,16 +856,16 @@ elif page == "📈 Performance":
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=nav_cum.index, y=nav_cum.values * 100, name="SFC Fund",
-                              line=dict(color="#6c63ff", width=3), fill="tozeroy", fillcolor="rgba(108,99,255,0.1)"))
+                              line=dict(color="#6366f1", width=3), fill="tozeroy", fillcolor="rgba(108,99,255,0.1)"))
     if bench_series is not None and len(bench_series) > 1:
         bench_returns = calculate_returns(bench_series)
         bench_cum = cumulative_returns(bench_returns)
-        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.values * 100, name="FTSE All-World",
-                                  line=dict(color="#00d97e", width=2, dash="dash")))
+        fig.add_trace(go.Scatter(x=bench_cum.index, y=bench_cum.values * 100, name="VNGA60",
+                                  line=dict(color="#22c55e", width=2, dash="dash")))
     fig.update_layout(height=450, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
                       plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                       yaxis_title="Rendimento Cumulativo (%)", hovermode="x unified")
-    st.plotly_chart(fig, width="stretch")
+    st.plotly_chart(fig, use_container_width=True)
 
     # Key Metrics
     st.markdown('<div class="section-header">Metriche Chiave</div>', unsafe_allow_html=True)
@@ -874,10 +880,10 @@ elif page == "📈 Performance":
     dd = drawdown_series(nav_series) * 100
     fig_dd = go.Figure()
     fig_dd.add_trace(go.Scatter(x=dd.index, y=dd.values, fill="tozeroy", fillcolor="rgba(230,55,87,0.3)",
-                                 line=dict(color="#e63757", width=2), name="Drawdown"))
+                                 line=dict(color="#ef4444", width=2), name="Drawdown"))
     fig_dd.update_layout(height=250, margin=dict(t=10, b=30, l=50, r=20), yaxis_title="Drawdown (%)",
                          template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_dd, width="stretch")
+    st.plotly_chart(fig_dd, use_container_width=True)
 
     # Monthly heatmap
     st.markdown('<div class="section-header">Performance Mensile</div>', unsafe_allow_html=True)
@@ -886,12 +892,12 @@ elif page == "📈 Performance":
         fig_heat = go.Figure(data=go.Heatmap(
             z=monthly.values * 100, x=monthly.columns.tolist(),
             y=[str(y) for y in monthly.index.tolist()],
-            colorscale=[[0, "#e63757"], [0.5, "#1a1a2e"], [1, "#00d97e"]], zmid=0,
+            colorscale=[[0, "#ef4444"], [0.5, "#1a1a2e"], [1, "#22c55e"]], zmid=0,
             text=np.where(np.isnan(monthly.values), "", np.vectorize(lambda x: f"{x*100:.1f}%")(monthly.values)),
             texttemplate="%{text}", textfont={"size": 11}))
         fig_heat.update_layout(height=max(180, len(monthly) * 50 + 50), margin=dict(t=10, b=10, l=60, r=20),
                                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_heat, width="stretch")
+        st.plotly_chart(fig_heat, use_container_width=True)
 
     # ── P&L per Posizione (Top and Bottom) ────────────────────────────────
     if has_data:
@@ -908,7 +914,7 @@ elif page == "📈 Performance":
             combined = pd.concat([top, bottom]).drop_duplicates()
             combined = combined.sort_values("pnl_pct_d")
 
-            colors = ["#e63757" if x < 0 else "#00d97e" for x in combined["pnl_pct_d"]]
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in combined["pnl_pct_d"]]
 
             fig_pnl = go.Figure(go.Bar(
                 x=combined["pnl_pct_d"].values,
@@ -925,7 +931,7 @@ elif page == "📈 Performance":
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 xaxis_title="P&L %", yaxis=dict(autorange="reversed"),
             )
-            st.plotly_chart(fig_pnl, width="stretch")
+            st.plotly_chart(fig_pnl, use_container_width=True)
         else:
             st.info("Nessun dato P&L disponibile.")
 
@@ -981,7 +987,7 @@ elif page == "📊 Analytics Avanzate":
          "📊 Drawdown Analysis", "📄 Report HTML"])
 
     with tab_perf:
-        st.markdown('<div class="section-header">NAV Giornaliero vs Benchmark (FTSE All-World)</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-header">NAV Giornaliero vs Benchmark (VNGA60)</div>', unsafe_allow_html=True)
 
         # Period selector
         period = st.selectbox("Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"], index=0)
@@ -1016,13 +1022,13 @@ elif page == "📊 Analytics Avanzate":
             fig = go.Figure()
             fig.add_trace(go.Scatter(
                 x=filtered["date"], y=filtered["nav_base100"],
-                name="SFC Fund", line=dict(color="#6c63ff", width=2.5),
+                name="SFC Fund", line=dict(color="#6366f1", width=2.5),
                 fill="tonexty" if "bench_base100" in filtered.columns else None,
                 fillcolor="rgba(108,99,255,0.08)"))
             if "bench_base100" in filtered.columns:
                 fig.add_trace(go.Scatter(
                     x=filtered["date"], y=filtered["bench_base100"],
-                    name="FTSE All-World", line=dict(color="#00d97e", width=2, dash="dash")))
+                    name="VNGA60", line=dict(color="#22c55e", width=2, dash="dash")))
 
             # Add reference line at 100
             fig.add_hline(y=100, line=dict(color="gray", width=1, dash="dot"))
@@ -1039,7 +1045,7 @@ elif page == "📊 Analytics Avanzate":
                 yaxis_title="Base 100", hovermode="x unified",
                 yaxis_range=[y_min - y_pad, y_max + y_pad],
                 legend=dict(orientation="h", y=1.08))
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
 
             # Period performance
             fund_perf = (filtered["nav"].iloc[-1] / filtered["nav"].iloc[0] - 1)
@@ -1097,7 +1103,7 @@ elif page == "📊 Analytics Avanzate":
         if rolling.empty:
             st.warning(f"Servono almeno {window} giorni di dati.")
         else:
-            for col_name, color in [("Rolling Sharpe", "#6c63ff"), ("Rolling Sortino", "#00d97e"), ("Rolling Volatility", "#ffc107")]:
+            for col_name, color in [("Rolling Sharpe", "#6366f1"), ("Rolling Sortino", "#22c55e"), ("Rolling Volatility", "#f59e0b")]:
                 if col_name in rolling.columns:
                     fig = go.Figure()
                     fig.add_trace(go.Scatter(
@@ -1110,7 +1116,7 @@ elif page == "📊 Analytics Avanzate":
                         height=250, margin=dict(t=10, b=30, l=50, r=20),
                         template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                         yaxis_title=col_name, showlegend=False)
-                    st.plotly_chart(fig, width="stretch")
+                    st.plotly_chart(fig, use_container_width=True)
 
     with tab_dd:
         st.markdown('<div class="section-header">Dettaglio Drawdown</div>', unsafe_allow_html=True)
@@ -1125,18 +1131,18 @@ elif page == "📊 Analytics Avanzate":
         fig_dd.add_trace(go.Scatter(
             x=dd_pct.index, y=dd_pct.values,
             fill="tozeroy", fillcolor="rgba(230,55,87,0.3)",
-            line=dict(color="#e63757", width=2), name="Drawdown"))
+            line=dict(color="#ef4444", width=2), name="Drawdown"))
         fig_dd.update_layout(
             height=300, margin=dict(t=10, b=30, l=50, r=20),
             yaxis_title="Drawdown %", template="plotly_dark",
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_dd, width="stretch")
+        st.plotly_chart(fig_dd, use_container_width=True)
 
         # Drawdown details table
         dd_detail = drawdown_details(nav_returns)
         if not dd_detail.empty:
             st.markdown("**Top 10 Drawdown Periods**")
-            st.dataframe(dd_detail, width="stretch", hide_index=True)
+            st.dataframe(dd_detail, use_container_width=True, hide_index=True)
         else:
             st.info("Dettagli drawdown non disponibili.")
 
@@ -1144,7 +1150,7 @@ elif page == "📊 Analytics Avanzate":
         st.markdown('<div class="section-header">Report HTML QuantStats</div>', unsafe_allow_html=True)
         st.markdown("Genera un report completo in formato HTML scaricabile, con tutte le metriche e grafici.")
 
-        if st.button("📄 Genera Report HTML", width="stretch"):
+        if st.button("📄 Genera Report HTML", use_container_width=True):
             with st.spinner("Generando report..."):
                 report_path = generate_html_report(
                     nav_returns, bench_returns,
@@ -1193,7 +1199,7 @@ elif page == "🏆 Contribuzione P&L":
         fig_g = go.Figure(go.Bar(
             x=top_gain["pnl"].values,
             y=top_gain["name"].values,
-            orientation="h", marker_color="#00d97e",
+            orientation="h", marker_color="#22c55e",
             text=[f"€{x:+,.0f}".replace(",", "'") for x in top_gain["pnl"]],
             textposition="outside"))
         fig_g.update_layout(
@@ -1201,14 +1207,14 @@ elif page == "🏆 Contribuzione P&L":
             margin=dict(t=10, b=30, l=180, r=80),
             template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_g, width="stretch")
+        st.plotly_chart(fig_g, use_container_width=True)
 
     with col_l:
         st.markdown("**🔴 Top 10 Contributori Negativi**")
         fig_l = go.Figure(go.Bar(
             x=top_loss["pnl"].values,
             y=top_loss["name"].values,
-            orientation="h", marker_color="#e63757",
+            orientation="h", marker_color="#ef4444",
             text=[f"€{x:+,.0f}".replace(",", "'") for x in top_loss["pnl"]],
             textposition="outside"))
         fig_l.update_layout(
@@ -1216,7 +1222,7 @@ elif page == "🏆 Contribuzione P&L":
             margin=dict(t=10, b=30, l=180, r=80),
             template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_l, width="stretch")
+        st.plotly_chart(fig_l, use_container_width=True)
 
     # Full contribution table
     contrib_table = contrib_pos.sort_values("pnl", ascending=False).copy()
@@ -1229,7 +1235,7 @@ elif page == "🏆 Contribuzione P&L":
                              "P&L €", "P&L %", "Contrib. PTF (pp)", "Peso PTF %"]
     show_contrib = format_table_numbers(show_contrib,
                                          euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(show_contrib, width="stretch", hide_index=True, height=min(600, len(show_contrib) * 38 + 50))
+    st.dataframe(show_contrib, use_container_width=True, hide_index=True, height=min(600, len(show_contrib) * 38 + 50))
 
     st.divider()
 
@@ -1246,7 +1252,7 @@ elif page == "🏆 Contribuzione P&L":
     by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2)
     by_sector = by_sector.sort_values("pnl", ascending=True)
 
-    colors_s = ["#e63757" if x < 0 else "#00d97e" for x in by_sector["pnl"]]
+    colors_s = ["#ef4444" if x < 0 else "#22c55e" for x in by_sector["pnl"]]
     fig_sec = go.Figure(go.Bar(
         x=by_sector["pnl"].values,
         y=by_sector["sector"].values,
@@ -1257,13 +1263,13 @@ elif page == "🏆 Contribuzione P&L":
         height=max(400, len(by_sector) * 30),
         margin=dict(t=10, b=30, l=200, r=80),
         template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_sec, width="stretch")
+    st.plotly_chart(fig_sec, use_container_width=True)
 
     sec_table = by_sector.sort_values("pnl", ascending=False)
     sec_show = sec_table[["sector", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
     sec_show.columns = ["Settore", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
     sec_show = format_table_numbers(sec_show, euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(sec_show, width="stretch", hide_index=True)
+    st.dataframe(sec_show, use_container_width=True, hide_index=True)
 
     st.divider()
 
@@ -1288,17 +1294,17 @@ elif page == "🏆 Contribuzione P&L":
     with col_pie:
         fig_mp = px.pie(by_macro, values="value", names="macro_class", hole=0.5,
                          color="macro_class",
-                         color_discrete_map={"Equity": "#6c63ff", "Fixed Income": "#00d97e",
-                                             "Alternative": "#ffc107", "Liquidità": "#8892b0"})
+                         color_discrete_map={"Equity": "#6366f1", "Fixed Income": "#22c55e",
+                                             "Alternative": "#f59e0b", "Liquidità": "#64748b"})
         fig_mp.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
                               template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                               title="Allocazione per Valore")
         fig_mp.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
-        st.plotly_chart(fig_mp, width="stretch")
+        st.plotly_chart(fig_mp, use_container_width=True)
 
     with col_bar:
         by_macro_sorted = by_macro[by_macro["macro_class"] != "Liquidità"].sort_values("pnl")
-        colors_m = ["#e63757" if x < 0 else "#00d97e" for x in by_macro_sorted["pnl"]]
+        colors_m = ["#ef4444" if x < 0 else "#22c55e" for x in by_macro_sorted["pnl"]]
         fig_mb = go.Figure(go.Bar(
             x=by_macro_sorted["pnl"].values,
             y=by_macro_sorted["macro_class"].values,
@@ -1309,12 +1315,12 @@ elif page == "🏆 Contribuzione P&L":
             height=350, margin=dict(t=20, b=30, l=120, r=80),
             template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             title="P&L per Macro Classe")
-        st.plotly_chart(fig_mb, width="stretch")
+        st.plotly_chart(fig_mb, use_container_width=True)
 
     macro_show = by_macro[["macro_class", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
     macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
     macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(macro_show, width="stretch", hide_index=True)
+    st.dataframe(macro_show, use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1387,7 +1393,7 @@ elif page == "🏛️ Analisi Fixed Income":
                 rating = st.text_input("Rating (es. BBB+, A-)",
                                         value=overrides.get(bond_isin, {}).get("rating", "NR"))
 
-            if st.form_submit_button("💾 Salva", width="stretch"):
+            if st.form_submit_button("💾 Salva", use_container_width=True):
                 current_ov = get_overrides()
                 if bond_isin not in current_ov:
                     current_ov[bond_isin] = {}
@@ -1497,7 +1503,7 @@ elif page == "🏛️ Analisi Fixed Income":
 
     # Detail table
     if analysis_rows:
-        st.dataframe(pd.DataFrame(analysis_rows), width="stretch", hide_index=True,
+        st.dataframe(pd.DataFrame(analysis_rows), use_container_width=True, hide_index=True,
                      height=min(500, len(analysis_rows) * 38 + 50))
 
     # ── Interest Rate Sensitivity ─────────────────────────────────────
@@ -1522,7 +1528,7 @@ elif page == "🏛️ Analisi Fixed Income":
         impact_df = pd.DataFrame(impacts)
 
         # Bar chart of impacts
-        colors = ["#00d97e" if x >= 0 else "#e63757" for x in impact_df["Impatto €"]]
+        colors = ["#22c55e" if x >= 0 else "#ef4444" for x in impact_df["Impatto €"]]
         fig_sens = go.Figure(go.Bar(
             x=[f"{r*100:+.0f}bp" for r in rate_changes],
             y=impact_df["Impatto €"].values,
@@ -1533,14 +1539,14 @@ elif page == "🏛️ Analisi Fixed Income":
             height=400, margin=dict(t=20, b=40, l=60, r=20),
             template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title="Variazione Tassi", yaxis_title="Impatto sul Valore FI (€)")
-        st.plotly_chart(fig_sens, width="stretch")
+        st.plotly_chart(fig_sens, use_container_width=True)
 
         # Table
         show_impact = impact_df.copy()
         show_impact["Impatto €"] = show_impact["Impatto €"].apply(lambda x: f"€{x:+,.0f}".replace(",", "'"))
         show_impact["Nuovo Valore FI"] = show_impact["Nuovo Valore FI"].apply(lambda x: fmt_eur_full(x))
         show_impact["Impatto %"] = show_impact["Impatto %"].apply(lambda x: f"{x:+.2f}%")
-        st.dataframe(show_impact, width="stretch", hide_index=True)
+        st.dataframe(show_impact, use_container_width=True, hide_index=True)
 
     # ── Rating Distribution ───────────────────────────────────────────
     st.divider()
@@ -1564,7 +1570,7 @@ elif page == "🏛️ Analisi Fixed Income":
                                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                                title="Distribuzione per Rating")
         fig_rat.update_traces(textposition="inside", textinfo="percent+label")
-        st.plotly_chart(fig_rat, width="stretch")
+        st.plotly_chart(fig_rat, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1672,7 +1678,7 @@ elif page == "🎯 Ottimizzazione PTF":
         comp_df = pd.DataFrame(comparison)
         comp_df = comp_df[(comp_df.iloc[:, 1:] > 0).any(axis=1)]  # Remove all-zero rows
         comp_df = comp_df.sort_values("Attuale %", ascending=False)
-        st.dataframe(comp_df, width="stretch", hide_index=True)
+        st.dataframe(comp_df, use_container_width=True, hide_index=True)
 
         # Efficient frontier chart
         st.divider()
@@ -1683,7 +1689,7 @@ elif page == "🎯 Ottimizzazione PTF":
             fig_ef.add_trace(go.Scatter(
                 x=frontier["volatility"] * 100, y=frontier["return"] * 100,
                 mode="lines", name="Frontiera Efficiente",
-                line=dict(color="#6c63ff", width=3)))
+                line=dict(color="#6366f1", width=3)))
 
             # Plot current portfolio
             if current_w:
@@ -1697,15 +1703,15 @@ elif page == "🎯 Ottimizzazione PTF":
                     cur_vol = float(np.sqrt(w_arr @ S.values @ w_arr)) * 100
                     fig_ef.add_trace(go.Scatter(
                         x=[cur_vol], y=[cur_ret], mode="markers",
-                        marker=dict(size=14, color="#e63757", symbol="star"),
+                        marker=dict(size=14, color="#ef4444", symbol="star"),
                         name="PTF Attuale"))
                 except Exception:
                     pass
 
             # Plot optimal portfolios
             for label, result, color in [
-                ("Max Sharpe", result_ms, "#00d97e"),
-                ("Min Vol", result_mv, "#ffc107"),
+                ("Max Sharpe", result_ms, "#22c55e"),
+                ("Min Vol", result_mv, "#f59e0b"),
                 ("HRP", result_hrp, "#ff6b6b")]:
                 if "volatility" in result:
                     fig_ef.add_trace(go.Scatter(
@@ -1718,7 +1724,7 @@ elif page == "🎯 Ottimizzazione PTF":
                 template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 xaxis_title="Volatilità Annualizzata (%)", yaxis_title="Return Atteso Annualizzato (%)",
                 legend=dict(orientation="h", y=1.1))
-            st.plotly_chart(fig_ef, width="stretch")
+            st.plotly_chart(fig_ef, use_container_width=True)
         else:
             st.info("Impossibile generare la frontiera efficiente.")
 
@@ -1732,23 +1738,23 @@ elif page == "🎯 Ottimizzazione PTF":
             fig_rc = go.Figure()
             fig_rc.add_trace(go.Bar(
                 x=rc_df["name"], y=rc_df["weight"],
-                name="Peso %", marker_color="#6c63ff"))
+                name="Peso %", marker_color="#6366f1"))
             fig_rc.add_trace(go.Bar(
                 x=rc_df["name"], y=rc_df["pct_contribution"],
-                name="Contributo Rischio %", marker_color="#e63757"))
+                name="Contributo Rischio %", marker_color="#ef4444"))
             fig_rc.update_layout(
                 height=450, margin=dict(t=20, b=100, l=50, r=20),
                 template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 barmode="group", xaxis_tickangle=-45,
                 legend=dict(orientation="h", y=1.08))
-            st.plotly_chart(fig_rc, width="stretch")
+            st.plotly_chart(fig_rc, use_container_width=True)
 
             # Table
             rc_show = rc_df.copy()
             rc_show["weight"] = rc_show["weight"].round(2)
             rc_show["pct_contribution"] = rc_show["pct_contribution"].round(2)
             rc_show.columns = ["Strumento", "Peso %", "Risk Contribution", "% Rischio Totale"]
-            st.dataframe(rc_show, width="stretch", hide_index=True)
+            st.dataframe(rc_show, use_container_width=True, hide_index=True)
 
             # Risk/Weight ratio
             rc_df["risk_weight_ratio"] = rc_df["pct_contribution"] / rc_df["weight"].replace(0, np.nan)
@@ -1770,7 +1776,7 @@ elif page == "🎯 Ottimizzazione PTF":
             fig_corr = go.Figure(data=go.Heatmap(
                 z=corr.values,
                 x=short_names, y=short_names,
-                colorscale=[[0, "#e63757"], [0.5, "#1a1a2e"], [1, "#00d97e"]],
+                colorscale=[[0, "#ef4444"], [0.5, "#1a1a2e"], [1, "#22c55e"]],
                 zmid=0, zmin=-1, zmax=1,
                 text=np.vectorize(lambda x: f"{x:.2f}")(corr.values),
                 texttemplate="%{text}", textfont={"size": 9}))
@@ -1778,7 +1784,7 @@ elif page == "🎯 Ottimizzazione PTF":
                 height=max(500, len(corr) * 25),
                 margin=dict(t=10, b=10, l=10, r=10),
                 template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig_corr, width="stretch")
+            st.plotly_chart(fig_corr, use_container_width=True)
 
             # Key insights
             upper_tri = corr.where(np.triu(np.ones(corr.shape), k=1).astype(bool))
@@ -1841,11 +1847,11 @@ elif page == "🔬 X-Ray Esposizioni":
             fig.update_layout(height=400, margin=dict(t=20, b=20), template="plotly_dark",
                               plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
             fig.update_traces(textposition="outside", textinfo="percent+label", textfont_size=10)
-            st.plotly_chart(fig, width="stretch")
+            st.plotly_chart(fig, use_container_width=True)
         with cr:
             show_g = grouped[[group_col, "weight", "value_fmt", "count", "names"]].copy()
             show_g.columns = [label, "Peso %", "Valore €", "# Strumenti", "Strumenti"]
-            st.dataframe(show_g, width="stretch", hide_index=True)
+            st.dataframe(show_g, use_container_width=True, hide_index=True)
 
     with tab1:
         if "sector" in positions.columns:
@@ -1868,7 +1874,7 @@ elif page == "🔬 X-Ray Esposizioni":
                                          color_continuous_scale="Blues", hover_name="country", labels={"weight": "Peso %"})
                 fig_map.update_layout(height=350, margin=dict(t=10, b=10, l=0, r=0), template="plotly_dark",
                                        geo=dict(showframe=False, bgcolor="rgba(0,0,0,0)"), paper_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_map, width="stretch")
+                st.plotly_chart(fig_map, use_container_width=True)
 
     with tab3:
         exposure_chart(positions, "currency", "Valuta")
@@ -1889,7 +1895,7 @@ elif page == "🔬 X-Ray Esposizioni":
             x=top20["current_value"].values,
             y=top20["name"].values,
             orientation="h",
-            marker_color=[{"Equity": "#6c63ff", "Fixed Income": "#00d97e", "Alternative": "#ffc107"}.get(mc, "#8892b0")
+            marker_color=[{"Equity": "#6366f1", "Fixed Income": "#22c55e", "Alternative": "#f59e0b"}.get(mc, "#64748b")
                           for mc in top20["macro_class"]],
             text=[f"€{v:,.0f} ({w:.1f}%)".replace(",", "'") for v, w in zip(top20["current_value"], top20["weight"])],
             textposition="outside",
@@ -1901,7 +1907,7 @@ elif page == "🔬 X-Ray Esposizioni":
             plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
             xaxis_title="Valore €",
         )
-        st.plotly_chart(fig_bar, width="stretch")
+        st.plotly_chart(fig_bar, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1988,7 +1994,7 @@ elif page == "💹 Multipli & Fondamentali":
                       "price_to_book": "P/B", "ev_to_ebitda": "EV/EBITDA",
                       "profit_margin": "Margin", "roe": "ROE", "dividend_yield": "Div Yield", "beta": "Beta"}
         detail = detail.rename(columns={k: v for k, v in col_rename.items() if k in detail.columns})
-        st.dataframe(detail, width="stretch", hide_index=True)
+        st.dataframe(detail, use_container_width=True, hide_index=True)
 
         # ── Contribution to P&L by Sector (replaces useless scatter) ──────
         st.markdown('<div class="section-header">Contributo al P&L per Settore</div>', unsafe_allow_html=True)
@@ -1999,7 +2005,7 @@ elif page == "💹 Multipli & Fondamentali":
                 total_pnl=("pnl", "sum"), total_value=("current_value", "sum"), count=("name", "count")
             ).reset_index()
             by_class = by_class.sort_values("total_pnl")
-            colors = ["#e63757" if x < 0 else "#00d97e" for x in by_class["total_pnl"]]
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in by_class["total_pnl"]]
             fig_contrib = go.Figure(go.Bar(
                 x=by_class["total_pnl"].values,
                 y=by_class["sector"].values,
@@ -2014,7 +2020,7 @@ elif page == "💹 Multipli & Fondamentali":
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
                 xaxis_title="P&L €",
             )
-            st.plotly_chart(fig_contrib, width="stretch")
+            st.plotly_chart(fig_contrib, use_container_width=True)
     else:
         st.warning("Nessun dato fondamentale disponibile. Verifica il mapping ISIN.")
 
@@ -2084,7 +2090,7 @@ elif page == "📝 Operazioni & Import":
                 tx_fees = st.number_input("Commissioni €", min_value=0.0, value=0.0, step=0.5)
                 tx_notes = st.text_input("Note", placeholder="Opzionale")
 
-            submitted = st.form_submit_button("✅ Registra Operazione", width="stretch")
+            submitted = st.form_submit_button("✅ Registra Operazione", use_container_width=True)
 
             if submitted:
                 if tx_type in ["BUY", "SELL"] and (not tx_isin or tx_qty <= 0 or tx_price <= 0):
@@ -2179,7 +2185,7 @@ elif page == "📝 Operazioni & Import":
             show_cols = [c for c in show_cols if c in display_tx.columns]
             st.dataframe(
                 display_tx[show_cols].sort_values("date", ascending=False),
-                width="stretch", hide_index=True, height=500)
+                use_container_width=True, hide_index=True, height=500)
 
             csv_buf = io.StringIO()
             display_tx.to_csv(csv_buf, index=False)
@@ -2318,7 +2324,7 @@ elif page == "📝 Operazioni & Import":
             show_price = price_status[["name", "isin", "ticker", "mapped", "avg_cost", "current_price", "pnl_pct_d"]].copy()
             show_price.columns = ["Nome", "ISIN", "Ticker", "Mappato", "Prezzo Carico", "Prezzo Attuale", "P&L %"]
             show_price = format_table_numbers(show_price, price_cols=["Prezzo Carico", "Prezzo Attuale"])
-            st.dataframe(show_price, width="stretch", hide_index=True)
+            st.dataframe(show_price, use_container_width=True, hide_index=True)
 
     with tab_manual:
         st.markdown("Inserisci manualmente i prezzi per strumenti **non mappati** su Yahoo Finance "
@@ -2348,7 +2354,7 @@ elif page == "📝 Operazioni & Import":
                 mp_price = st.number_input("Nuovo Prezzo", min_value=0.0, step=0.01,
                                             help="Inserisci il prezzo corrente dello strumento")
 
-                if st.form_submit_button("💾 Aggiorna Prezzo", width="stretch"):
+                if st.form_submit_button("💾 Aggiorna Prezzo", use_container_width=True):
                     if mp_isin and mp_price > 0:
                         fresh_pos = load_positions()
                         idx = fresh_pos[fresh_pos["isin"] == mp_isin].index
@@ -2467,7 +2473,7 @@ elif page == "⚙️ Gestione Info Strumenti":
                         mc_list = ["Equity", "Fixed Income", "Alternative"]
                         new_macro = st.selectbox("Macro Classe", mc_list,
                                                   index=mc_list.index(existing.get("macro_class", "Equity")) if existing.get("macro_class") in mc_list else 0)
-                    if st.form_submit_button("💾 Salva", width="stretch"):
+                    if st.form_submit_button("💾 Salva", use_container_width=True):
                         update = {}
                         if new_name: update["name"] = new_name
                         if new_sector: update["sector"] = new_sector
@@ -2512,4 +2518,4 @@ elif page == "⚙️ Gestione Info Strumenti":
                     st.rerun()
 
         map_df = pd.DataFrame([{"ISIN": k, "Ticker": v or "❌ Non mappato"} for k, v in current_map.items() if k != "_comment"])
-        st.dataframe(map_df, width="stretch", hide_index=True, height=400)
+        st.dataframe(map_df, use_container_width=True, hide_index=True, height=400)

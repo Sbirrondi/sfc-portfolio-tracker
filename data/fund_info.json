@@ -3,7 +3,7 @@
   "inception_date": "2023-10-01",
   "initial_nav": 10000000,
   "currency": "EUR",
-  "benchmark": "FTSE All-World",
+  "benchmark": "VNGA60",
   "benchmark_ticker": "VNGA60.MI",
   "current_nav": 12112945.15,
   "performance_since_inception": 0.2113,
