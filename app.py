@@ -39,22 +39,119 @@ st.set_page_config(page_title="SFC Investment Fund", page_icon="📊", layout="w
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    .main .block-container { padding-top: 1rem; max-width: 1500px; font-family: 'Inter', sans-serif; }
-    .fund-header {
-        background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
-        padding: 1.5rem 2rem; border-radius: 16px; color: white; margin-bottom: 1.5rem;
-        display: flex; align-items: center; gap: 1.5rem; border: 1px solid #2a2a4a;
+
+    /* ── Global ── */
+    .main .block-container {
+        padding-top: 0.5rem; max-width: 1600px;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    .fund-header img { width: 70px; height: 70px; border-radius: 50%; background: white; padding: 4px; }
-    .fund-header-text h1 { margin: 0; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.5px; }
-    .fund-header-text p { margin: 0.2rem 0 0; color: #8892b0; font-size: 0.85rem; }
+    #MainMenu, footer, header { visibility: hidden; }
+
+    /* ── Sidebar ── */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #080810 0%, #0d0d1a 100%);
+        border-right: 1px solid rgba(99,102,241,0.12);
+    }
+
+    /* ── Fund Banner ── */
+    .fund-banner {
+        background: linear-gradient(135deg, #0a0a14 0%, #12122a 50%, #0f1a2e 100%);
+        padding: 1rem 1.5rem; border-radius: 12px; color: white;
+        display: flex; align-items: center; gap: 1.2rem;
+        border: 1px solid rgba(99,102,241,0.18);
+        margin-bottom: 0.6rem; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    .fund-banner img { width: 52px; height: 52px; border-radius: 50%; background: white; padding: 3px; }
+    .fund-banner h1 { margin:0; font-size:1.3rem; font-weight:700; letter-spacing:-0.5px; color:#e2e8f0; }
+    .fund-banner p { margin:0.1rem 0 0; color:#64748b; font-size:0.75rem; letter-spacing:0.3px; }
+
+    /* ── KPI Cards ── */
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.7rem; margin-bottom:0.8rem; }
+    @media(max-width:768px){ .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+    .kpi-card {
+        background: linear-gradient(135deg, #0d0d1a 0%, #13132a 100%);
+        border: 1px solid rgba(99,102,241,0.10); border-radius:10px;
+        padding: 0.9rem 1.1rem; transition: border-color 0.2s;
+    }
+    .kpi-card:hover { border-color: rgba(99,102,241,0.3); }
+    .kpi-label { font-size:0.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:0.35rem; }
+    .kpi-value { font-size:1.45rem; font-weight:700; color:#e2e8f0; line-height:1.2; }
+    .kpi-delta { font-size:0.72rem; font-weight:500; margin-top:0.25rem; color:#64748b; }
+    .kpi-delta .pos { color:#22c55e; font-weight:600; }
+    .kpi-delta .neg { color:#ef4444; font-weight:600; }
+    .accent-purple { border-left:3px solid #6366f1; }
+    .accent-green { border-left:3px solid #22c55e; }
+    .accent-blue { border-left:3px solid #3b82f6; }
+    .accent-amber { border-left:3px solid #f59e0b; }
+
+    /* ── Section Headers ── */
     .section-header {
-        font-size: 1.1rem; font-weight: 600; color: #ccd6f6; margin: 1.5rem 0 0.8rem;
-        padding-bottom: 0.5rem; border-bottom: 1px solid #2a2a4a;
+        font-size:0.8rem; font-weight:600; color:#94a3b8; text-transform:uppercase;
+        letter-spacing:0.8px; margin:1.2rem 0 0.5rem; padding-bottom:0.4rem;
+        border-bottom:1px solid rgba(99,102,241,0.10);
     }
-    [data-testid="stSidebar"] { background: #0a0a0a; }
-    .stTabs [data-baseweb="tab-list"] { gap: 0.3rem; background: #0f0f1a; padding: 0.3rem; border-radius: 12px; }
-    .stTabs [data-baseweb="tab"] { border-radius: 10px; padding: 0.5rem 1.2rem; font-weight: 500; }
+
+    /* ── Performance Table ── */
+    .perf-table {
+        width:100%; border-collapse:separate; border-spacing:0; font-size:0.8rem;
+        border-radius:8px; overflow:hidden; border:1px solid rgba(99,102,241,0.10);
+    }
+    .perf-table thead th {
+        background:#0d0d1a; color:#94a3b8; font-weight:600; font-size:0.65rem;
+        text-transform:uppercase; letter-spacing:0.5px; padding:0.55rem 0.7rem;
+        text-align:right; border-bottom:1px solid rgba(99,102,241,0.12);
+    }
+    .perf-table thead th:first-child { text-align:left; }
+    .perf-table tbody td {
+        padding:0.5rem 0.7rem; text-align:right; color:#cbd5e1;
+        border-bottom:1px solid rgba(99,102,241,0.05);
+    }
+    .perf-table tbody td:first-child { text-align:left; font-weight:500; color:#e2e8f0; }
+    .perf-table tbody tr:hover { background:rgba(99,102,241,0.04); }
+    .perf-table .pos { color:#22c55e; font-weight:600; }
+    .perf-table .neg { color:#ef4444; font-weight:600; }
+
+    /* ── Risk / Stat Grid ── */
+    .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; }
+    .stat-item {
+        background:#0d0d1a; border:1px solid rgba(99,102,241,0.07);
+        border-radius:8px; padding:0.6rem 0.8rem;
+    }
+    .stat-label { font-size:0.6rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+    .stat-value { font-size:1.05rem; font-weight:700; color:#e2e8f0; margin-top:0.15rem; }
+
+    /* ── Movers List ── */
+    .mover-item {
+        display:flex; justify-content:space-between; align-items:center;
+        padding:0.4rem 0; border-bottom:1px solid rgba(99,102,241,0.05); font-size:0.78rem;
+    }
+    .mover-item:last-child { border-bottom:none; }
+    .mover-name { color:#cbd5e1; font-weight:500; max-width:68%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .mover-pnl { font-weight:700; }
+    .mover-pnl.pos { color:#22c55e; }
+    .mover-pnl.neg { color:#ef4444; }
+    .mover-section { font-size:0.6rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:0.5rem 0 0.3rem; }
+    .mover-section:first-child { margin-top:0; }
+
+    /* ── Streamlit Overrides ── */
+    .stTabs [data-baseweb="tab-list"] {
+        gap:0.2rem; background:rgba(13,13,26,0.6); padding:0.25rem;
+        border-radius:10px; border:1px solid rgba(99,102,241,0.08);
+    }
+    .stTabs [data-baseweb="tab"] { border-radius:8px; padding:0.4rem 1rem; font-weight:500; font-size:0.8rem; }
+    [data-testid="stMetric"] {
+        background: linear-gradient(135deg, #0d0d1a 0%, #13132a 100%);
+        border:1px solid rgba(99,102,241,0.08); border-radius:10px; padding:0.7rem 0.9rem;
+    }
+    [data-testid="stMetricLabel"] { font-size:0.68rem !important; text-transform:uppercase; letter-spacing:0.4px; }
+    [data-testid="stExpander"] {
+        border:1px solid rgba(99,102,241,0.08); border-radius:10px; background:rgba(13,13,26,0.3);
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-track { background:#0a0a14; }
+    ::-webkit-scrollbar-thumb { background:#2a2a4a; border-radius:3px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -171,10 +268,16 @@ if has_data:
 with st.sidebar:
     logo_b64 = get_logo_base64()
     if logo_b64:
-        st.markdown(f'<div style="text-align:center;margin-bottom:1rem;"><img src="data:image/png;base64,{logo_b64}" width="120" style="border-radius:50%;background:white;padding:8px;"></div>', unsafe_allow_html=True)
+        st.markdown(f"""<div style="text-align:center;margin:0.5rem 0 0.8rem;">
+            <img src="data:image/png;base64,{logo_b64}" width="80"
+                 style="border-radius:50%;background:white;padding:5px;box-shadow:0 2px 12px rgba(99,102,241,0.2);">
+        </div>""", unsafe_allow_html=True)
 
-    st.markdown('<h2 style="text-align:center;margin:0;">SFC Investment Fund</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center;color:#8892b0;font-size:0.8rem;">Starting Finance Club Cattolica</p>', unsafe_allow_html=True)
+    st.markdown("""<div style="text-align:center;margin-bottom:0.3rem;">
+        <span style="font-size:1.05rem;font-weight:700;color:#e2e8f0;letter-spacing:-0.3px;">SFC Investment Fund</span><br>
+        <span style="font-size:0.65rem;color:#64748b;letter-spacing:0.5px;text-transform:uppercase;">Starting Finance Club Cattolica</span>
+    </div>""", unsafe_allow_html=True)
+
     st.divider()
 
     page = st.radio(
@@ -187,31 +290,41 @@ with st.sidebar:
          "📝 Operazioni & Import", "⚙️ Gestione Info Strumenti"],
         label_visibility="collapsed",
     )
+
     st.divider()
 
     if has_data:
-        st.caption(f"📊 {len(positions)} posizioni")
-        st.caption(f"💰 NAV: {fmt_eur_full(nav_total)}")
-        st.caption(f"💵 Liquidità: {fmt_eur_full(liquidita)}")
-        st.caption(f"📅 Inception: {fund_info.get('inception_date', 'N/A')}")
+        # Compact fund summary
+        _perf = (nav_total - fund_info.get("initial_nav", 10_000_000)) / fund_info.get("initial_nav", 10_000_000) if fund_info.get("initial_nav", 0) > 0 else 0
+        _perf_color = "#22c55e" if _perf >= 0 else "#ef4444"
+        st.markdown(f"""<div style="background:rgba(13,13,26,0.5);border:1px solid rgba(99,102,241,0.08);border-radius:8px;padding:0.6rem 0.8rem;margin-bottom:0.5rem;">
+            <div style="font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">NAV</div>
+            <div style="font-size:1.1rem;font-weight:700;color:#e2e8f0;">{fmt_eur_short(nav_total)}</div>
+            <div style="font-size:0.72rem;color:{_perf_color};font-weight:600;">{_perf*100:+.2f}% since inception</div>
+        </div>""", unsafe_allow_html=True)
 
-    # Last update timestamps
-    last_prices = fund_info.get("last_updated", "—")
-    last_manual = fund_info.get("last_manual_update", "—")
-    st.caption(f"📡 Prezzi live: {last_prices}")
-    st.caption(f"✏️ Prezzi manuali: {last_manual}")
+        st.markdown(f"""<div style="font-size:0.72rem;color:#94a3b8;line-height:1.7;padding:0 0.2rem;">
+            <span style="color:#64748b;">Posizioni:</span> {len(positions)}<br>
+            <span style="color:#64748b;">Cash:</span> {fmt_eur_short(liquidita)}<br>
+            <span style="color:#64748b;">Inception:</span> {fund_info.get('inception_date', 'N/A')}
+        </div>""", unsafe_allow_html=True)
+
+    st.markdown(f"""<div style="font-size:0.65rem;color:#475569;line-height:1.6;padding:0.3rem 0.2rem;margin-top:0.3rem;">
+        Last update: {fund_info.get("last_updated", "—")}
+    </div>""", unsafe_allow_html=True)
 
     # GitHub sync status
     try:
         from github_sync import get_sync_status
         sync = get_sync_status()
         if sync["enabled"]:
-            st.caption(f"☁️ Sync attivo")
+            st.markdown('<div style="font-size:0.6rem;color:#22c55e;padding:0 0.2rem;">● Sync attivo</div>', unsafe_allow_html=True)
         else:
-            st.caption("⚠️ Sync non configurato")
+            st.markdown('<div style="font-size:0.6rem;color:#f59e0b;padding:0 0.2rem;">○ Sync non configurato</div>', unsafe_allow_html=True)
     except Exception:
         pass
 
+    st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
     if st.button("🔄 Ricarica Dati", use_container_width=True):
         with st.spinner("Aggiornando prezzi e ricalcolando..."):
             try:
@@ -234,175 +347,181 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 
 if page == "🏠 Dashboard":
+    import streamlit.components.v1 as components
 
+    # ── Ticker Tape (TradingView) — live market context ───────────────
+    ticker_tape = """
+    <div class="tradingview-widget-container">
+      <div class="tradingview-widget-container__widget"></div>
+      <script type="text/javascript"
+        src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
+        {
+          "symbols": [
+            {"proName": "MIL:VNGA60", "title": "VNGA60 Benchmark"},
+            {"proName": "INDEX:FTSEMIB", "title": "FTSE MIB"},
+            {"proName": "FOREXCOM:SPXUSD", "title": "S&P 500"},
+            {"proName": "TVC:SX5E", "title": "Euro Stoxx 50"},
+            {"proName": "FX:EURUSD", "title": "EUR/USD"},
+            {"proName": "FX:EURGBP", "title": "EUR/GBP"},
+            {"proName": "TVC:GOLD", "title": "Gold"},
+            {"proName": "CBOT:ZN1!", "title": "US 10Y"}
+          ],
+          "showSymbolLogo": true,
+          "isTransparent": true,
+          "displayMode": "adaptive",
+          "colorTheme": "dark",
+          "locale": "it"
+        }
+      </script>
+    </div>"""
+    components.html(ticker_tape, height=46)
+
+    # ── Fund Banner ───────────────────────────────────────────────────
     logo_html = ""
     logo_b64 = get_logo_base64()
     if logo_b64:
-        logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="SFC Logo">'
+        logo_html = f'<img src="data:image/png;base64,{logo_b64}" alt="SFC">'
 
     st.markdown(f"""
-    <div class="fund-header">
+    <div class="fund-banner">
         {logo_html}
-        <div class="fund-header-text">
+        <div>
             <h1>SFC Cattolica Investment Fund</h1>
-            <p>Starting Finance Club Cattolica · Simulated Investment Fund · Since Oct 2023</p>
+            <p>Starting Finance Club Cattolica &middot; Simulated Investment Fund &middot; Since Oct 2023</p>
         </div>
     </div>""", unsafe_allow_html=True)
 
     if not has_data:
-        st.info("👋 Benvenuto! Vai su **Operazioni & Import** per caricare i dati.")
+        st.info("Benvenuto! Vai su Operazioni & Import per caricare i dati.")
         st.stop()
 
-    # ── KPI Cards ─────────────────────────────────────────────────────
-    # Usa nav_total calcolato live dalle posizioni (più affidabile del valore salvato in JSON)
+    # ── Compute Dashboard Data ────────────────────────────────────────
     nav = nav_total
     initial_nav = fund_info.get("initial_nav", 10_000_000)
     inception_perf = (nav - initial_nav) / initial_nav if initial_nav > 0 else total_pnl_pct
-    bench_perf = fund_info.get("benchmark_performance", 0)
-    diff_perf = (inception_perf or 0) - (bench_perf or 0)
+    bench_perf_val = fund_info.get("benchmark_performance", 0) or 0
+    alpha = inception_perf - bench_perf_val
 
-    # Compute P&L breakdown
     unrealized_total = positions["unrealized_pnl"].sum() if "unrealized_pnl" in positions.columns else total_pnl
     realized_total = positions["realized_pnl"].sum() if "realized_pnl" in positions.columns else 0
     dividends_total = positions["dividends_received"].sum() if "dividends_received" in positions.columns else 0
     total_return_all = unrealized_total + realized_total + dividends_total
     cash_pct = liquidita / nav_total if nav_total > 0 else 0
 
-    # Row 1: NAV, Performance, Benchmark, Scostamento
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("NAV Corrente", fmt_eur_full(nav))
-    k2.metric("Performance", fmt_pct(inception_perf))
-    k3.metric("Benchmark", fmt_pct(bench_perf))
-    k4.metric("Scostamento", fmt_pct(diff_perf))
+    def _pc(v): return "pos" if v > 0 else ("neg" if v < 0 else "")
+    def _pf(v): return f"{v*100:+.2f}%"
 
-    # Row 2: Total Return, P&L breakdown, Cash
-    r1, r2, r3, r4 = st.columns(4)
-    r1.metric("Total Return", fmt_eur_full(total_return_all))
-    r2.metric("di cui Non Realizzato", fmt_eur_full(unrealized_total))
-    r3.metric("di cui Realizzato + Div.", fmt_eur_full(realized_total + dividends_total))
-    r4.metric("Liquidità", f"{fmt_eur_short(liquidita)} ({cash_pct:.0%})")
+    # ── KPI Cards (custom HTML) ───────────────────────────────────────
+    st.markdown(f"""
+    <div class="kpi-grid">
+        <div class="kpi-card accent-purple">
+            <div class="kpi-label">NAV Corrente</div>
+            <div class="kpi-value">{fmt_eur_short(nav)}</div>
+            <div class="kpi-delta"><span class="{_pc(inception_perf)}">{_pf(inception_perf)}</span> since inception</div>
+        </div>
+        <div class="kpi-card accent-green">
+            <div class="kpi-label">Total Return</div>
+            <div class="kpi-value">{fmt_eur_short(total_return_all)}</div>
+            <div class="kpi-delta">Unreal. {fmt_eur_short(unrealized_total)} &middot; Real. {fmt_eur_short(realized_total + dividends_total)}</div>
+        </div>
+        <div class="kpi-card accent-blue">
+            <div class="kpi-label">Alpha vs Benchmark</div>
+            <div class="kpi-value"><span class="{_pc(alpha)}">{_pf(alpha)}</span></div>
+            <div class="kpi-delta">Fund {_pf(inception_perf)} &middot; Bench {_pf(bench_perf_val)}</div>
+        </div>
+        <div class="kpi-card accent-amber">
+            <div class="kpi-label">Cash &amp; Positions</div>
+            <div class="kpi-value">{fmt_eur_short(liquidita)}</div>
+            <div class="kpi-delta">{cash_pct:.1%} del NAV &middot; {len(positions)} posizioni attive</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
 
-    st.divider()
-
-    # ── Performance Comparison Table ──────────────────────────────────────
+    # ── NAV vs Benchmark Chart ────────────────────────────────────────
+    nav_df = None
     if not nav_history.empty:
-        st.markdown('<div class="section-header">Performance Overview</div>', unsafe_allow_html=True)
-
         nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
-        # Filter out obviously wrong NAV values
         initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
         if initial_nav_val > 0:
             nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
             nav_df = nav_df.reset_index(drop=True)
-
-        # Calculate performance over different timeframes
         nav_df["date"] = pd.to_datetime(nav_df["date"])
-        latest_nav = nav_df["nav"].iloc[-1]
-        latest_date = nav_df["date"].iloc[-1]
 
-        bench_vals = pd.to_numeric(nav_df.get("benchmark", pd.Series(dtype=float)), errors="coerce")
+        if len(nav_df) > 1:
+            st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
+            nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
+            if "benchmark" in nav_df.columns:
+                bp = pd.to_numeric(nav_df["benchmark"], errors="coerce")
+                fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
+                nav_df["bench_index"] = bp / fv * 100
 
-        perf_rows = []
-        timeframes = {
-            "YTD": pd.Timestamp(latest_date.year, 1, 1),
-            "1M": latest_date - pd.DateOffset(months=1),
-            "3M": latest_date - pd.DateOffset(months=3),
-            "6M": latest_date - pd.DateOffset(months=6),
-            "1Y": latest_date - pd.DateOffset(years=1),
-            "Since Inception": nav_df["date"].iloc[0],
-        }
-        for label, start_dt in timeframes.items():
-            mask = nav_df["date"] >= start_dt
-            subset = nav_df[mask]
-            if len(subset) >= 1:
-                start_nav = subset["nav"].iloc[0]
-                fund_perf = (latest_nav / start_nav - 1) if start_nav > 0 else 0
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
+                line=dict(color="#6366f1", width=2.5),
+                fill="tozeroy", fillcolor="rgba(99,102,241,0.06)"))
+            if "bench_index" in nav_df.columns:
+                fig.add_trace(go.Scatter(
+                    x=nav_df["date"], y=nav_df["bench_index"], name="Benchmark (VNGA60)",
+                    line=dict(color="#22c55e", width=2, dash="dot")))
 
-                bench_perf_val = None
-                bench_subset = bench_vals[mask].dropna()
-                if len(bench_subset) >= 1:
-                    bench_start = bench_subset.iloc[0]
-                    bench_end = bench_subset.iloc[-1]
-                    bench_perf_val = (bench_end / bench_start - 1) if bench_start > 0 else None
+            av = nav_df["nav_index"].dropna().tolist()
+            if "bench_index" in nav_df.columns:
+                av += nav_df["bench_index"].dropna().tolist()
+            ym, yx = (min(av), max(av)) if av else (95, 105)
+            yp = max((yx - ym) * 0.15, 0.5)
 
-                row = {"Periodo": label, "Fondo SFC": f"{fund_perf:+.2%}"}
-                if bench_perf_val is not None:
-                    row["FTSE All-World"] = f"{bench_perf_val:+.2%}"
-                    row["Differenza"] = f"{(fund_perf - bench_perf_val):+.2%}"
-                else:
-                    row["FTSE All-World"] = "N/A"
-                    row["Differenza"] = "N/A"
-                perf_rows.append(row)
+            fig.update_layout(
+                height=370, margin=dict(t=10, b=35, l=50, r=20),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                yaxis_title="Base 100", yaxis_range=[ym - yp, yx + yp],
+                hovermode="x unified",
+                legend=dict(orientation="h", y=1.05, x=0, font=dict(size=11)),
+                xaxis=dict(gridcolor="rgba(99,102,241,0.05)"),
+                yaxis=dict(gridcolor="rgba(99,102,241,0.05)"),
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-        if perf_rows:
-            perf_table = pd.DataFrame(perf_rows)
-            st.dataframe(perf_table, width="stretch", hide_index=True, height=280)
+    # ── Two Columns: Perf Table + Allocation ──────────────────────────
+    col_left, col_right = st.columns([1.15, 0.85])
 
-    # ── NAV vs Benchmark Chart ────────────────────────────────────────────
-    if not nav_history.empty and len(nav_df) > 1:
-        st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
-        nav_df["nav_index"] = nav_df["nav"] / nav_df["nav"].iloc[0] * 100
-        if "benchmark" in nav_df.columns:
-            bench_plot = pd.to_numeric(nav_df["benchmark"], errors="coerce")
-            first_valid = bench_plot.dropna().iloc[0] if not bench_plot.dropna().empty else 1
-            nav_df["bench_index"] = bench_plot / first_valid * 100
+    with col_left:
+        st.markdown('<div class="section-header">Performance Overview</div>', unsafe_allow_html=True)
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["nav_index"], name="SFC Fund",
-                                  line=dict(color="#6c63ff", width=3)))
-        if "bench_index" in nav_df.columns:
-            fig.add_trace(go.Scatter(x=nav_df["date"], y=nav_df["bench_index"], name="FTSE All-World",
-                                      line=dict(color="#00d97e", width=2, dash="dash")))
-        all_nav_vals = nav_df["nav_index"].dropna().tolist()
-        if "bench_index" in nav_df.columns:
-            all_nav_vals += nav_df["bench_index"].dropna().tolist()
-        if all_nav_vals:
-            y_min, y_max = min(all_nav_vals), max(all_nav_vals)
-            y_pad = max((y_max - y_min) * 0.15, 0.5)
-        else:
-            y_min, y_max, y_pad = 95, 105, 1
-        fig.update_layout(height=400, margin=dict(t=20, b=40, l=50, r=20), template="plotly_dark",
-                          plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                          yaxis_title="Base 100", yaxis_range=[y_min - y_pad, y_max + y_pad],
-                          hovermode="x unified", legend=dict(orientation="h", y=1.08))
-        st.plotly_chart(fig, width="stretch")
+        if nav_df is not None and len(nav_df) >= 1:
+            latest_nav_v = nav_df["nav"].iloc[-1]
+            latest_date = nav_df["date"].iloc[-1]
+            bv = pd.to_numeric(nav_df.get("benchmark", pd.Series(dtype=float)), errors="coerce")
 
-    # ── TradingView Widget - FTSE All-World (Benchmark) ──────────────────
-    import streamlit.components.v1 as components
-    st.markdown('<div class="section-header">Vanguard LifeStrategy 60% (VNGA60) - TradingView</div>', unsafe_allow_html=True)
-    tv_html = """
-    <div class="tradingview-widget-container">
-      <div class="tradingview-widget-container__widget"></div>
-      <script type="text/javascript"
-        src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js"
-        async>
-        {
-          "symbol": "MIL:VNGA60",
-          "interval": "D",
-          "timezone": "Europe/Rome",
-          "theme": "dark",
-          "style": "1",
-          "locale": "it_IT",
-          "toolbar_bg": "#0a0a0a",
-          "enable_publishing": false,
-          "allow_symbol_change": true,
-          "save_image": true,
-          "hide_volume": false,
-          "backgroundColor": "rgba(0,0,0,0)",
-          "gridColor": "rgba(42, 42, 74, 0.3)",
-          "width": "100%",
-          "height": "450",
-          "studies": ["MASimple@tv-basicstudies"]
-        }
-      </script>
-    </div>
-    """
-    components.html(tv_html, height=470)
+            rows_html = ""
+            for label, start_dt in {
+                "YTD": pd.Timestamp(latest_date.year, 1, 1),
+                "1M": latest_date - pd.DateOffset(months=1),
+                "3M": latest_date - pd.DateOffset(months=3),
+                "6M": latest_date - pd.DateOffset(months=6),
+                "1Y": latest_date - pd.DateOffset(years=1),
+                "Since Inception": nav_df["date"].iloc[0],
+            }.items():
+                mask = nav_df["date"] >= start_dt
+                subset = nav_df[mask]
+                if len(subset) >= 1:
+                    sn = subset["nav"].iloc[0]
+                    fp = (latest_nav_v / sn - 1) if sn > 0 else 0
+                    bs = bv[mask].dropna()
+                    bp = ((bs.iloc[-1] / bs.iloc[0] - 1) if len(bs) >= 1 and bs.iloc[0] > 0 else None)
+                    dp = (fp - bp) if bp is not None else None
+                    b_str = f'<span class="{_pc(bp)}">{bp:+.2%}</span>' if bp is not None else '<span style="color:#475569">N/A</span>'
+                    d_str = f'<span class="{_pc(dp)}">{dp:+.2%}</span>' if dp is not None else '<span style="color:#475569">N/A</span>'
+                    rows_html += f'<tr><td>{label}</td><td><span class="{_pc(fp)}">{fp:+.2%}</span></td><td>{b_str}</td><td>{d_str}</td></tr>'
 
-    # ── Asset Allocation ─────────────────────────────────────────────────
-    col1, col2 = st.columns([1, 1])
+            if rows_html:
+                st.markdown(f"""
+                <table class="perf-table">
+                    <thead><tr><th>Periodo</th><th>Fondo SFC</th><th>Benchmark</th><th>Alpha</th></tr></thead>
+                    <tbody>{rows_html}</tbody>
+                </table>""", unsafe_allow_html=True)
 
-    with col1:
+    with col_right:
         st.markdown('<div class="section-header">Asset Allocation</div>', unsafe_allow_html=True)
         macro = positions.groupby("macro_class")["current_value"].sum().reset_index()
         macro["pct"] = macro["current_value"] / nav_total * 100
@@ -410,39 +529,167 @@ if page == "🏠 Dashboard":
             liq_row = pd.DataFrame([{"macro_class": "Liquidità", "current_value": liquidita, "pct": liquidita / nav_total * 100}])
             macro = pd.concat([macro, liq_row], ignore_index=True)
 
-        fig = px.bar(macro, x="macro_class", y="pct",
-                     text=[f"{p:.1f}%" for p in macro["pct"]],
-                     color="macro_class",
-                     color_discrete_map={"Equity": "#6c63ff", "Fixed Income": "#00d97e", "Alternative": "#ffc107", "Liquidità": "#8892b0"})
-        fig.update_layout(height=350, margin=dict(t=20, b=40, l=40, r=20),
-                          template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                          showlegend=False, yaxis_title="Peso %")
-        fig.update_traces(textposition="outside")
-        st.plotly_chart(fig, width="stretch")
+        cmap = {"Equity": "#6366f1", "Fixed Income": "#22c55e", "Alternative": "#f59e0b", "Liquidità": "#64748b"}
+        fig = px.pie(macro, values="pct", names="macro_class", hole=0.6,
+                     color="macro_class", color_discrete_map=cmap)
+        fig.update_layout(
+            height=270, margin=dict(t=10, b=10, l=10, r=10),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            legend=dict(orientation="h", y=-0.15, font=dict(size=10)),
+            annotations=[dict(text=f"<b>{len(positions)}</b><br><span style='font-size:10px;color:#64748b'>posizioni</span>",
+                              x=0.5, y=0.5, font_size=16, font_color="#94a3b8", showarrow=False)],
+        )
+        fig.update_traces(textposition="inside", textinfo="percent+label", textfont_size=10)
+        st.plotly_chart(fig, use_container_width=True)
 
-    with col2:
-        st.markdown('<div class="section-header">Composizione per Macro Classe</div>', unsafe_allow_html=True)
-        fig = px.pie(macro, values="pct", names="macro_class", hole=0.5,
-                     color="macro_class",
-                     color_discrete_map={"Equity": "#6c63ff", "Fixed Income": "#00d97e", "Alternative": "#ffc107", "Liquidità": "#8892b0"})
-        fig.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
-                          template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        fig.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
-        st.plotly_chart(fig, width="stretch")
+    # ── Two Columns: P&L Breakdown + Risk | Top Movers ────────────────
+    col_a, col_b = st.columns(2)
 
-    # ── Top 10 Holdings ──────────────────────────────────────────────────
-    st.markdown('<div class="section-header">Top 10 Posizioni per Valore</div>', unsafe_allow_html=True)
+    with col_a:
+        st.markdown('<div class="section-header">P&L Breakdown &amp; Risk</div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="stat-grid">
+            <div class="stat-item"><div class="stat-label">Non Realizzato</div>
+                <div class="stat-value" style="color:{'#22c55e' if unrealized_total >= 0 else '#ef4444'}">{fmt_eur_short(unrealized_total)}</div></div>
+            <div class="stat-item"><div class="stat-label">Realizzato + Div.</div>
+                <div class="stat-value">{fmt_eur_short(realized_total + dividends_total)}</div></div>
+            <div class="stat-item"><div class="stat-label">Investito Totale</div>
+                <div class="stat-value">{fmt_eur_short(total_invested)}</div></div>
+            <div class="stat-item"><div class="stat-label">Controvalore</div>
+                <div class="stat-value">{fmt_eur_short(total_value)}</div></div>
+        </div>""", unsafe_allow_html=True)
+
+        # Risk metrics from NAV history
+        if nav_df is not None and len(nav_df) > 2:
+            ns = pd.Series(nav_df["nav"].values, index=pd.DatetimeIndex(nav_df["date"]))
+            ns = ns[ns > 0]
+            if len(ns) > 2:
+                nr = calculate_returns(ns)
+                ppy, _ = detect_frequency(ns)
+                vol = annualized_volatility(nr, ppy)
+                sr = sharpe_ratio(nr, 0.03, ppy)
+                mdd = max_drawdown(nr)
+                st.markdown(f"""
+                <div class="stat-grid" style="margin-top:0.45rem">
+                    <div class="stat-item"><div class="stat-label">Volatilità Ann.</div>
+                        <div class="stat-value">{vol*100:.1f}%</div></div>
+                    <div class="stat-item"><div class="stat-label">Sharpe Ratio</div>
+                        <div class="stat-value">{sr:.2f}</div></div>
+                    <div class="stat-item"><div class="stat-label">Max Drawdown</div>
+                        <div class="stat-value" style="color:#ef4444">{mdd*100:.1f}%</div></div>
+                    <div class="stat-item"><div class="stat-label">Equity / Fixed Inc.</div>
+                        <div class="stat-value">{positions[positions["macro_class"]=="Equity"]["current_value"].sum()/nav_total*100:.0f}% / {positions[positions["macro_class"]=="Fixed Income"]["current_value"].sum()/nav_total*100:.0f}%</div></div>
+                </div>""", unsafe_allow_html=True)
+
+    with col_b:
+        st.markdown('<div class="section-header">Top &amp; Bottom Performers</div>', unsafe_allow_html=True)
+        pnl_sorted = positions[positions["pnl_pct"] != 0].sort_values("pnl_pct", ascending=False)
+        if not pnl_sorted.empty:
+            top5 = pnl_sorted.head(5)
+            btm5 = pnl_sorted.tail(5)
+            mhtml = '<div class="mover-section">Best Performers</div>'
+            for _, r in top5.iterrows():
+                pv = r["pnl_pct"] * 100
+                mhtml += f'<div class="mover-item"><span class="mover-name">{r["name"]}</span><span class="mover-pnl {_pc(r["pnl_pct"])}">{pv:+.1f}%</span></div>'
+            mhtml += '<div class="mover-section">Worst Performers</div>'
+            for _, r in btm5.iterrows():
+                pv = r["pnl_pct"] * 100
+                mhtml += f'<div class="mover-item"><span class="mover-name">{r["name"]}</span><span class="mover-pnl {_pc(r["pnl_pct"])}">{pv:+.1f}%</span></div>'
+            st.markdown(mhtml, unsafe_allow_html=True)
+
+    # ── Top 10 Holdings ───────────────────────────────────────────────
+    st.markdown('<div class="section-header">Top 10 Holdings</div>', unsafe_allow_html=True)
     top10 = positions.nlargest(10, "current_value")[
         ["name", "macro_class", "currency", "avg_cost", "current_price", "invested_capital", "current_value", "pnl", "pnl_pct"]
     ].copy()
     top10["weight"] = (top10["current_value"] / nav_total * 100).round(2)
     top10["pnl_pct_d"] = (top10["pnl_pct"] * 100).round(2)
-    top10_display = top10[["name", "macro_class", "currency", "avg_cost", "current_price", "invested_capital", "current_value", "pnl", "pnl_pct_d", "weight"]].copy()
-    top10_display.columns = ["Nome", "Classe", "Valuta", "Prezzo Carico", "Prezzo Attuale", "Investito", "Controvalore", "P&L", "P&L %", "Peso %"]
+    top10_display = top10[["name", "macro_class", "currency", "avg_cost", "current_price",
+                           "invested_capital", "current_value", "pnl", "pnl_pct_d", "weight"]].copy()
+    top10_display.columns = ["Nome", "Classe", "Valuta", "Costo", "Prezzo", "Investito", "Valore", "P&L", "P&L %", "Peso %"]
     top10_display = format_table_numbers(top10_display,
-                                          euro_cols=["Investito", "Controvalore", "P&L"],
-                                          price_cols=["Prezzo Carico", "Prezzo Attuale"])
-    st.dataframe(top10_display, width="stretch", hide_index=True, height=min(450, 10 * 38 + 50))
+                                          euro_cols=["Investito", "Valore", "P&L"],
+                                          price_cols=["Costo", "Prezzo"])
+    st.dataframe(top10_display, use_container_width=True, hide_index=True, height=min(420, 10 * 38 + 50))
+
+    # ── Market Context (TradingView widgets in tabs) ──────────────────
+    st.markdown('<div class="section-header">Contesto di Mercato</div>', unsafe_allow_html=True)
+    tab_bench, tab_overview, tab_cal = st.tabs(["Benchmark Live", "Market Overview", "Calendario Economico"])
+
+    with tab_bench:
+        tv_chart = """
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript"
+            src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+            { "symbol": "MIL:VNGA60", "interval": "D", "timezone": "Europe/Rome",
+              "theme": "dark", "style": "1", "locale": "it_IT",
+              "enable_publishing": false, "allow_symbol_change": true,
+              "save_image": true, "hide_volume": false,
+              "backgroundColor": "rgba(0,0,0,0)", "gridColor": "rgba(42,42,74,0.12)",
+              "width": "100%", "height": "500",
+              "studies": ["MASimple@tv-basicstudies"] }
+          </script>
+        </div>"""
+        components.html(tv_chart, height=520)
+
+    with tab_overview:
+        tv_mkt = """
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript"
+            src="https://s3.tradingview.com/external-embedding/embed-widget-market-overview.js" async>
+            { "colorTheme": "dark", "dateRange": "1M", "showChart": true,
+              "locale": "it", "isTransparent": true, "showSymbolLogo": true,
+              "showFloatingTooltip": true, "width": "100%", "height": "500",
+              "plotLineColorGrowing": "rgba(99,102,241,0.8)",
+              "plotLineColorFalling": "rgba(239,68,68,0.8)",
+              "gridLineColor": "rgba(99,102,241,0.06)",
+              "scaleFontColor": "rgba(148,163,184,1)",
+              "belowLineFillColorGrowing": "rgba(99,102,241,0.05)",
+              "belowLineFillColorFalling": "rgba(239,68,68,0.05)",
+              "belowLineFillColorGrowingBottom": "rgba(0,0,0,0)",
+              "belowLineFillColorFallingBottom": "rgba(0,0,0,0)",
+              "symbolActiveColor": "rgba(99,102,241,0.12)",
+              "tabs": [
+                { "title": "Indici", "symbols": [
+                    {"s": "INDEX:FTSEMIB", "d": "FTSE MIB"},
+                    {"s": "FOREXCOM:SPXUSD", "d": "S&P 500"},
+                    {"s": "TVC:SX5E", "d": "Euro Stoxx 50"},
+                    {"s": "TVC:NI225", "d": "Nikkei 225"},
+                    {"s": "TVC:DAX", "d": "DAX"} ]},
+                { "title": "Bond", "symbols": [
+                    {"s": "CBOT:ZN1!", "d": "US 10Y Treasury"},
+                    {"s": "CBOT:ZB1!", "d": "US 30Y Treasury"},
+                    {"s": "EUREX:FGBL1!", "d": "Euro Bund"},
+                    {"s": "EUREX:FBTP1!", "d": "BTP Future"} ]},
+                { "title": "Forex", "symbols": [
+                    {"s": "FX:EURUSD", "d": "EUR/USD"},
+                    {"s": "FX:EURGBP", "d": "EUR/GBP"},
+                    {"s": "FX:EURJPY", "d": "EUR/JPY"},
+                    {"s": "FX:EURCHF", "d": "EUR/CHF"} ]},
+                { "title": "Commodities", "symbols": [
+                    {"s": "TVC:GOLD", "d": "Gold"},
+                    {"s": "TVC:SILVER", "d": "Silver"},
+                    {"s": "TVC:USOIL", "d": "WTI Crude"} ]}
+              ] }
+          </script>
+        </div>"""
+        components.html(tv_mkt, height=520)
+
+    with tab_cal:
+        tv_cal = """
+        <div class="tradingview-widget-container">
+          <div class="tradingview-widget-container__widget"></div>
+          <script type="text/javascript"
+            src="https://s3.tradingview.com/external-embedding/embed-widget-events.js" async>
+            { "colorTheme": "dark", "isTransparent": true,
+              "width": "100%", "height": "480",
+              "locale": "it", "importanceFilter": "0,1",
+              "countryFilter": "eu,us,gb,it" }
+          </script>
+        </div>"""
+        components.html(tv_cal, height=500)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
