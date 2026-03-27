@@ -435,10 +435,10 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
         {
           "symbols": [
-            {"proName": "OANDA:IT40EUR", "title": "FTSE MIB"},
-            {"proName": "OANDA:SPX500USD", "title": "S&P 500"},
-            {"proName": "OANDA:EU50EUR", "title": "Euro Stoxx 50"},
-            {"proName": "OANDA:NAS100USD", "title": "Nasdaq 100"},
+            {"proName": "FOREXCOM:IT40", "title": "FTSE MIB"},
+            {"proName": "FOREXCOM:SPXUSD", "title": "S&P 500"},
+            {"proName": "FOREXCOM:EU50", "title": "Euro Stoxx 50"},
+            {"proName": "FOREXCOM:NSXUSD", "title": "Nasdaq 100"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
             {"proName": "FX:EURHKD", "title": "EUR/HKD"},
@@ -531,6 +531,20 @@ if page == "🏠 Dashboard":
             nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
             nav_df = nav_df.reset_index(drop=True)
         nav_df["date"] = pd.to_datetime(nav_df["date"])
+
+        # Auto-interpolate to daily if data is sparse (monthly points)
+        if len(nav_df) >= 2:
+            _avg_gap = (nav_df["date"].iloc[-1] - nav_df["date"].iloc[0]).days / max(len(nav_df) - 1, 1)
+            if _avg_gap > 7:  # More than weekly → interpolate to daily
+                _daily_range = pd.date_range(start=nav_df["date"].iloc[0], end=nav_df["date"].iloc[-1], freq="B")
+                _nav_indexed = nav_df.set_index("date")["nav"]
+                _daily_nav = _nav_indexed.reindex(_daily_range).interpolate(method="linear").ffill().bfill()
+                _daily_df = pd.DataFrame({"date": _daily_range, "nav": _daily_nav.values})
+                if "benchmark" in nav_df.columns:
+                    _bench_indexed = pd.to_numeric(nav_df.set_index("date")["benchmark"], errors="coerce")
+                    _daily_bench = _bench_indexed.reindex(_daily_range).interpolate(method="linear").ffill().bfill()
+                    _daily_df["benchmark"] = _daily_bench.values
+                nav_df = _daily_df.reset_index(drop=True)
 
         if len(nav_df) > 1:
             st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
@@ -731,7 +745,7 @@ if page == "🏠 Dashboard":
           <div class="tradingview-widget-container__widget"></div>
           <script type="text/javascript"
             src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-            { "symbol": "OANDA:EU50EUR", "interval": "D", "timezone": "Europe/Rome",
+            { "symbol": "FOREXCOM:EU50", "interval": "D", "timezone": "Europe/Rome",
               "theme": "dark", "style": "1", "locale": "it_IT",
               "enable_publishing": false, "allow_symbol_change": true,
               "save_image": true, "hide_volume": false,
