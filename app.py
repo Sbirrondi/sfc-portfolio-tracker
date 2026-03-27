@@ -402,13 +402,44 @@ with st.sidebar:
     if st.button("🔄 Ricarica Dati", use_container_width=True):
         with st.spinner("Ricalcolando posizioni da transazioni e aggiornando prezzi..."):
             try:
-                # Step 1: Recompute positions from transactions (fixes qty, avg_cost_local, avg_fx)
+                # Step 1: Save old positions as price fallback
+                old_pos = load_positions()
+                old_prices = {}
+                if not old_pos.empty:
+                    for _, r in old_pos.iterrows():
+                        _isin = r.get("isin", "")
+                        _cp = float(r.get("current_price", 0) or 0)
+                        _fx = float(r.get("fx_rate_current", 1.0) or 1.0)
+                        if _isin and _cp > 0:
+                            old_prices[_isin] = {"current_price": _cp, "fx_rate_current": _fx}
+
+                # Step 2: Recompute positions from transactions (fixes qty, avg_cost_local, avg_fx)
                 fresh_pos = compute_positions_from_transactions()
                 if not fresh_pos.empty:
-                    # Step 2: Update live prices and FX rates
+                    # Step 3: Update live prices and FX rates (uses batch download)
                     updated = update_position_prices(fresh_pos, get_isin_map())
+
+                    # Step 4: For any position that still has price=0, use old price as fallback
+                    for idx, row in updated.iterrows():
+                        cp = float(row.get("current_price", 0) or 0)
+                        if cp <= 0:
+                            isin = row.get("isin", "")
+                            if isin in old_prices:
+                                ocp = old_prices[isin]["current_price"]
+                                ofx = old_prices[isin]["fx_rate_current"]
+                                updated.at[idx, "current_price"] = ocp
+                                updated.at[idx, "fx_rate_current"] = ofx
+                                qty = float(row.get("quantity", 0) or 0)
+                                invested = float(row.get("invested_capital", 0) or 0)
+                                value_eur = qty * ocp * ofx
+                                unrealized = value_eur - invested
+                                updated.at[idx, "current_value"] = round(value_eur, 2)
+                                updated.at[idx, "pnl"] = round(unrealized, 2)
+                                updated.at[idx, "unrealized_pnl"] = round(unrealized, 2)
+                                updated.at[idx, "pnl_pct"] = round(unrealized / invested, 6) if invested > 0 else 0
+
                     save_positions(updated)
-                    # Step 3: Recompute cash and NAV
+                    # Step 5: Recompute cash and NAV
                     cash = compute_cash_from_transactions()
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)

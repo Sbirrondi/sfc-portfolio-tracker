@@ -284,7 +284,7 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
     if positions.empty:
         return positions
 
-    from data_fetcher import get_ticker_info, get_fx_rate
+    from data_fetcher import get_ticker_info, get_fx_rate, batch_download_prices
 
     df = positions.copy()
 
@@ -304,6 +304,20 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
     df["avg_fx"] = pd.to_numeric(df["avg_fx"], errors="coerce").fillna(1.0)
     df["avg_fx"] = df["avg_fx"].replace(0.0, 1.0)
 
+    # Build ISIN→ticker mapping for all positions
+    isin_to_ticker = {}
+    all_tickers = []
+    for _, row in df.iterrows():
+        isin = row.get("isin", "")
+        ticker = isin_map.get(isin)
+        if ticker:
+            isin_to_ticker[isin] = ticker
+            if ticker not in all_tickers:
+                all_tickers.append(ticker)
+
+    # BATCH download all prices in one call (much faster & more reliable)
+    batch_prices = batch_download_prices(all_tickers) if all_tickers else {}
+
     # Fetch FX rates once per currency (avoid repeated API calls)
     currencies_needed = df[df["currency"] != "EUR"]["currency"].unique()
     fx_rates = {}
@@ -315,26 +329,35 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
 
     for idx, row in df.iterrows():
         isin = row.get("isin", "")
-        ticker = isin_map.get(isin)
+        ticker = isin_to_ticker.get(isin)
         currency = row.get("currency", "EUR")
         qty = float(row["quantity"])
 
         live_price = None
         yf_currency = currency  # Will be updated from yfinance if available
+
         if ticker:
-            try:
-                info = get_ticker_info(ticker)
-                lp = info.get("current_price", 0)
-                if lp and lp > 0:
-                    live_price = lp
-                    df.at[idx, "current_price"] = round(live_price, 4)
-                # Use the actual trading currency from yfinance for FX conversion
-                # This ensures correct conversion even if transaction currency was wrong
-                reported_ccy = info.get("currency", "")
-                if reported_ccy and reported_ccy != "":
-                    yf_currency = reported_ccy
-            except Exception:
-                pass
+            # Try batch prices first (fast, reliable)
+            bp = batch_prices.get(ticker, {})
+            if bp.get("price", 0) > 0:
+                live_price = bp["price"]
+                df.at[idx, "current_price"] = round(live_price, 4)
+                if bp.get("currency"):
+                    yf_currency = bp["currency"]
+
+            # Fallback to individual info call if batch missed this ticker
+            if live_price is None:
+                try:
+                    info = get_ticker_info(ticker)
+                    lp = info.get("current_price", 0)
+                    if lp and lp > 0:
+                        live_price = lp
+                        df.at[idx, "current_price"] = round(live_price, 4)
+                    reported_ccy = info.get("currency", "")
+                    if reported_ccy and reported_ccy != "":
+                        yf_currency = reported_ccy
+                except Exception:
+                    pass
 
         # Get current FX rate based on actual trading currency
         if yf_currency != "EUR":

@@ -204,6 +204,67 @@ def get_current_prices(tickers: list) -> dict:
     return prices
 
 
+def batch_download_prices(tickers: list) -> dict:
+    """
+    Scarica prezzi correnti per tutti i ticker in una singola chiamata yf.download.
+    Molto più veloce e affidabile di chiamare get_ticker_info uno alla volta.
+    Restituisce: {ticker: {"price": float, "currency": str}}
+    """
+    if not tickers:
+        return {}
+
+    result = {}
+    valid_tickers = [t for t in tickers if t and isinstance(t, str)]
+    if not valid_tickers:
+        return result
+
+    try:
+        # Single batch call for all tickers — much faster than individual calls
+        data = yf.download(valid_tickers, period="5d", auto_adjust=True, progress=False, threads=True)
+        if data.empty:
+            return result
+
+        if len(valid_tickers) == 1:
+            ticker = valid_tickers[0]
+            if "Close" in data.columns:
+                closes = data["Close"].dropna()
+                if not closes.empty:
+                    result[ticker] = {"price": float(closes.iloc[-1])}
+        else:
+            if "Close" in data.columns.get_level_values(0):
+                close_data = data["Close"]
+                for ticker in valid_tickers:
+                    if ticker in close_data.columns:
+                        closes = close_data[ticker].dropna()
+                        if not closes.empty:
+                            result[ticker] = {"price": float(closes.iloc[-1])}
+    except Exception:
+        pass
+
+    # Fetch currency info for tickers that got prices (batch via yf.Tickers)
+    tickers_with_prices = [t for t in result if t in valid_tickers]
+    if tickers_with_prices:
+        try:
+            batch = yf.Tickers(" ".join(tickers_with_prices))
+            for ticker in tickers_with_prices:
+                try:
+                    t_obj = getattr(batch.tickers, ticker.replace(".", "_").replace("-", "_"), None)
+                    if t_obj is None:
+                        # Try dict access
+                        t_obj = batch.tickers.get(ticker)
+                    if t_obj:
+                        fast = t_obj.fast_info
+                        ccy = getattr(fast, "currency", None)
+                        if ccy:
+                            result[ticker]["currency"] = ccy
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    return result
+
+
 # ── Benchmark Data ───────────────────────────────────────────────────────────
 
 BENCHMARKS = {
