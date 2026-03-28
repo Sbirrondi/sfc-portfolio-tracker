@@ -1932,8 +1932,8 @@ elif page == "🔬 X-Ray Esposizioni":
     c4.metric("HHI Index", f"{hhi:.4f}")
     st.divider()
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["🏢 Settore", "🌍 Geografia", "💱 Valuta", "📊 Macro Classe", "🏭 Tipo Asset", "📈 Top Holdings"])
+    tab1, tab_ind, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["🏢 Settore", "🔎 Industry", "🌍 Geografia", "💱 Valuta", "📊 Macro Classe", "🏭 Tipo Asset", "📈 Top Holdings"])
 
     def exposure_chart(df, group_col, label):
         if df.empty:
@@ -1962,6 +1962,12 @@ elif page == "🔬 X-Ray Esposizioni":
     with tab1:
         if "sector" in positions.columns:
             exposure_chart(positions, "sector", "Settore")
+
+    with tab_ind:
+        if "industry" in positions.columns:
+            exposure_chart(positions, "industry", "Industry")
+        else:
+            st.info("Nessun dato di industry disponibile. Configura le industry in overrides.json.")
 
     with tab2:
         if "country" in positions.columns:

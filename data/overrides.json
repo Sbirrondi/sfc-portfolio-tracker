@@ -3,6 +3,7 @@
   "IE00BNGJJT35": {
     "name": "Xtrackers S&P 500 Equal Weight",
     "sector": "US Large Cap",
+    "industry": "Large Cap Blend",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -11,6 +12,7 @@
   "IE00BLNMYC90": {
     "name": "iShares S&P 500 Equal Weight",
     "sector": "US Large Cap",
+    "industry": "Large Cap Blend",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -19,6 +21,7 @@
   "IE00BFMXXD54": {
     "name": "Vanguard S&P 500",
     "sector": "US Large Cap",
+    "industry": "Large Cap Blend",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -27,6 +30,7 @@
   "IE00B53SZB19": {
     "name": "iShares Nasdaq 100",
     "sector": "US Tech",
+    "industry": "Large Cap Growth",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -35,6 +39,7 @@
   "IE00B4KBBD01": {
     "name": "iShares MSCI NA Utilities",
     "sector": "Utilities",
+    "industry": "Utilities",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -43,6 +48,7 @@
   "LU0489337690": {
     "name": "Amundi FTSE EPRA Real Estate",
     "sector": "Real Estate",
+    "industry": "Real Estate Europe",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -51,6 +57,7 @@
   "IE00BM67HK77": {
     "name": "Xtrackers MSCI World Health Care",
     "sector": "Healthcare",
+    "industry": "Healthcare Global",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -59,6 +66,7 @@
   "IE00BYXG2H39": {
     "name": "iShares Biotechnology",
     "sector": "Healthcare",
+    "industry": "Biotechnology",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -67,6 +75,7 @@
   "HK0000516697": {
     "name": "China Healthcare Biotech Fund",
     "sector": "Healthcare",
+    "industry": "Biotechnology",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -75,6 +84,7 @@
   "IE00B4YBJ215": {
     "name": "iShares Core S&P 500",
     "sector": "US Large Cap",
+    "industry": "Large Cap Blend",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -83,6 +93,7 @@
   "IE00BJ38QD84": {
     "name": "iShares MSCI USA Small Cap",
     "sector": "US Small Cap",
+    "industry": "Small Cap Blend",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -91,6 +102,7 @@
   "IE000NFR7C63": {
     "name": "Amundi MSCI China Tech",
     "sector": "Technology",
+    "industry": "China Technology",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -99,6 +111,7 @@
   "LU0908500753": {
     "name": "Amundi Stoxx Europe 600",
     "sector": "Europe Broad",
+    "industry": "Diversified Europe",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -107,6 +120,7 @@
   "IE00BQQP9F84": {
     "name": "iShares Gold Producers",
     "sector": "Gold Miners",
+    "industry": "Gold Mining",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -115,6 +129,7 @@
   "LU1437017350": {
     "name": "Amundi MSCI Emerging Markets",
     "sector": "Emerging Markets",
+    "industry": "EM Diversified",
     "country": "Emerging Markets",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -123,6 +138,7 @@
   "IE000P16KP52": {
     "name": "iShares Digital Security",
     "sector": "Technology",
+    "industry": "Cybersecurity",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -187,6 +203,7 @@
   "IT0005433690": {
     "name": "BTP 0,25% Mar 2028",
     "sector": "Government Bond",
+    "industry": "Gov. Italia",
     "country": "Italy",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -198,6 +215,7 @@
   "IT0005436693": {
     "name": "BTP 0,6% Aug 2031",
     "sector": "Government Bond",
+    "industry": "Gov. Italia",
     "country": "Italy",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -209,6 +227,7 @@
   "AT0000A2HLC4": {
     "name": "Austria 0,85% Jun 2120",
     "sector": "Government Bond",
+    "industry": "Gov. Austria",
     "country": "Austria",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -220,6 +239,7 @@
   "IT0005640666": {
     "name": "BOT ZC Mar 2026",
     "sector": "Government Bond",
+    "industry": "Gov. Italia",
     "country": "Italy",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -231,6 +251,7 @@
   "DE0001141836": {
     "name": "Bobl 0% Apr 2026",
     "sector": "Government Bond",
+    "industry": "Gov. Germania",
     "country": "Germany",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -242,6 +263,7 @@
   "XS2262211076": {
     "name": "Romania 1.375% Dec 2029",
     "sector": "Government Bond",
+    "industry": "Gov. Romania",
     "country": "Romania",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -253,6 +275,7 @@
   "XS2943818059": {
     "name": "Iliad Holding 5.375% 2030",
     "sector": "Corporate Bond",
+    "industry": "Telecom",
     "country": "France",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -264,6 +287,7 @@
   "AU000XCLWAX7": {
     "name": "Australia 2,75% Nov 2029",
     "sector": "Government Bond",
+    "industry": "Gov. Australia",
     "country": "Australia",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -275,6 +299,7 @@
   "DE000A2QP4D2": {
     "name": "iShares Brazil Govt Bond",
     "sector": "Government Bond",
+    "industry": "Gov. Brasile",
     "country": "Brazil",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -286,6 +311,7 @@
   "GB00BJYDH287": {
     "name": "WisdomTree Bitcoin ETP",
     "sector": "Crypto",
+    "industry": "Bitcoin",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -294,6 +320,7 @@
   "GB00BLD4ZM24": {
     "name": "WisdomTree Ethereum ETP",
     "sector": "Crypto",
+    "industry": "Ethereum",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -302,6 +329,7 @@
   "IE00B579F325": {
     "name": "iShares Physical Gold",
     "sector": "Commodities",
+    "industry": "Oro",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -411,6 +439,7 @@
   "US91282CMN82": {
     "name": "US Treasury 4.25% Feb 2028",
     "sector": "Government Bond",
+    "industry": "Gov. USA",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -422,6 +451,7 @@
   "GB00BSQNRC93": {
     "name": "UK Bond 4.375% 24/28",
     "sector": "Government Bond",
+    "industry": "Gov. UK",
     "country": "United Kingdom",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -433,6 +463,7 @@
   "IE00B4L60045": {
     "name": "iShares Euro Corp Bond 1-5yr",
     "sector": "Corporate Bond",
+    "industry": "Investment Grade EUR",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -444,6 +475,7 @@
   "US912810PV44": {
     "name": "US TIPS 1.75% Jan 2028",
     "sector": "Government Bond",
+    "industry": "Inflation-Linked",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -455,6 +487,7 @@
   "LU1681041114": {
     "name": "Amundi EUR FRN Corp Bond ESG",
     "sector": "Corporate Bond",
+    "industry": "Floating Rate EUR",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
