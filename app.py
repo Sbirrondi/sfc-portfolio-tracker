@@ -318,19 +318,17 @@ def load_all_data():
     return positions, overrides, isin_map, fund_info, nav_history, transactions, cash_data
 
 
-@st.cache_data(ttl=3600, show_spinner="Caricamento dati benchmark giornalieri...")
-def _build_daily_nav_from_snapshots(nav_history_json: str, benchmark_ticker: str):
-    """Interpolate monthly NAV snapshots to daily and add daily benchmark data."""
-    import yfinance as yf
-
-    nav_df = pd.read_json(io.StringIO(nav_history_json))
-    if nav_df.empty or len(nav_df) < 2:
+def _interpolate_nav_to_daily(nav_history: pd.DataFrame) -> pd.DataFrame:
+    """Interpolate monthly NAV snapshots to daily resolution.
+    Pure computation, no API calls - always works."""
+    if nav_history.empty or len(nav_history) < 2:
         return pd.DataFrame()
 
+    nav_df = nav_history.copy()
     nav_df["date"] = pd.to_datetime(nav_df["date"])
     nav_df = nav_df.sort_values("date").drop_duplicates(subset=["date"]).set_index("date")
 
-    # Filter outliers before interpolation
+    # Filter outliers
     initial_nav = nav_df["nav"].iloc[0]
     if initial_nav > 0:
         nav_df = nav_df[(nav_df["nav"] > initial_nav * 0.1) & (nav_df["nav"] < initial_nav * 5.0)]
@@ -338,28 +336,15 @@ def _build_daily_nav_from_snapshots(nav_history_json: str, benchmark_ticker: str
     if len(nav_df) < 2:
         return pd.DataFrame()
 
-    # Resample to daily and interpolate NAV
+    # Resample to daily and interpolate
     daily_idx = pd.date_range(nav_df.index[0], nav_df.index[-1], freq="D")
     daily = nav_df.reindex(daily_idx)
     daily["nav"] = daily["nav"].interpolate(method="linear")
 
-    # Download daily benchmark data
-    if benchmark_ticker:
-        try:
-            bench_data = yf.download(
-                benchmark_ticker, start=str(daily.index[0].date()),
-                auto_adjust=True, progress=False,
-            )
-            if not bench_data.empty:
-                bench_close = bench_data["Close"]
-                if isinstance(bench_close, pd.DataFrame):
-                    bench_close = bench_close.iloc[:, 0]
-                bench_close = bench_close.reindex(daily_idx).ffill()
-                daily["benchmark"] = bench_close
-        except Exception:
-            pass
-
-    if "benchmark" not in daily.columns:
+    # Interpolate benchmark too if present
+    if "benchmark" in daily.columns:
+        daily["benchmark"] = pd.to_numeric(daily["benchmark"], errors="coerce").interpolate(method="linear")
+    else:
         daily["benchmark"] = np.nan
 
     daily = daily.reset_index().rename(columns={"index": "date"})
@@ -571,31 +556,10 @@ if page == "🏠 Dashboard":
     </div>""", unsafe_allow_html=True)
 
     # ── NAV vs Benchmark Chart ────────────────────────────────────────
-    nav_df = None
+    # Interpolate monthly NAV snapshots to daily for smooth chart
+    nav_df = _interpolate_nav_to_daily(nav_history)
 
-    # Build daily NAV from monthly snapshots (interpolated) + daily benchmark
-    if not nav_history.empty and len(nav_history) >= 2:
-        try:
-            _bench_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
-            _daily_nav = _build_daily_nav_from_snapshots(
-                nav_history.to_json(), _bench_ticker,
-            )
-            if not _daily_nav.empty and len(_daily_nav) > 5:
-                nav_df = _daily_nav.copy()
-                nav_df["date"] = pd.to_datetime(nav_df["date"])
-        except Exception:
-            pass
-
-    # Fallback: raw monthly snapshots
-    if nav_df is None and not nav_history.empty:
-        nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
-        initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
-        if initial_nav_val > 0:
-            nav_df = nav_df[(nav_df["nav"] > initial_nav_val * 0.1) & (nav_df["nav"] < initial_nav_val * 5.0)]
-            nav_df = nav_df.reset_index(drop=True)
-        nav_df["date"] = pd.to_datetime(nav_df["date"])
-
-    if nav_df is not None and len(nav_df) > 1:
+    if not nav_df.empty and len(nav_df) > 1:
         st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
 
         # Timeframe selector
@@ -651,7 +615,7 @@ if page == "🏠 Dashboard":
     with col_left:
         st.markdown('<div class="section-header">Performance Overview</div>', unsafe_allow_html=True)
 
-        if nav_df is not None and len(nav_df) >= 1:
+        if not nav_df.empty and len(nav_df) >= 1:
             latest_nav_v = nav_df["nav"].iloc[-1]
             latest_date = nav_df["date"].iloc[-1]
             bv = pd.to_numeric(nav_df.get("benchmark", pd.Series(dtype=float)), errors="coerce")
@@ -723,7 +687,7 @@ if page == "🏠 Dashboard":
         </div>""", unsafe_allow_html=True)
 
         # Risk metrics from NAV history
-        if nav_df is not None and len(nav_df) > 2:
+        if not nav_df.empty and len(nav_df) > 2:
             ns = pd.Series(nav_df["nav"].values, index=pd.DatetimeIndex(nav_df["date"]))
             ns = ns[ns > 0]
             if len(ns) > 2:
