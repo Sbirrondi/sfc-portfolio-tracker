@@ -665,7 +665,19 @@ def recalculate_all():
             if "_old_fx_rate_current" in positions.columns:
                 old_fx = pd.to_numeric(positions["_old_fx_rate_current"], errors="coerce").fillna(1.0)
                 old_fx = old_fx.replace(0.0, 1.0)
-                positions["fx_rate_current"] = old_fx
+                # Only use old FX rate if it's actually meaningful (not 1.0 for non-EUR)
+                for idx, row in positions.iterrows():
+                    ccy = row.get("currency", "EUR")
+                    fx_val = old_fx.iloc[idx] if idx < len(old_fx) else 1.0
+                    if ccy != "EUR" and abs(fx_val - 1.0) < 1e-6:
+                        # FX rate of 1.0 for non-EUR is wrong — use avg_fx as fallback
+                        avg_fx_val = float(row.get("avg_fx", 1.0) or 1.0)
+                        if avg_fx_val > 0 and abs(avg_fx_val - 1.0) > 1e-6:
+                            positions.at[idx, "fx_rate_current"] = avg_fx_val
+                        else:
+                            positions.at[idx, "fx_rate_current"] = 1.0
+                    else:
+                        positions.at[idx, "fx_rate_current"] = fx_val
                 positions.drop(columns=["_old_fx_rate_current"], inplace=True)
 
             # Recalculate current_value and P&L from current_price + new position data
