@@ -284,7 +284,55 @@ _BOND_EURONEXT_MAP = {
     "AU000XCLWAX7": "ETLX",  # Australia 2.75% Nov 2029
 }
 
+# Map ISIN -> TradingView exchange:ticker for bonds via TradingView scanner API
+_BOND_TV_MAP = {
+    "XS2943818059": "SWB:XS2943818059",    # Iliad 5.375% 2030
+    "US91282CMN82": "OTCB:91282CMN8",       # US Treasury 4.25% Feb 2028
+    "GB00BSQNRC93": "DUS:GBBSQNRC9",       # UK Bond 4.375% 24/28
+    "US912810PV44": "FWB:US912810PV4",      # US TIPS 1.75% Jan 2028
+}
+
 _bond_price_cache = {}
+
+
+def _fetch_tradingview_prices(isins: list) -> dict:
+    """Fetch bond prices from TradingView scanner API. Returns {isin: price}."""
+    tv_tickers = {isin: _BOND_TV_MAP[isin] for isin in isins if isin in _BOND_TV_MAP}
+    if not tv_tickers:
+        return {}
+
+    try:
+        import requests as req_lib
+        url = "https://scanner.tradingview.com/bond/scan"
+        payload = {
+            "symbols": {
+                "tickers": list(tv_tickers.values()),
+                "query": {"types": []}
+            },
+            "columns": ["close", "name", "currency"]
+        }
+        resp = req_lib.post(url, json=payload,
+                           headers={"Content-Type": "application/json"},
+                           timeout=10)
+        if resp.status_code != 200:
+            return {}
+
+        data = resp.json()
+        results = {}
+        # Build reverse map: tv_ticker -> isin
+        rev_map = {v: k for k, v in tv_tickers.items()}
+        for item in data.get("data", []):
+            ticker = item.get("s", "")
+            vals = item.get("d", [])
+            if vals and len(vals) > 0:
+                price = vals[0]
+                if isinstance(price, (int, float)) and 5 < price < 200:
+                    isin = rev_map.get(ticker)
+                    if isin:
+                        results[isin] = price
+        return results
+    except Exception:
+        return {}
 
 
 def _fetch_euronext_price(isin: str) -> float:
@@ -327,12 +375,19 @@ def get_bond_price_from_borsa_italiana(isin: str) -> float:
     if isin in _bond_price_cache:
         return _bond_price_cache[isin]
 
-    # Try Euronext API first (for non-Italian bonds)
+    # Try Euronext API (for non-Italian bonds)
     if isin in _BOND_EURONEXT_MAP:
         price = _fetch_euronext_price(isin)
         if price > 0:
             _bond_price_cache[isin] = price
             return price
+
+    # Try TradingView API
+    if isin in _BOND_TV_MAP:
+        tv_prices = _fetch_tradingview_prices([isin])
+        if isin in tv_prices:
+            _bond_price_cache[isin] = tv_prices[isin]
+            return tv_prices[isin]
 
     url_path = _BOND_BORSA_IT_MAP.get(isin)
     if not url_path:
@@ -377,10 +432,21 @@ def get_bond_price_from_borsa_italiana(isin: str) -> float:
 def get_all_bond_prices() -> dict:
     """Fetch prices for all mapped bonds. Returns {isin: price}."""
     results = {}
+
+    # Batch fetch TradingView bonds in one API call (efficient)
+    tv_isins = list(_BOND_TV_MAP.keys())
+    if tv_isins:
+        tv_prices = _fetch_tradingview_prices(tv_isins)
+        for isin, price in tv_prices.items():
+            _bond_price_cache[isin] = price
+            results[isin] = price
+
+    # Fetch Borsa Italiana and Euronext bonds individually
     for isin in list(_BOND_BORSA_IT_MAP.keys()) + list(_BOND_EURONEXT_MAP.keys()):
         price = get_bond_price_from_borsa_italiana(isin)
         if price > 0:
             results[isin] = price
+
     return results
 
 
