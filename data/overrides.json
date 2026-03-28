@@ -417,5 +417,10 @@
     "coupon_rate": 4.375,
     "maturity_date": "2028-03-01",
     "rating": "AA"
+  },
+  "IE00B4L60045": {
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   }
 }
