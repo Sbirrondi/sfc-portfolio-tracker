@@ -422,5 +422,10 @@
     "coupon_rate": 0.0,
     "maturity_date": "2029-01-01",
     "rating": "NR"
+  },
+  "US912810PV44": {
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   }
 }
