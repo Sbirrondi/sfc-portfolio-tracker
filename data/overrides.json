@@ -407,5 +407,10 @@
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
+  },
+  "US91282CMN82": {
+    "coupon_rate": 0.0,
+    "maturity_date": "",
+    "rating": "NR"
   }
 }
