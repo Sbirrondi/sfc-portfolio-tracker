@@ -306,7 +306,7 @@ def format_table_numbers(df, euro_cols=None, pct_cols=None, price_cols=None):
 
 # ── Load Data ────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=300)
 def load_all_data():
     positions = load_positions()
     overrides = get_overrides()
