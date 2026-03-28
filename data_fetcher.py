@@ -267,8 +267,79 @@ def get_all_tickers_info(tickers: list) -> pd.DataFrame:
     return pd.DataFrame(infos)
 
 
+# ── Bond Price Scraping (Borsa Italiana) ─────────────────────────────────────
+
+# Map ISIN -> Borsa Italiana URL path for bonds without yfinance tickers
+_BOND_URL_MAP = {
+    "IT0005433690": "mot/btp/scheda",
+    "IT0005436693": "mot/btp/scheda",
+    "AT0000A2HLC4": "mot/euro-obbligazioni/scheda",
+    "DE0001141836": "mot/euro-obbligazioni/scheda",
+    "XS2262211076": "mot/euro-obbligazioni/scheda",
+    "IT0005640666": "mot/btp/scheda",
+}
+
+_bond_price_cache = {}
+
+
+def get_bond_price_from_borsa_italiana(isin: str) -> float:
+    """Fetch bond price from Borsa Italiana website by scraping the page."""
+    if isin in _bond_price_cache:
+        return _bond_price_cache[isin]
+
+    url_path = _BOND_URL_MAP.get(isin)
+    if not url_path:
+        return 0.0
+
+    url = f"https://www.borsaitaliana.it/borsa/obbligazioni/{url_path}/{isin}.html"
+    try:
+        import requests as req_lib
+        import re
+        from bs4 import BeautifulSoup
+
+        resp = req_lib.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        if resp.status_code != 200:
+            return 0.0
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+
+        # Method 1: Look for price in <strong> tags (main price display)
+        for tag in soup.find_all("strong"):
+            text = tag.get_text(strip=True)
+            m = re.match(r'^(\d{1,3}),(\d{2,5})$', text)
+            if m:
+                price = float(f"{m.group(1)}.{m.group(2)}")
+                if 5 < price < 200:
+                    _bond_price_cache[isin] = price
+                    return price
+
+        # Method 2: Search full page text for price patterns
+        full_text = soup.get_text()
+        for m in re.finditer(r'(\d{1,3}),(\d{2,5})', full_text):
+            price = float(f"{m.group(1)}.{m.group(2)}")
+            if 10 < price < 150:
+                _bond_price_cache[isin] = price
+                return price
+
+    except Exception:
+        pass
+
+    return 0.0
+
+
+def get_all_bond_prices() -> dict:
+    """Fetch prices for all mapped bonds from Borsa Italiana. Returns {isin: price}."""
+    results = {}
+    for isin in _BOND_URL_MAP:
+        price = get_bond_price_from_borsa_italiana(isin)
+        if price > 0:
+            results[isin] = price
+    return results
+
+
 def clear_cache():
     """Svuota la cache."""
-    global _info_cache, _price_cache
+    global _info_cache, _price_cache, _bond_price_cache
     _info_cache = {}
     _price_cache = {}
+    _bond_price_cache = {}

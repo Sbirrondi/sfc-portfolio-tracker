@@ -284,7 +284,7 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
     if positions.empty:
         return positions
 
-    from data_fetcher import get_ticker_info, get_fx_rate
+    from data_fetcher import get_ticker_info, get_fx_rate, get_bond_price_from_borsa_italiana
 
     df = positions.copy()
 
@@ -347,6 +347,13 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
         else:
             fx_now = 1.0
         df.at[idx, "fx_rate_current"] = round(fx_now, 6)
+
+        # If no yfinance price, try Borsa Italiana for bonds
+        if live_price is None and not ticker:
+            bi_price = get_bond_price_from_borsa_italiana(isin)
+            if bi_price > 0:
+                live_price = bi_price
+                df.at[idx, "current_price"] = round(live_price, 4)
 
         # Use existing price if no live price fetched
         if live_price is None:
