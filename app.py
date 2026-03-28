@@ -318,6 +318,55 @@ def load_all_data():
     return positions, overrides, isin_map, fund_info, nav_history, transactions, cash_data
 
 
+@st.cache_data(ttl=3600, show_spinner="Caricamento dati benchmark giornalieri...")
+def _build_daily_nav_from_snapshots(nav_history_json: str, benchmark_ticker: str):
+    """Interpolate monthly NAV snapshots to daily and add daily benchmark data."""
+    import yfinance as yf
+
+    nav_df = pd.read_json(io.StringIO(nav_history_json))
+    if nav_df.empty or len(nav_df) < 2:
+        return pd.DataFrame()
+
+    nav_df["date"] = pd.to_datetime(nav_df["date"])
+    nav_df = nav_df.sort_values("date").drop_duplicates(subset=["date"]).set_index("date")
+
+    # Filter outliers before interpolation
+    initial_nav = nav_df["nav"].iloc[0]
+    if initial_nav > 0:
+        nav_df = nav_df[(nav_df["nav"] > initial_nav * 0.1) & (nav_df["nav"] < initial_nav * 5.0)]
+
+    if len(nav_df) < 2:
+        return pd.DataFrame()
+
+    # Resample to daily and interpolate NAV
+    daily_idx = pd.date_range(nav_df.index[0], nav_df.index[-1], freq="D")
+    daily = nav_df.reindex(daily_idx)
+    daily["nav"] = daily["nav"].interpolate(method="linear")
+
+    # Download daily benchmark data
+    if benchmark_ticker:
+        try:
+            bench_data = yf.download(
+                benchmark_ticker, start=str(daily.index[0].date()),
+                auto_adjust=True, progress=False,
+            )
+            if not bench_data.empty:
+                bench_close = bench_data["Close"]
+                if isinstance(bench_close, pd.DataFrame):
+                    bench_close = bench_close.iloc[:, 0]
+                bench_close = bench_close.reindex(daily_idx).ffill()
+                daily["benchmark"] = bench_close
+        except Exception:
+            pass
+
+    if "benchmark" not in daily.columns:
+        daily["benchmark"] = np.nan
+
+    daily = daily.reset_index().rename(columns={"index": "date"})
+    daily = daily.dropna(subset=["nav"])
+    return daily
+
+
 positions, overrides, isin_map, fund_info, nav_history, transactions, cash_data = load_all_data()
 has_data = not positions.empty
 
@@ -523,7 +572,22 @@ if page == "🏠 Dashboard":
 
     # ── NAV vs Benchmark Chart ────────────────────────────────────────
     nav_df = None
-    if not nav_history.empty:
+
+    # Build daily NAV from monthly snapshots (interpolated) + daily benchmark
+    if not nav_history.empty and len(nav_history) >= 2:
+        try:
+            _bench_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
+            _daily_nav = _build_daily_nav_from_snapshots(
+                nav_history.to_json(), _bench_ticker,
+            )
+            if not _daily_nav.empty and len(_daily_nav) > 5:
+                nav_df = _daily_nav.copy()
+                nav_df["date"] = pd.to_datetime(nav_df["date"])
+        except Exception:
+            pass
+
+    # Fallback: raw monthly snapshots
+    if nav_df is None and not nav_history.empty:
         nav_df = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
         initial_nav_val = nav_df["nav"].iloc[0] if len(nav_df) > 0 else 10_000_000
         if initial_nav_val > 0:
@@ -531,55 +595,55 @@ if page == "🏠 Dashboard":
             nav_df = nav_df.reset_index(drop=True)
         nav_df["date"] = pd.to_datetime(nav_df["date"])
 
-        if len(nav_df) > 1:
-            st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
+    if nav_df is not None and len(nav_df) > 1:
+        st.markdown('<div class="section-header">Andamento NAV vs Benchmark</div>', unsafe_allow_html=True)
 
-            # Timeframe selector
-            dash_period = st.selectbox(
-                "Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"],
-                index=5, key="dash_period_sel",
-            )
-            _today = pd.Timestamp.today()
-            if dash_period == "YTD":
-                _dash_start = pd.Timestamp(_today.year, 1, 1)
-            elif dash_period == "1M":
-                _dash_start = _today - pd.DateOffset(months=1)
-            elif dash_period == "3M":
-                _dash_start = _today - pd.DateOffset(months=3)
-            elif dash_period == "6M":
-                _dash_start = _today - pd.DateOffset(months=6)
-            elif dash_period == "1Y":
-                _dash_start = _today - pd.DateOffset(years=1)
-            else:
-                _dash_start = nav_df["date"].iloc[0]
+        # Timeframe selector
+        dash_period = st.selectbox(
+            "Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"],
+            index=5, key="dash_period_sel",
+        )
+        _today = pd.Timestamp.today()
+        if dash_period == "YTD":
+            _dash_start = pd.Timestamp(_today.year, 1, 1)
+        elif dash_period == "1M":
+            _dash_start = _today - pd.DateOffset(months=1)
+        elif dash_period == "3M":
+            _dash_start = _today - pd.DateOffset(months=3)
+        elif dash_period == "6M":
+            _dash_start = _today - pd.DateOffset(months=6)
+        elif dash_period == "1Y":
+            _dash_start = _today - pd.DateOffset(years=1)
+        else:
+            _dash_start = nav_df["date"].iloc[0]
 
-            nav_df_filtered = nav_df[nav_df["date"] >= _dash_start].copy()
-            if len(nav_df_filtered) < 2:
-                nav_df_filtered = nav_df.copy()
+        nav_df_filtered = nav_df[nav_df["date"] >= _dash_start].copy()
+        if len(nav_df_filtered) < 2:
+            nav_df_filtered = nav_df.copy()
 
-            nav_df_filtered["nav_index"] = nav_df_filtered["nav"] / nav_df_filtered["nav"].iloc[0] * 100
-            if "benchmark" in nav_df_filtered.columns:
-                bp = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce")
-                fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
-                nav_df_filtered["bench_index"] = bp / fv * 100
+        nav_df_filtered["nav_index"] = nav_df_filtered["nav"] / nav_df_filtered["nav"].iloc[0] * 100
+        if "benchmark" in nav_df_filtered.columns:
+            bp = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce")
+            fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
+            nav_df_filtered["bench_index"] = bp / fv * 100
 
-            _series = [{"dates": nav_df_filtered["date"], "values": nav_df_filtered["nav_index"],
-                         "color": "#6366f1", "type": "Area", "lineWidth": 2}]
-            if "bench_index" in nav_df_filtered.columns:
-                _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
-                                "color": "#22c55e", "type": "Line", "lineWidth": 2})
-            tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
+        _series = [{"dates": nav_df_filtered["date"], "values": nav_df_filtered["nav_index"],
+                     "color": "#6366f1", "type": "Area", "lineWidth": 2}]
+        if "bench_index" in nav_df_filtered.columns:
+            _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
+                            "color": "#22c55e", "type": "Line", "lineWidth": 2})
+        tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
 
-            # Period performance summary
-            _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
-            _cp = st.columns(3)
-            _cp[0].metric(f"SFC Fund ({dash_period})", f"{_fund_p:+.2%}")
-            if "benchmark" in nav_df_filtered.columns:
-                _bclean = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce").dropna()
-                if len(_bclean) >= 2:
-                    _bp = _bclean.iloc[-1] / _bclean.iloc[0] - 1
-                    _cp[1].metric(f"Benchmark ({dash_period})", f"{_bp:+.2%}")
-                    _cp[2].metric("Alpha", f"{_fund_p - _bp:+.2%}")
+        # Period performance summary
+        _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
+        _cp = st.columns(3)
+        _cp[0].metric(f"SFC Fund ({dash_period})", f"{_fund_p:+.2%}")
+        if "benchmark" in nav_df_filtered.columns:
+            _bclean = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce").dropna()
+            if len(_bclean) >= 2:
+                _bp = _bclean.iloc[-1] / _bclean.iloc[0] - 1
+                _cp[1].metric(f"Benchmark ({dash_period})", f"{_bp:+.2%}")
+                _cp[2].metric("Alpha", f"{_fund_p - _bp:+.2%}")
 
     # ── Two Columns: Perf Table + Allocation ──────────────────────────
     col_left, col_right = st.columns([1.15, 0.85])

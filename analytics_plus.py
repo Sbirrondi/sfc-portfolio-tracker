@@ -83,15 +83,26 @@ def build_daily_nav_series(
     if data.empty:
         return pd.DataFrame(columns=["date", "nav", "benchmark"])
 
-    # Extract close prices
-    if len(tickers) == 1:
-        close = data[["Close"]].copy()
-        close.columns = [tickers[0]]
-    else:
-        if "Close" in data.columns.get_level_values(0):
+    # Extract close prices - handle both old and new yfinance column formats
+    close = None
+    if isinstance(data.columns, pd.MultiIndex):
+        level0 = data.columns.get_level_values(0).unique()
+        if "Close" in level0:
             close = data["Close"].copy()
-        else:
-            return pd.DataFrame(columns=["date", "nav", "benchmark"])
+        elif "Price" in level0:
+            close = data["Price"].copy()
+    else:
+        # Single ticker: columns are just ["Close", "Open", ...]
+        if "Close" in data.columns:
+            close = data[["Close"]].copy()
+            close.columns = [tickers[0]]
+
+    if close is None or close.empty:
+        return pd.DataFrame(columns=["date", "nav", "benchmark"])
+
+    # If close is a Series (single ticker from MultiIndex), convert to DataFrame
+    if isinstance(close, pd.Series):
+        close = close.to_frame(name=tickers[0])
 
     # Forward fill missing prices (holidays, different exchanges)
     close = close.ffill()
@@ -107,13 +118,25 @@ def build_daily_nav_series(
         try:
             fx_raw = yf.download(list(fx_tickers), start=start, auto_adjust=True, progress=False)
             if not fx_raw.empty:
-                if len(fx_tickers) == 1:
-                    pair = list(fx_tickers)[0]
-                    fx_data[pair] = fx_raw["Close"].ffill()
-                else:
-                    for pair in fx_tickers:
-                        if pair in fx_raw["Close"].columns:
-                            fx_data[pair] = fx_raw["Close"][pair].ffill()
+                # Extract Close/Price from FX data
+                fx_close = None
+                if isinstance(fx_raw.columns, pd.MultiIndex):
+                    level0 = fx_raw.columns.get_level_values(0).unique()
+                    if "Close" in level0:
+                        fx_close = fx_raw["Close"]
+                    elif "Price" in level0:
+                        fx_close = fx_raw["Price"]
+                elif "Close" in fx_raw.columns:
+                    fx_close = fx_raw["Close"]
+
+                if fx_close is not None:
+                    if isinstance(fx_close, pd.Series):
+                        pair = list(fx_tickers)[0]
+                        fx_data[pair] = fx_close.ffill()
+                    else:
+                        for pair in fx_tickers:
+                            if pair in fx_close.columns:
+                                fx_data[pair] = fx_close[pair].ffill()
         except Exception:
             pass
 
