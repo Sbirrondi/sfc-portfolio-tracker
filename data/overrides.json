@@ -414,8 +414,8 @@
     "rating": "AA"
   },
   "GB00BSQNRC93": {
-    "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "coupon_rate": 4.375,
+    "maturity_date": "2028-03-01",
+    "rating": "AA"
   }
 }
