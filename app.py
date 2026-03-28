@@ -370,6 +370,12 @@ if has_data:
     liquidita = cash_data.get("balance", 0) if cash_data else 0
     nav_total = total_value + liquidita
 
+    # Use NAV from history (includes realized PnL, dividends) as authoritative value
+    if not nav_history.empty and "nav" in nav_history.columns:
+        _nav_series = pd.to_numeric(nav_history["nav"], errors="coerce").dropna()
+        if len(_nav_series) >= 1:
+            nav_total = _nav_series.iloc[-1]
+
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
 
@@ -484,15 +490,15 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
         {
           "symbols": [
-            {"proName": "AMEX:VNGA60", "title": "VNGA60"},
-            {"proName": "FOREXCOM:IT40", "title": "FTSE MIB"},
-            {"proName": "FOREXCOM:SPXUSD", "title": "S&P 500"},
-            {"proName": "FOREXCOM:EU50EUR", "title": "Euro Stoxx 50"},
-            {"proName": "FOREXCOM:NSXUSD", "title": "Nasdaq 100"},
+            {"proName": "AMEX:SPY", "title": "S&P 500"},
+            {"proName": "AMEX:QQQ", "title": "Nasdaq 100"},
+            {"proName": "AMEX:EFA", "title": "EAFE"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
             {"proName": "TVC:GOLD", "title": "Gold"},
-            {"proName": "TVC:US10Y", "title": "US 10Y"}
+            {"proName": "CBOE:TNX", "title": "US 10Y"},
+            {"proName": "AMEX:TLT", "title": "US Treasury 20Y+"},
+            {"proName": "AMEX:VT", "title": "World ETF"}
           ],
           "showSymbolLogo": true,
           "isTransparent": true,
@@ -764,7 +770,7 @@ if page == "🏠 Dashboard":
           <div class="tradingview-widget-container__widget"></div>
           <script type="text/javascript"
             src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-            { "symbol": "FOREXCOM:SPXUSD", "interval": "D", "timezone": "Europe/Rome",
+            { "symbol": "AMEX:SPY", "interval": "D", "timezone": "Europe/Rome",
               "theme": "dark", "style": "1", "locale": "it_IT",
               "enable_publishing": false, "allow_symbol_change": true,
               "save_image": true, "hide_volume": false,
@@ -795,18 +801,18 @@ if page == "🏠 Dashboard":
               "symbolActiveColor": "rgba(99,102,241,0.12)",
               "tabs": [
                 { "title": "Indici", "symbols": [
-                    {"s": "FOREXCOM:IT40", "d": "FTSE MIB"},
-                    {"s": "FOREXCOM:SPXUSD", "d": "S&P 500"},
-                    {"s": "FOREXCOM:EU50EUR", "d": "Euro Stoxx 50"},
-                    {"s": "TVC:NI225", "d": "Nikkei 225"},
-                    {"s": "FOREXCOM:DE40EUR", "d": "DAX 40"},
-                    {"s": "FOREXCOM:NSXUSD", "d": "Nasdaq 100"} ]},
+                    {"s": "AMEX:SPY", "d": "S&P 500"},
+                    {"s": "AMEX:QQQ", "d": "Nasdaq 100"},
+                    {"s": "AMEX:EFA", "d": "EAFE"},
+                    {"s": "AMEX:VGK", "d": "Europe ETF"},
+                    {"s": "AMEX:EWI", "d": "Italy ETF"},
+                    {"s": "TVC:NI225", "d": "Nikkei 225"} ]},
                 { "title": "Bond", "symbols": [
-                    {"s": "TVC:US10Y", "d": "US 10Y Yield"},
-                    {"s": "TVC:US02Y", "d": "US 2Y Yield"},
-                    {"s": "TVC:DE10Y", "d": "Bund 10Y Yield"},
-                    {"s": "TVC:IT10Y", "d": "BTP 10Y Yield"},
-                    {"s": "TVC:GB10Y", "d": "Gilt 10Y Yield"} ]},
+                    {"s": "CBOE:TNX", "d": "US 10Y Yield"},
+                    {"s": "AMEX:TLT", "d": "US Treasury 20Y+"},
+                    {"s": "AMEX:IEF", "d": "US Treasury 7-10Y"},
+                    {"s": "AMEX:AGG", "d": "US Aggregate Bond"},
+                    {"s": "AMEX:BND", "d": "Total Bond Market"} ]},
                 { "title": "Forex", "symbols": [
                     {"s": "FX:EURUSD", "d": "EUR/USD"},
                     {"s": "FX:EURGBP", "d": "EUR/GBP"},
