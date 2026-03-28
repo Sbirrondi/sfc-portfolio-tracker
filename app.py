@@ -484,11 +484,11 @@ if page == "🏠 Dashboard":
         src="https://s3.tradingview.com/external-embedding/embed-widget-ticker-tape.js" async>
         {
           "symbols": [
-            {"proName": "MIL:VNGA60", "title": "VNGA60"},
-            {"proName": "MIL:FTSEMIB", "title": "FTSE MIB"},
-            {"proName": "SP:SPX", "title": "S&P 500"},
-            {"proName": "TVC:SX5E", "title": "Euro Stoxx 50"},
-            {"proName": "NASDAQ:NDX", "title": "Nasdaq 100"},
+            {"proName": "AMEX:VNGA60", "title": "VNGA60"},
+            {"proName": "FOREXCOM:IT40", "title": "FTSE MIB"},
+            {"proName": "FOREXCOM:SPXUSD", "title": "S&P 500"},
+            {"proName": "FOREXCOM:EU50EUR", "title": "Euro Stoxx 50"},
+            {"proName": "FOREXCOM:NSXUSD", "title": "Nasdaq 100"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
             {"proName": "TVC:GOLD", "title": "Gold"},
@@ -764,7 +764,7 @@ if page == "🏠 Dashboard":
           <div class="tradingview-widget-container__widget"></div>
           <script type="text/javascript"
             src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
-            { "symbol": "MIL:VNGA60", "interval": "D", "timezone": "Europe/Rome",
+            { "symbol": "FOREXCOM:SPXUSD", "interval": "D", "timezone": "Europe/Rome",
               "theme": "dark", "style": "1", "locale": "it_IT",
               "enable_publishing": false, "allow_symbol_change": true,
               "save_image": true, "hide_volume": false,
@@ -795,18 +795,18 @@ if page == "🏠 Dashboard":
               "symbolActiveColor": "rgba(99,102,241,0.12)",
               "tabs": [
                 { "title": "Indici", "symbols": [
-                    {"s": "MIL:FTSEMIB", "d": "FTSE MIB"},
-                    {"s": "SP:SPX", "d": "S&P 500"},
-                    {"s": "TVC:SX5E", "d": "Euro Stoxx 50"},
+                    {"s": "FOREXCOM:IT40", "d": "FTSE MIB"},
+                    {"s": "FOREXCOM:SPXUSD", "d": "S&P 500"},
+                    {"s": "FOREXCOM:EU50EUR", "d": "Euro Stoxx 50"},
                     {"s": "TVC:NI225", "d": "Nikkei 225"},
-                    {"s": "XETR:DAX", "d": "DAX 40"},
-                    {"s": "NASDAQ:NDX", "d": "Nasdaq 100"} ]},
+                    {"s": "FOREXCOM:DE40EUR", "d": "DAX 40"},
+                    {"s": "FOREXCOM:NSXUSD", "d": "Nasdaq 100"} ]},
                 { "title": "Bond", "symbols": [
                     {"s": "TVC:US10Y", "d": "US 10Y Yield"},
                     {"s": "TVC:US02Y", "d": "US 2Y Yield"},
-                    {"s": "EUREX:FGBL1!", "d": "Euro Bund"},
-                    {"s": "EUREX:FBTP1!", "d": "BTP Future"},
-                    {"s": "TVC:DE10Y", "d": "Bund 10Y Yield"} ]},
+                    {"s": "TVC:DE10Y", "d": "Bund 10Y Yield"},
+                    {"s": "TVC:IT10Y", "d": "BTP 10Y Yield"},
+                    {"s": "TVC:GB10Y", "d": "Gilt 10Y Yield"} ]},
                 { "title": "Forex", "symbols": [
                     {"s": "FX:EURUSD", "d": "EUR/USD"},
                     {"s": "FX:EURGBP", "d": "EUR/GBP"},
