@@ -424,8 +424,8 @@
     "rating": "NR"
   },
   "US912810PV44": {
-    "coupon_rate": 0.0,
-    "maturity_date": "",
-    "rating": "NR"
+    "coupon_rate": 1.75,
+    "maturity_date": "2028-01-01",
+    "rating": "AA"
   }
 }
