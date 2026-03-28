@@ -439,7 +439,23 @@ with st.sidebar:
                 # Step 1: Recompute positions from transactions (fixes qty, avg_cost_local, avg_fx)
                 fresh_pos = compute_positions_from_transactions()
                 if not fresh_pos.empty:
-                    # Step 2: Update live prices and FX rates
+                    # Step 1b: Preserve manual prices from existing positions
+                    # (bonds and other instruments without yfinance tickers)
+                    existing = load_positions()
+                    if not existing.empty:
+                        old_prices = existing[["isin", "current_price", "fx_rate_current"]].copy()
+                        old_prices = old_prices.rename(columns={
+                            "current_price": "_old_price",
+                            "fx_rate_current": "_old_fx",
+                        })
+                        fresh_pos = fresh_pos.merge(old_prices, on="isin", how="left")
+                        # Restore old prices where fresh has 0
+                        mask = (fresh_pos["current_price"] == 0) & (fresh_pos["_old_price"].fillna(0) > 0)
+                        fresh_pos.loc[mask, "current_price"] = fresh_pos.loc[mask, "_old_price"]
+                        mask_fx = fresh_pos["_old_fx"].fillna(0) > 0
+                        fresh_pos.loc[mask_fx, "fx_rate_current"] = fresh_pos.loc[mask_fx, "_old_fx"]
+                        fresh_pos.drop(columns=["_old_price", "_old_fx"], inplace=True)
+                    # Step 2: Update live prices and FX rates (yfinance overwrites only mapped tickers)
                     updated = update_position_prices(fresh_pos, get_isin_map())
                     save_positions(updated)
                     # Step 3: Recompute cash and NAV
