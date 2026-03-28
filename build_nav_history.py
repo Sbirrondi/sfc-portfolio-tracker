@@ -1,0 +1,388 @@
+"""
+Build daily NAV history from transaction history + historical market prices.
+=============================================================================
+Tracks positions and cash day-by-day from inception, fetches historical prices
+from yfinance for mapped tickers, and applies FX rates for non-EUR positions.
+Bonds without tickers use their last known price (invested value / qty).
+
+Usage:
+    python build_nav_history.py
+"""
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+import pandas as pd
+import numpy as np
+import yfinance as yf
+import json
+from bisect import bisect_right
+from datetime import datetime, timedelta
+
+DATA_DIR = Path(__file__).parent / "data"
+
+
+def load_transactions():
+    df = pd.read_csv(DATA_DIR / "fund_transactions.csv")
+    df["date"] = pd.to_datetime(df["date"])
+    return df.sort_values("date").reset_index(drop=True)
+
+
+def load_isin_map():
+    with open(DATA_DIR / "isin_map.json") as f:
+        return json.load(f)
+
+
+def load_fund_info():
+    with open(DATA_DIR / "fund_info.json") as f:
+        return json.load(f)
+
+
+def load_manual_bond_prices():
+    """Load current manual prices for bonds from fund_positions.csv."""
+    pos_file = DATA_DIR / "fund_positions.csv"
+    if not pos_file.exists():
+        return {}
+    df = pd.read_csv(pos_file)
+    bond_prices = {}
+    for _, row in df.iterrows():
+        isin = row.get("isin", "")
+        price = float(row.get("current_price", 0) or 0)
+        currency = row.get("currency", "EUR") or "EUR"
+        if price > 0:
+            bond_prices[isin] = {"price": price, "currency": currency}
+    return bond_prices
+
+
+def build_daily_positions_and_cash(transactions: pd.DataFrame):
+    """
+    For each transaction date, compute the running state of:
+    - positions: dict of ISIN -> {qty, total_cost_eur, total_cost_local, currency}
+    - cash: float
+    Returns list of (date, positions_snapshot, cash) sorted by date.
+    """
+    positions = {}  # isin -> {qty, cost_eur, cost_local, currency}
+    cash = 0.0
+    events = []  # (date, positions_copy, cash)
+
+    for _, row in transactions.iterrows():
+        tx_date = row["date"]
+        tx_type = row.get("transaction_type", "")
+        isin = row.get("isin", "")
+        qty = float(row.get("quantity", 0) or 0)
+        price = float(row.get("price", 0) or 0)
+        fees = float(row.get("fees", 0) or 0)
+        currency = row.get("currency", "EUR") or "EUR"
+        fx = float(row.get("fx_rate", 1.0) or 1.0)
+
+        if tx_type == "DEPOSIT":
+            cash += qty
+        elif tx_type == "WITHDRAWAL":
+            cash -= qty
+        elif tx_type == "BUY" and isin:
+            cost_local = qty * price
+            cost_eur = cost_local
+            if currency != "EUR" and fx > 0 and fx != 1.0:
+                cost_eur = cost_local / fx
+            cash -= (cost_eur + fees)
+
+            if isin not in positions:
+                positions[isin] = {"qty": 0, "cost_eur": 0, "cost_local": 0, "currency": currency}
+            positions[isin]["qty"] += qty
+            positions[isin]["cost_eur"] += cost_eur
+            positions[isin]["cost_local"] += cost_local
+            positions[isin]["currency"] = currency
+
+        elif tx_type == "SELL" and isin:
+            if isin in positions and positions[isin]["qty"] > 0:
+                p = positions[isin]
+                sell_qty = min(qty, p["qty"])
+                avg_cost_eur = p["cost_eur"] / p["qty"] if p["qty"] > 0 else 0
+                avg_cost_local = p["cost_local"] / p["qty"] if p["qty"] > 0 else 0
+
+                proceeds_local = sell_qty * price
+                proceeds_eur = proceeds_local
+                if currency != "EUR" and fx > 0 and fx != 1.0:
+                    proceeds_eur = proceeds_local / fx
+                cash += (proceeds_eur - fees)
+
+                p["cost_eur"] -= sell_qty * avg_cost_eur
+                p["cost_local"] -= sell_qty * avg_cost_local
+                p["qty"] -= sell_qty
+
+                if p["qty"] < 1e-8:
+                    del positions[isin]
+
+        elif tx_type == "DIVIDEND":
+            div = qty * price if price > 0 else qty
+            if currency != "EUR" and fx > 0 and fx != 1.0:
+                div = div / fx
+            cash += div
+
+        # Record state after this transaction
+        pos_snapshot = {k: dict(v) for k, v in positions.items()}
+        events.append((tx_date, pos_snapshot, cash))
+
+    return events
+
+
+def _extract_close(data, tickers):
+    """Extract Close prices from yfinance download result."""
+    if data.empty:
+        return pd.DataFrame()
+    if isinstance(data.columns, pd.MultiIndex):
+        level0 = data.columns.get_level_values(0).unique()
+        col_name = "Close" if "Close" in level0 else ("Price" if "Price" in level0 else None)
+        if not col_name:
+            return pd.DataFrame()
+        close = data[col_name].copy()
+    else:
+        if "Close" in data.columns:
+            close = data[["Close"]].copy()
+            close.columns = [tickers[0]]
+        else:
+            return pd.DataFrame()
+    if isinstance(close, pd.Series):
+        close = close.to_frame(name=tickers[0])
+    return close
+
+
+def download_prices(tickers: list, start_date: str):
+    """Download historical close prices in batches to avoid data loss."""
+    print(f"Downloading prices for {len(tickers)} tickers from {start_date}...")
+
+    end_str = (pd.Timestamp.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    all_close = pd.DataFrame()
+    batch_size = 10
+
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        try:
+            data = yf.download(batch, start=start_date, end=end_str, auto_adjust=True, progress=True, threads=True)
+            close = _extract_close(data, batch)
+            if not close.empty:
+                close = close.ffill()
+                if all_close.empty:
+                    all_close = close
+                else:
+                    all_close = all_close.join(close, how="outer")
+        except Exception as e:
+            print(f"Batch download failed for {batch}: {e}")
+
+    if not all_close.empty:
+        all_close = all_close.ffill()
+
+    return all_close
+
+
+def download_fx_rates(currencies: set, start_date: str):
+    """Download historical FX rates for currency pairs vs EUR."""
+    fx_tickers = [f"{ccy}EUR=X" for ccy in currencies]
+    if not fx_tickers:
+        return {}
+
+    print(f"Downloading FX rates for {currencies}...")
+    end_str = (pd.Timestamp.today() + timedelta(days=1)).strftime("%Y-%m-%d")
+    try:
+        data = yf.download(fx_tickers, start=start_date, end=end_str, auto_adjust=True, progress=True)
+    except Exception:
+        return {}
+
+    if data.empty:
+        return {}
+
+    fx_data = {}
+    if isinstance(data.columns, pd.MultiIndex):
+        level0 = data.columns.get_level_values(0).unique()
+        col_name = "Close" if "Close" in level0 else ("Price" if "Price" in level0 else None)
+        if col_name:
+            close = data[col_name]
+            if isinstance(close, pd.Series):
+                pair = fx_tickers[0]
+                fx_data[pair] = close.ffill()
+            else:
+                for pair in fx_tickers:
+                    if pair in close.columns:
+                        fx_data[pair] = close[pair].ffill()
+    elif "Close" in data.columns:
+        pair = fx_tickers[0]
+        fx_data[pair] = data["Close"].ffill()
+
+    return fx_data
+
+
+def build_daily_nav():
+    """Main function: build daily NAV history from transactions."""
+    transactions = load_transactions()
+    isin_map = load_isin_map()
+    fund_info = load_fund_info()
+
+    if transactions.empty:
+        print("No transactions found.")
+        return
+
+    inception = pd.to_datetime(fund_info.get("inception_date", "2023-10-01"))
+    benchmark_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
+
+    # Build position events from transactions
+    events = build_daily_positions_and_cash(transactions)
+    if not events:
+        print("No events to process.")
+        return
+
+    # Collect all ISINs and their currencies
+    all_isins = set()
+    all_currencies = set()
+    for _, pos_snap, _ in events:
+        for isin, info in pos_snap.items():
+            all_isins.add(isin)
+            if info["currency"] != "EUR":
+                all_currencies.add(info["currency"])
+
+    # Map ISINs to tickers
+    mapped_tickers = {}
+    unmapped_isins = set()
+    for isin in all_isins:
+        ticker = isin_map.get(isin)
+        if ticker:
+            mapped_tickers[isin] = ticker
+        else:
+            unmapped_isins.add(isin)
+
+    print(f"Mapped tickers: {len(mapped_tickers)}, Unmapped (bonds etc): {len(unmapped_isins)}")
+
+    # Download all historical prices
+    all_tickers = list(set(mapped_tickers.values()))
+    if benchmark_ticker:
+        all_tickers.append(benchmark_ticker)
+
+    start_str = str(inception.date())
+    prices = download_prices(all_tickers, start_str)
+    fx_data = download_fx_rates(all_currencies, start_str)
+
+    if prices.empty:
+        print("No price data available.")
+        return
+
+    # Load manual bond prices for unmapped instruments
+    manual_prices = load_manual_bond_prices()
+
+    # Build daily date range
+    end_date = pd.Timestamp.today()
+    all_dates = pd.date_range(inception, end_date, freq="B")  # Business days
+
+    # For each date, find the applicable position state using bisect
+    event_dates = [e[0] for e in events]
+
+    nav_records = []
+
+    for date in all_dates:
+        # Binary search for latest event on or before this date
+        idx = bisect_right(event_dates, date) - 1
+        if idx < 0:
+            continue  # Before first transaction
+        _, positions_snap, cash = events[idx]
+
+        # Calculate portfolio value
+        port_value = 0.0
+        for isin, info in positions_snap.items():
+            qty = info["qty"]
+            currency = info["currency"]
+            cost_eur = info["cost_eur"]
+            cost_local = info["cost_local"]
+
+            if qty <= 0:
+                continue
+
+            # Helper: get FX rate for this currency on this date
+            def get_fx_rate(ccy):
+                if ccy == "EUR":
+                    return 1.0
+                fx_pair = f"{ccy}EUR=X"
+                if fx_pair in fx_data and date in fx_data[fx_pair].index:
+                    fx_val = fx_data[fx_pair].loc[date]
+                    if pd.notna(fx_val) and fx_val > 0:
+                        return float(fx_val)
+                return None
+
+            # Try to get market price from downloaded data
+            ticker = mapped_tickers.get(isin)
+            price_found = False
+            if ticker and ticker in prices.columns:
+                if date in prices.index:
+                    p = prices.loc[date, ticker]
+                    if pd.notna(p) and p > 0:
+                        fx_rate = get_fx_rate(currency)
+                        if fx_rate is None:
+                            fx_rate = 1.0  # fallback
+                        value = qty * float(p) * fx_rate
+                        port_value += value
+                        price_found = True
+
+            if not price_found:
+                # For unmapped instruments (bonds), use manual price if available
+                # Interpolate linearly from cost_local to current manual price
+                if isin in manual_prices:
+                    mp = manual_prices[isin]
+                    current_price = mp["price"]
+                    bond_ccy = mp["currency"]
+                    avg_cost_local = cost_local / qty if qty > 0 else 0
+
+                    # Linear interpolation between avg_cost and current_price
+                    # based on time fraction from first purchase to today
+                    first_buy_date = None
+                    for ev_d, ev_p, _ in events:
+                        if isin in ev_p and ev_p[isin]["qty"] > 0:
+                            first_buy_date = ev_d
+                            break
+                    if first_buy_date and end_date > first_buy_date:
+                        frac = (date - first_buy_date).days / (end_date - first_buy_date).days
+                        frac = max(0.0, min(1.0, frac))
+                        interp_price = avg_cost_local + (current_price - avg_cost_local) * frac
+                    else:
+                        interp_price = current_price
+
+                    # Convert to EUR
+                    fx_rate = get_fx_rate(bond_ccy)
+                    if fx_rate is None:
+                        fx_rate = cost_eur / cost_local if cost_local > 0 else 1.0
+                    value = qty * interp_price * fx_rate
+                    port_value += value
+                else:
+                    # No price at all — use invested capital
+                    port_value += cost_eur
+
+        total_nav = port_value + cash
+
+        # Benchmark value
+        bench_val = np.nan
+        if benchmark_ticker and benchmark_ticker in prices.columns:
+            if date in prices.index:
+                bv = prices.loc[date, benchmark_ticker]
+                if pd.notna(bv):
+                    bench_val = float(bv)
+
+        nav_records.append({
+            "date": date,
+            "nav": round(total_nav, 2),
+            "benchmark": round(bench_val, 4) if pd.notna(bench_val) else np.nan,
+        })
+
+    result = pd.DataFrame(nav_records)
+    print(f"\nGenerated {len(result)} daily NAV points")
+    print(f"Date range: {result['date'].iloc[0]} to {result['date'].iloc[-1]}")
+    print(f"NAV range: {result['nav'].min():,.0f} to {result['nav'].max():,.0f}")
+    print(f"Latest NAV: {result['nav'].iloc[-1]:,.2f}")
+
+    # Save
+    output_path = DATA_DIR / "fund_nav_history.csv"
+    result.to_csv(output_path, index=False)
+    print(f"\nSaved to {output_path}")
+
+    return result
+
+
+if __name__ == "__main__":
+    build_daily_nav()

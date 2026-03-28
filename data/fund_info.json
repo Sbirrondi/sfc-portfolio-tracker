@@ -4,7 +4,7 @@
   "initial_nav": 10000000,
   "currency": "EUR",
   "benchmark": "VNGA60",
-  "benchmark_ticker": "VNGA60.MI",
+  "benchmark_ticker": "V60A.DE",
   "current_nav": 12534502.02,
   "performance_since_inception": 0.25345020199999996,
   "benchmark_performance": 0,
