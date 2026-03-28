@@ -420,7 +420,7 @@
   },
   "IE00B4L60045": {
     "coupon_rate": 0.0,
-    "maturity_date": "",
+    "maturity_date": "2029-01-01",
     "rating": "NR"
   }
 }
