@@ -2140,7 +2140,7 @@ elif page == "📝 Operazioni & Import":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_operazioni")
-    if _mgmt_pw != "SFCcattolica2024":
+    if _mgmt_pw != "Maradona1":
         if _mgmt_pw:
             st.warning("Password errata")
         st.stop()
@@ -2558,7 +2558,7 @@ elif page == "⚙️ Gestione Info Strumenti":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_gestione_info")
-    if _mgmt_pw != "SFCcattolica2024":
+    if _mgmt_pw != "Maradona1":
         if _mgmt_pw:
             st.warning("Password errata")
         st.stop()
