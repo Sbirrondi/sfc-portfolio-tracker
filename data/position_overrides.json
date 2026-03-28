@@ -1,0 +1,164 @@
+{
+  "IT0004176001": {
+    "sector": "Industrials"
+  },
+  "GB00B082RF11": {
+    "sector": "Business Services"
+  },
+  "NL0015435975": {
+    "sector": "Consumer Staples"
+  },
+  "IT0003549422": {
+    "sector": "Consumer Discretionary"
+  },
+  "FR0000121014": {
+    "sector": "Consumer Discretionary"
+  },
+  "IT0005282865": {
+    "sector": "Technology"
+  },
+  "IT0004965148": {
+    "sector": "Consumer Discretionary"
+  },
+  "NL0010273215": {
+    "sector": "Technology"
+  },
+  "NL0011585146": {
+    "sector": "Consumer Discretionary"
+  },
+  "US91324P1021": {
+    "sector": "Healthcare"
+  },
+  "US1273871087": {
+    "sector": "Technology"
+  },
+  "US5949181045": {
+    "sector": "Technology"
+  },
+  "US58733R1023": {
+    "sector": "Technology"
+  },
+  "US67066G1040": {
+    "sector": "Technology"
+  },
+  "IT0000072170": {
+    "sector": "Financials"
+  },
+  "AU000000EMR4": {
+    "sector": "Materials"
+  },
+  "IE00BNGJJT35": {
+    "sector": "US Equity"
+  },
+  "IE00BLNMYC90": {
+    "sector": "US Equity"
+  },
+  "IE00BFMXXD54": {
+    "sector": "US Equity"
+  },
+  "IE00B53SZB19": {
+    "sector": "US Equity"
+  },
+  "IE00B4YBJ215": {
+    "sector": "US Equity"
+  },
+  "IE00BJ38QD84": {
+    "sector": "US Equity"
+  },
+  "IE00B4KBBD01": {
+    "sector": "US Equity"
+  },
+  "LU0908500753": {
+    "sector": "European Equity"
+  },
+  "LU0489337690": {
+    "sector": "European Equity"
+  },
+  "LU1437017350": {
+    "sector": "Emerging Markets"
+  },
+  "IE000NFR7C63": {
+    "sector": "China Equity"
+  },
+  "HK0000516697": {
+    "sector": "China Equity"
+  },
+  "IE00BM67HK77": {
+    "sector": "Healthcare"
+  },
+  "IE00BYXG2H39": {
+    "sector": "Healthcare"
+  },
+  "IE000P16KP52": {
+    "sector": "Technology"
+  },
+  "IE00B579F325": {
+    "sector": "Precious Metals"
+  },
+  "DE000A1E0HS6": {
+    "sector": "Precious Metals"
+  },
+  "GB00B15KXQ89": {
+    "sector": "Industrial Metals"
+  },
+  "US37954Y8710": {
+    "sector": "Energy"
+  },
+  "IE000M7V94E1": {
+    "sector": "Energy"
+  },
+  "US9123184098": {
+    "sector": "Energy"
+  },
+  "GB00BJYDH287": {
+    "sector": "Crypto"
+  },
+  "GB00BLD4ZM24": {
+    "sector": "Crypto"
+  },
+  "IE00BQQP9F84": {
+    "sector": "Precious Metals"
+  },
+  "IT0005433690": {
+    "sector": "Gov. Italia"
+  },
+  "IT0005436693": {
+    "sector": "Gov. Italia"
+  },
+  "AT0000A2HLC4": {
+    "sector": "Gov. Europa"
+  },
+  "DE0001141836": {
+    "sector": "Gov. Europa"
+  },
+  "XS2262211076": {
+    "sector": "Gov. Europa"
+  },
+  "IT0005640666": {
+    "sector": "Gov. Italia"
+  },
+  "XS2943818059": {
+    "sector": "Corporate Bond"
+  },
+  "AU000XCLWAX7": {
+    "sector": "Gov. Internazionali"
+  },
+  "DE000A2QP4D2": {
+    "sector": "Gov. Internazionali"
+  },
+  "US91282CMN82": {
+    "sector": "Gov. Internazionali"
+  },
+  "GB00BSQNRC93": {
+    "sector": "Gov. Internazionali"
+  },
+  "US912810PV44": {
+    "sector": "Gov. Internazionali"
+  },
+  "IE00B4L60045": {
+    "sector": "Corporate Bond"
+  },
+  "LU1681041114": {
+    "sector": "Corporate Bond"
+  }
+}

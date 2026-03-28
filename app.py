@@ -2138,6 +2138,13 @@ elif page == "💹 Multipli & Fondamentali":
 elif page == "📝 Operazioni & Import":
     st.markdown('<div class="section-header">Gestione Operazioni</div>', unsafe_allow_html=True)
 
+    # Password gate for management pages
+    _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_operazioni")
+    if _mgmt_pw != "SFCcattolica2024":
+        if _mgmt_pw:
+            st.warning("Password errata")
+        st.stop()
+
     # KPIs
     if has_data:
         c1, c2, c3, c4 = st.columns(4)
@@ -2548,6 +2555,14 @@ elif page == "📝 Operazioni & Import":
 
 elif page == "⚙️ Gestione Info Strumenti":
     st.markdown('<div class="section-header">Gestione Info Strumenti</div>', unsafe_allow_html=True)
+
+    # Password gate for management pages
+    _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_gestione_info")
+    if _mgmt_pw != "SFCcattolica2024":
+        if _mgmt_pw:
+            st.warning("Password errata")
+        st.stop()
+
     st.markdown("Modifica manualmente settore, paese e altre info per strumenti non coperti da Yahoo Finance.")
 
     tab_edit, tab_isin = st.tabs(["✏️ Modifica Info", "🔗 Mapping ISIN → Ticker"])
