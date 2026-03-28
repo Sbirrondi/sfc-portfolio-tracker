@@ -267,10 +267,10 @@ def get_all_tickers_info(tickers: list) -> pd.DataFrame:
     return pd.DataFrame(infos)
 
 
-# ── Bond Price Scraping (Borsa Italiana) ─────────────────────────────────────
+# ── Bond Price Scraping ──────────────────────────────────────────────────────
 
-# Map ISIN -> Borsa Italiana URL path for bonds without yfinance tickers
-_BOND_URL_MAP = {
+# Map ISIN -> Borsa Italiana URL path for bonds
+_BOND_BORSA_IT_MAP = {
     "IT0005433690": "mot/btp/scheda",
     "IT0005436693": "mot/btp/scheda",
     "AT0000A2HLC4": "mot/euro-obbligazioni/scheda",
@@ -279,15 +279,62 @@ _BOND_URL_MAP = {
     "IT0005640666": "mot/btp/scheda",
 }
 
+# Map ISIN -> Euronext market code for bonds available via Euronext ajax API
+_BOND_EURONEXT_MAP = {
+    "AU000XCLWAX7": "ETLX",  # Australia 2.75% Nov 2029
+}
+
 _bond_price_cache = {}
 
 
+def _fetch_euronext_price(isin: str) -> float:
+    """Fetch bond price from Euronext ajax API."""
+    market = _BOND_EURONEXT_MAP.get(isin)
+    if not market:
+        return 0.0
+    url = f"https://live.euronext.com/en/ajax/getDetailedQuote/{isin}-{market}"
+    try:
+        import requests as req_lib
+        import re
+        from bs4 import BeautifulSoup
+
+        resp = req_lib.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=15)
+        if resp.status_code != 200 or "unknown" in resp.text.lower():
+            return 0.0
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        full_text = soup.get_text()
+
+        # Look for "% XX.XX" pattern (Euronext bond price format)
+        for m in re.finditer(r'%\s*(\d{1,3}[.,]\d{1,5})', full_text):
+            price_str = m.group(1).replace(",", ".")
+            price = float(price_str)
+            if 5 < price < 200:
+                return price
+
+        # Also try plain number patterns
+        for m in re.finditer(r'(\d{1,3}),(\d{2,5})', full_text):
+            price = float(f"{m.group(1)}.{m.group(2)}")
+            if 10 < price < 150:
+                return price
+    except Exception:
+        pass
+    return 0.0
+
+
 def get_bond_price_from_borsa_italiana(isin: str) -> float:
-    """Fetch bond price from Borsa Italiana website by scraping the page."""
+    """Fetch bond price: tries Borsa Italiana first, then Euronext API."""
     if isin in _bond_price_cache:
         return _bond_price_cache[isin]
 
-    url_path = _BOND_URL_MAP.get(isin)
+    # Try Euronext API first (for non-Italian bonds)
+    if isin in _BOND_EURONEXT_MAP:
+        price = _fetch_euronext_price(isin)
+        if price > 0:
+            _bond_price_cache[isin] = price
+            return price
+
+    url_path = _BOND_BORSA_IT_MAP.get(isin)
     if not url_path:
         return 0.0
 
@@ -328,9 +375,9 @@ def get_bond_price_from_borsa_italiana(isin: str) -> float:
 
 
 def get_all_bond_prices() -> dict:
-    """Fetch prices for all mapped bonds from Borsa Italiana. Returns {isin: price}."""
+    """Fetch prices for all mapped bonds. Returns {isin: price}."""
     results = {}
-    for isin in _BOND_URL_MAP:
+    for isin in list(_BOND_BORSA_IT_MAP.keys()) + list(_BOND_EURONEXT_MAP.keys()):
         price = get_bond_price_from_borsa_italiana(isin)
         if price > 0:
             results[isin] = price
