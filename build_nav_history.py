@@ -384,5 +384,182 @@ def build_daily_nav():
     return result
 
 
+def fill_missing_nav_days(progress_callback=None):
+    """Incrementally fill only missing business days in nav_history.csv.
+
+    Reads existing history, finds gaps, downloads prices only for
+    the missing date range, computes NAV for those days, and merges back.
+    Returns the updated DataFrame or None if nothing to do.
+    """
+    nav_file = DATA_DIR / "fund_nav_history.csv"
+    if not nav_file.exists():
+        if progress_callback:
+            progress_callback("Nessuna storia NAV trovata, esegui prima un rebuild completo.")
+        return None
+
+    # Load existing history
+    existing = pd.read_csv(nav_file, parse_dates=["date"])
+    existing = existing.sort_values("date").drop_duplicates(subset=["date"]).reset_index(drop=True)
+    existing_dates = set(existing["date"].dt.normalize())
+
+    # Determine expected business days range
+    transactions = load_transactions()
+    if transactions.empty:
+        return None
+    fund_info = load_fund_info()
+    inception = pd.to_datetime(fund_info.get("inception_date", "2023-10-01"))
+    today = pd.Timestamp.today().normalize()
+    all_bdays = pd.date_range(inception, today, freq="B")
+
+    # Find missing days
+    missing_dates = sorted([d for d in all_bdays if d not in existing_dates])
+    if not missing_dates:
+        if progress_callback:
+            progress_callback("Storia NAV completa, nessun giorno mancante.")
+        return existing
+
+    if progress_callback:
+        progress_callback(f"Trovati {len(missing_dates)} giorni mancanti da ricostruire...")
+
+    # Find the date range we need prices for (min to max of missing dates)
+    range_start = missing_dates[0]
+    range_end = missing_dates[-1]
+
+    # Build position events from transactions
+    events = build_daily_positions_and_cash(transactions)
+    if not events:
+        return None
+    event_dates = [e[0] for e in events]
+
+    # Collect ISINs and currencies needed for the missing period
+    all_isins = set()
+    all_currencies = set()
+    for _, pos_snap, _ in events:
+        for isin, info in pos_snap.items():
+            all_isins.add(isin)
+            if info["currency"] != "EUR":
+                all_currencies.add(info["currency"])
+
+    isin_map = load_isin_map()
+    mapped_tickers = {}
+    unmapped_isins = set()
+    for isin in all_isins:
+        ticker = isin_map.get(isin)
+        if ticker:
+            mapped_tickers[isin] = ticker
+        else:
+            unmapped_isins.add(isin)
+
+    # Download prices only for the missing range (with 5-day buffer for ffill)
+    benchmark_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
+    all_tickers = list(set(mapped_tickers.values()))
+    if benchmark_ticker:
+        all_tickers.append(benchmark_ticker)
+
+    dl_start = (range_start - timedelta(days=5)).strftime("%Y-%m-%d")
+    dl_end = (range_end + timedelta(days=2)).strftime("%Y-%m-%d")
+
+    if progress_callback:
+        progress_callback(f"Download prezzi dal {range_start.date()} al {range_end.date()}...")
+
+    prices = download_prices(all_tickers, dl_start)
+    fx_data = download_fx_rates(all_currencies, dl_start) if all_currencies else {}
+    manual_prices = load_manual_bond_prices()
+    end_date = today
+
+    # Calculate NAV only for missing dates
+    new_records = []
+    for date in missing_dates:
+        idx = bisect_right(event_dates, date) - 1
+        if idx < 0:
+            continue
+        _, positions_snap, cash = events[idx]
+
+        port_value = 0.0
+        for isin, info in positions_snap.items():
+            qty = info["qty"]
+            currency = info["currency"]
+            cost_eur = info["cost_eur"]
+            cost_local = info["cost_local"]
+            if qty <= 0:
+                continue
+
+            def get_fx_rate(ccy):
+                if ccy == "EUR":
+                    return 1.0
+                fx_pair = f"{ccy}EUR=X"
+                if fx_pair in fx_data and date in fx_data[fx_pair].index:
+                    fx_val = fx_data[fx_pair].loc[date]
+                    if pd.notna(fx_val) and fx_val > 0:
+                        return float(fx_val)
+                return None
+
+            ticker = mapped_tickers.get(isin)
+            price_found = False
+            if ticker and not prices.empty and ticker in prices.columns:
+                if date in prices.index:
+                    p = prices.loc[date, ticker]
+                    if pd.notna(p) and p > 0:
+                        fx_rate = get_fx_rate(currency) or 1.0
+                        port_value += qty * float(p) * fx_rate
+                        price_found = True
+
+            if not price_found:
+                if isin in manual_prices:
+                    mp = manual_prices[isin]
+                    current_price = mp["price"]
+                    bond_ccy = mp["currency"]
+                    avg_cost_local = cost_local / qty if qty > 0 else 0
+                    first_buy_date = None
+                    for ev_d, ev_p, _ in events:
+                        if isin in ev_p and ev_p[isin]["qty"] > 0:
+                            first_buy_date = ev_d
+                            break
+                    if first_buy_date and end_date > first_buy_date:
+                        frac = (date - first_buy_date).days / (end_date - first_buy_date).days
+                        frac = max(0.0, min(1.0, frac))
+                        interp_price = avg_cost_local + (current_price - avg_cost_local) * frac
+                    else:
+                        interp_price = current_price
+                    fx_rate = get_fx_rate(bond_ccy)
+                    if fx_rate is None:
+                        fx_rate = cost_eur / cost_local if cost_local > 0 else 1.0
+                    port_value += qty * interp_price * fx_rate
+                else:
+                    port_value += cost_eur
+
+        total_nav = port_value + cash
+        bench_val = np.nan
+        if benchmark_ticker and not prices.empty and benchmark_ticker in prices.columns:
+            if date in prices.index:
+                bv = prices.loc[date, benchmark_ticker]
+                if pd.notna(bv):
+                    bench_val = float(bv)
+
+        new_records.append({
+            "date": date,
+            "nav": round(total_nav, 2),
+            "benchmark": round(bench_val, 4) if pd.notna(bench_val) else np.nan,
+        })
+
+    if not new_records:
+        return existing
+
+    new_df = pd.DataFrame(new_records)
+    # Merge: existing + new, drop duplicates keeping existing
+    merged = pd.concat([existing, new_df], ignore_index=True)
+    merged = merged.sort_values("date").drop_duplicates(subset=["date"], keep="first").reset_index(drop=True)
+
+    # Forward-fill benchmark NaNs
+    merged["benchmark"] = pd.to_numeric(merged["benchmark"], errors="coerce")
+    merged["benchmark"] = merged["benchmark"].ffill()
+
+    merged.to_csv(nav_file, index=False)
+    if progress_callback:
+        progress_callback(f"Aggiunti {len(new_records)} giorni alla storia NAV.")
+
+    return merged
+
+
 if __name__ == "__main__":
     build_daily_nav()

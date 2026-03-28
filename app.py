@@ -24,6 +24,7 @@ from fund_manager import (
     update_position_prices, compute_positions_from_transactions,
     recalculate_all, get_portfolio_summary,
 )
+from build_nav_history import fill_missing_nav_days
 from analytics import (
     calculate_returns, cumulative_returns, total_return,
     annualized_return, annualized_volatility, sharpe_ratio,
@@ -440,12 +441,14 @@ with st.sidebar:
 
     st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
     if st.button("🔄 Ricarica Dati", use_container_width=True):
+        _status = st.empty()
         with st.spinner("Ricalcolando posizioni da transazioni e aggiornando prezzi..."):
             try:
-                # Step 1: Recompute positions from transactions (fixes qty, avg_cost_local, avg_fx)
+                # Step 1: Recompute positions from transactions
+                _status.info("Step 1/4 — Ricalcolo posizioni da transazioni...")
                 fresh_pos = compute_positions_from_transactions()
                 if not fresh_pos.empty:
-                    # Step 1b: Preserve existing manual prices for bonds before update
+                    # Step 1b: Preserve existing manual prices for bonds
                     existing = load_positions()
                     if not existing.empty:
                         old_prices = existing[["isin", "current_price", "fx_rate_current"]].copy()
@@ -453,24 +456,31 @@ with st.sidebar:
                             "current_price": "_old_price", "fx_rate_current": "_old_fx",
                         })
                         fresh_pos = fresh_pos.merge(old_prices, on="isin", how="left")
-                        # Pre-fill current_price with old values so they're available as fallback
                         mask = (fresh_pos["current_price"] == 0) & (fresh_pos["_old_price"].fillna(0) > 0)
                         fresh_pos.loc[mask, "current_price"] = fresh_pos.loc[mask, "_old_price"]
                         mask_fx = fresh_pos["_old_fx"].fillna(0) > 0
                         fresh_pos.loc[mask_fx, "fx_rate_current"] = fresh_pos.loc[mask_fx, "_old_fx"]
                         fresh_pos.drop(columns=["_old_price", "_old_fx"], inplace=True)
 
-                    # Step 2: Update live prices and FX rates (yfinance + Borsa Italiana)
+                    # Step 2: Update live prices and FX rates
+                    _status.info("Step 2/4 — Download prezzi live...")
                     updated = update_position_prices(fresh_pos, get_isin_map())
                     save_positions(updated)
-                    # Step 3: Recompute cash and NAV
+
+                    # Step 3: Recompute cash and NAV snapshot for today
+                    _status.info("Step 3/4 — Calcolo cash e NAV di oggi...")
                     cash = compute_cash_from_transactions()
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
                     update_fund_info(nav, len(updated))
                     snapshot_nav(nav)
+
+                    # Step 4: Fill missing NAV history days (incremental)
+                    _status.info("Step 4/4 — Ricostruzione giorni NAV mancanti...")
+                    fill_missing_nav_days(progress_callback=lambda msg: _status.info(f"Step 4/4 — {msg}"))
+
             except Exception as e:
-                st.warning(f"Errore aggiornamento prezzi: {e}")
+                st.warning(f"Errore aggiornamento: {e}")
         st.cache_data.clear()
         st.rerun()
 
