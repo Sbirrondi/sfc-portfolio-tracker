@@ -530,8 +530,16 @@ if page == "🏠 Dashboard":
         st.stop()
 
     # ── Compute Dashboard Data ────────────────────────────────────────
+    # Use nav_history as single source of truth for all performance calcs
     nav = nav_total
-    initial_nav = fund_info.get("initial_nav", 10_000_000)
+    if not nav_history.empty and "nav" in nav_history.columns:
+        _nav_clean = pd.to_numeric(nav_history["nav"], errors="coerce").dropna()
+        if len(_nav_clean) >= 2:
+            initial_nav = _nav_clean.iloc[0]
+        else:
+            initial_nav = fund_info.get("initial_nav", 10_000_000)
+    else:
+        initial_nav = fund_info.get("initial_nav", 10_000_000)
     inception_perf = (nav - initial_nav) / initial_nav if initial_nav > 0 else total_pnl_pct
 
     # Compute benchmark performance from nav_history (live, not from stale JSON)
@@ -617,6 +625,11 @@ if page == "🏠 Dashboard":
         if "bench_index" in nav_df_filtered.columns:
             _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
                             "color": "#22c55e", "type": "Line", "lineWidth": 2})
+        # Chart legend
+        st.markdown("""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
+            <span><span style="display:inline-block;width:12px;height:3px;background:#6366f1;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">SFC Fund</span></span>
+            <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark (VNGA60)</span></span>
+        </div>""", unsafe_allow_html=True)
         tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
 
         # Period performance summary
