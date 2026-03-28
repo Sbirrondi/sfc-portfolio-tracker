@@ -409,23 +409,71 @@
     "macro_class": "Equity"
   },
   "US91282CMN82": {
+    "name": "US Treasury 4.25% Feb 2028",
+    "sector": "Government Bond",
+    "country": "United States",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "Governativi USA",
     "coupon_rate": 4.25,
     "maturity_date": "2028-02-01",
     "rating": "AA"
   },
   "GB00BSQNRC93": {
+    "name": "UK Bond 4.375% 24/28",
+    "sector": "Government Bond",
+    "country": "United Kingdom",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "Governativi UK",
     "coupon_rate": 4.375,
     "maturity_date": "2028-03-01",
     "rating": "AA"
   },
   "IE00B4L60045": {
+    "name": "iShares Euro Corp Bond 1-5yr",
+    "sector": "Corporate Bond",
+    "country": "Europe",
+    "asset_type": "ETF",
+    "macro_class": "Fixed Income",
+    "classification": "Corp Bond Euro 1-5yr",
     "coupon_rate": 0.0,
     "maturity_date": "2029-01-01",
     "rating": "NR"
   },
   "US912810PV44": {
+    "name": "US TIPS 1.75% Jan 2028",
+    "sector": "Government Bond",
+    "country": "United States",
+    "asset_type": "Bond",
+    "macro_class": "Fixed Income",
+    "classification": "Governativi USA TIPS",
     "coupon_rate": 1.75,
     "maturity_date": "2028-01-01",
     "rating": "AA"
+  },
+  "LU1681041114": {
+    "name": "Amundi EUR FRN Corp Bond ESG",
+    "sector": "Corporate Bond",
+    "country": "Europe",
+    "asset_type": "ETF",
+    "macro_class": "Fixed Income",
+    "classification": "Corp Bond Euro FRN"
+  },
+  "NL0015435975": {
+    "name": "Campari",
+    "sector": "Consumer Staples",
+    "industry": "Beverages",
+    "country": "Italy",
+    "asset_type": "Stock",
+    "macro_class": "Equity"
+  },
+  "IT0000072170": {
+    "name": "Fineco",
+    "sector": "Financials",
+    "industry": "Online Banking",
+    "country": "Italy",
+    "asset_type": "Stock",
+    "macro_class": "Equity"
   }
 }
