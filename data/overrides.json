@@ -3,7 +3,7 @@
   "IE00BNGJJT35": {
     "name": "Xtrackers S&P 500 Equal Weight",
     "sector": "US Large Cap",
-    "industry": "Large Cap Blend",
+    "industry": "Large Cap USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -12,7 +12,7 @@
   "IE00BLNMYC90": {
     "name": "iShares S&P 500 Equal Weight",
     "sector": "US Large Cap",
-    "industry": "Large Cap Blend",
+    "industry": "Large Cap USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -21,7 +21,7 @@
   "IE00BFMXXD54": {
     "name": "Vanguard S&P 500",
     "sector": "US Large Cap",
-    "industry": "Large Cap Blend",
+    "industry": "Large Cap USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -30,7 +30,7 @@
   "IE00B53SZB19": {
     "name": "iShares Nasdaq 100",
     "sector": "US Tech",
-    "industry": "Large Cap Growth",
+    "industry": "Growth USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -39,7 +39,7 @@
   "IE00B4KBBD01": {
     "name": "iShares MSCI NA Utilities",
     "sector": "Utilities",
-    "industry": "Utilities",
+    "industry": "Utilities & Real Estate",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -48,7 +48,7 @@
   "LU0489337690": {
     "name": "Amundi FTSE EPRA Real Estate",
     "sector": "Real Estate",
-    "industry": "Real Estate Europe",
+    "industry": "Utilities & Real Estate",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -57,7 +57,7 @@
   "IE00BM67HK77": {
     "name": "Xtrackers MSCI World Health Care",
     "sector": "Healthcare",
-    "industry": "Healthcare Global",
+    "industry": "Healthcare & Biotech",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -66,7 +66,7 @@
   "IE00BYXG2H39": {
     "name": "iShares Biotechnology",
     "sector": "Healthcare",
-    "industry": "Biotechnology",
+    "industry": "Healthcare & Biotech",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -75,7 +75,7 @@
   "HK0000516697": {
     "name": "China Healthcare Biotech Fund",
     "sector": "Healthcare",
-    "industry": "Biotechnology",
+    "industry": "Healthcare & Biotech",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -84,7 +84,7 @@
   "IE00B4YBJ215": {
     "name": "iShares Core S&P 500",
     "sector": "US Large Cap",
-    "industry": "Large Cap Blend",
+    "industry": "Large Cap USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -93,7 +93,7 @@
   "IE00BJ38QD84": {
     "name": "iShares MSCI USA Small Cap",
     "sector": "US Small Cap",
-    "industry": "Small Cap Blend",
+    "industry": "Small Cap USA",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -102,7 +102,7 @@
   "IE000NFR7C63": {
     "name": "Amundi MSCI China Tech",
     "sector": "Technology",
-    "industry": "China Technology",
+    "industry": "Tech & Semiconduttori",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -111,7 +111,7 @@
   "LU0908500753": {
     "name": "Amundi Stoxx Europe 600",
     "sector": "Europe Broad",
-    "industry": "Diversified Europe",
+    "industry": "Europa",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -120,7 +120,7 @@
   "IE00BQQP9F84": {
     "name": "iShares Gold Producers",
     "sector": "Gold Miners",
-    "industry": "Gold Mining",
+    "industry": "Metalli Preziosi",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -129,7 +129,7 @@
   "LU1437017350": {
     "name": "Amundi MSCI Emerging Markets",
     "sector": "Emerging Markets",
-    "industry": "EM Diversified",
+    "industry": "Emergenti",
     "country": "Emerging Markets",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -138,7 +138,7 @@
   "IE000P16KP52": {
     "name": "iShares Digital Security",
     "sector": "Technology",
-    "industry": "Cybersecurity",
+    "industry": "Tech & Semiconduttori",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -147,7 +147,7 @@
   "IT0004176001": {
     "name": "Prysmian",
     "sector": "Industrials",
-    "industry": "Cables & Connectivity",
+    "industry": "Industriali",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -155,7 +155,7 @@
   "GB00B082RF11": {
     "name": "Rentokil Initial",
     "sector": "Industrials",
-    "industry": "Business Services",
+    "industry": "Industriali",
     "country": "United Kingdom",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -163,7 +163,7 @@
   "IT0003549422": {
     "name": "Sanlorenzo",
     "sector": "Consumer Cyclical",
-    "industry": "Luxury Yachts",
+    "industry": "Lusso",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -171,7 +171,7 @@
   "FR0000121014": {
     "name": "LVMH",
     "sector": "Consumer Cyclical",
-    "industry": "Luxury Goods",
+    "industry": "Lusso",
     "country": "France",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -179,7 +179,7 @@
   "IT0005282865": {
     "name": "Reply",
     "sector": "Technology",
-    "industry": "IT Consulting",
+    "industry": "Tech & Semiconduttori",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -187,7 +187,7 @@
   "IT0004965148": {
     "name": "Moncler",
     "sector": "Consumer Cyclical",
-    "industry": "Luxury Apparel",
+    "industry": "Lusso",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -195,7 +195,7 @@
   "NL0010273215": {
     "name": "ASML Holding",
     "sector": "Technology",
-    "industry": "Semiconductors",
+    "industry": "Tech & Semiconduttori",
     "country": "Netherlands",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -227,7 +227,7 @@
   "AT0000A2HLC4": {
     "name": "Austria 0,85% Jun 2120",
     "sector": "Government Bond",
-    "industry": "Gov. Austria",
+    "industry": "Gov. Internazionali",
     "country": "Austria",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -251,7 +251,7 @@
   "DE0001141836": {
     "name": "Bobl 0% Apr 2026",
     "sector": "Government Bond",
-    "industry": "Gov. Germania",
+    "industry": "Gov. Internazionali",
     "country": "Germany",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -263,7 +263,7 @@
   "XS2262211076": {
     "name": "Romania 1.375% Dec 2029",
     "sector": "Government Bond",
-    "industry": "Gov. Romania",
+    "industry": "Gov. Internazionali",
     "country": "Romania",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -275,7 +275,7 @@
   "XS2943818059": {
     "name": "Iliad Holding 5.375% 2030",
     "sector": "Corporate Bond",
-    "industry": "Telecom",
+    "industry": "Corporate Bond",
     "country": "France",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -287,7 +287,7 @@
   "AU000XCLWAX7": {
     "name": "Australia 2,75% Nov 2029",
     "sector": "Government Bond",
-    "industry": "Gov. Australia",
+    "industry": "Gov. Internazionali",
     "country": "Australia",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -299,7 +299,7 @@
   "DE000A2QP4D2": {
     "name": "iShares Brazil Govt Bond",
     "sector": "Government Bond",
-    "industry": "Gov. Brasile",
+    "industry": "Gov. Internazionali",
     "country": "Brazil",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -311,7 +311,7 @@
   "GB00BJYDH287": {
     "name": "WisdomTree Bitcoin ETP",
     "sector": "Crypto",
-    "industry": "Bitcoin",
+    "industry": "Crypto",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -320,7 +320,7 @@
   "GB00BLD4ZM24": {
     "name": "WisdomTree Ethereum ETP",
     "sector": "Crypto",
-    "industry": "Ethereum",
+    "industry": "Crypto",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -329,7 +329,7 @@
   "IE00B579F325": {
     "name": "iShares Physical Gold",
     "sector": "Commodities",
-    "industry": "Oro",
+    "industry": "Metalli Preziosi",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -338,7 +338,7 @@
   "US37954Y8710": {
     "name": "Global X Uranium ETF",
     "sector": "Commodities",
-    "industry": "Uranium",
+    "industry": "Energia",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -347,7 +347,7 @@
   "GB00B15KXQ89": {
     "name": "WisdomTree Copper",
     "sector": "Commodities",
-    "industry": "Industrial Metals",
+    "industry": "Energia",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -356,7 +356,7 @@
   "US9123184098": {
     "name": "United States Natural Gas Fund",
     "sector": "Commodities",
-    "industry": "Natural Gas",
+    "industry": "Energia",
     "country": "United States",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -365,7 +365,7 @@
   "DE000A1E0HS6": {
     "name": "Xtrackers Physical Silver",
     "sector": "Commodities",
-    "industry": "Precious Metals",
+    "industry": "Metalli Preziosi",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -374,7 +374,7 @@
   "IE000M7V94E1": {
     "name": "VanEck Uranium & Nuclear",
     "sector": "Commodities",
-    "industry": "Nuclear Energy",
+    "industry": "Energia",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -383,7 +383,7 @@
   "NL0011585146": {
     "name": "Ferrari",
     "sector": "Consumer Cyclical",
-    "industry": "Luxury Automobiles",
+    "industry": "Lusso",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -391,7 +391,7 @@
   "AU000000EMR4": {
     "name": "Emerald Resources",
     "sector": "Materials",
-    "industry": "Gold Mining",
+    "industry": "Metalli Preziosi",
     "country": "Australia",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -399,7 +399,7 @@
   "US91324P1021": {
     "name": "UnitedHealth Group",
     "sector": "Healthcare",
-    "industry": "Health Insurance",
+    "industry": "Healthcare & Biotech",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -407,7 +407,7 @@
   "US1273871087": {
     "name": "Cadence Design Systems",
     "sector": "Technology",
-    "industry": "EDA Software",
+    "industry": "Tech & Semiconduttori",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -415,7 +415,7 @@
   "US5949181045": {
     "name": "Microsoft",
     "sector": "Technology",
-    "industry": "Software",
+    "industry": "Tech & Semiconduttori",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -423,7 +423,7 @@
   "US58733R1023": {
     "name": "MercadoLibre",
     "sector": "Consumer Cyclical",
-    "industry": "E-Commerce",
+    "industry": "Emergenti",
     "country": "Argentina",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -431,7 +431,7 @@
   "US67066G1040": {
     "name": "Nvidia",
     "sector": "Technology",
-    "industry": "Semiconductors",
+    "industry": "Tech & Semiconduttori",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -439,7 +439,7 @@
   "US91282CMN82": {
     "name": "US Treasury 4.25% Feb 2028",
     "sector": "Government Bond",
-    "industry": "Gov. USA",
+    "industry": "Gov. Internazionali",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -451,7 +451,7 @@
   "GB00BSQNRC93": {
     "name": "UK Bond 4.375% 24/28",
     "sector": "Government Bond",
-    "industry": "Gov. UK",
+    "industry": "Gov. Internazionali",
     "country": "United Kingdom",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -463,7 +463,7 @@
   "IE00B4L60045": {
     "name": "iShares Euro Corp Bond 1-5yr",
     "sector": "Corporate Bond",
-    "industry": "Investment Grade EUR",
+    "industry": "Corporate Bond",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -475,7 +475,7 @@
   "US912810PV44": {
     "name": "US TIPS 1.75% Jan 2028",
     "sector": "Government Bond",
-    "industry": "Inflation-Linked",
+    "industry": "Gov. Internazionali",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -487,7 +487,7 @@
   "LU1681041114": {
     "name": "Amundi EUR FRN Corp Bond ESG",
     "sector": "Corporate Bond",
-    "industry": "Floating Rate EUR",
+    "industry": "Corporate Bond",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -496,7 +496,7 @@
   "NL0015435975": {
     "name": "Campari",
     "sector": "Consumer Staples",
-    "industry": "Beverages",
+    "industry": "Lusso",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -504,7 +504,7 @@
   "IT0000072170": {
     "name": "Fineco",
     "sector": "Financials",
-    "industry": "Online Banking",
+    "industry": "Industriali",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
