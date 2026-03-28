@@ -39,7 +39,7 @@
   "IE00B4KBBD01": {
     "name": "iShares MSCI NA Utilities",
     "sector": "Utilities",
-    "industry": "Utilities & Real Estate",
+    "industry": "Utilities",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -48,7 +48,7 @@
   "LU0489337690": {
     "name": "Amundi FTSE EPRA Real Estate",
     "sector": "Real Estate",
-    "industry": "Utilities & Real Estate",
+    "industry": "Real Estate",
     "country": "Europe",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -57,7 +57,7 @@
   "IE00BM67HK77": {
     "name": "Xtrackers MSCI World Health Care",
     "sector": "Healthcare",
-    "industry": "Healthcare & Biotech",
+    "industry": "Healthcare",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -66,7 +66,7 @@
   "IE00BYXG2H39": {
     "name": "iShares Biotechnology",
     "sector": "Healthcare",
-    "industry": "Healthcare & Biotech",
+    "industry": "Biotecnologie",
     "country": "United States",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -75,7 +75,7 @@
   "HK0000516697": {
     "name": "China Healthcare Biotech Fund",
     "sector": "Healthcare",
-    "industry": "Healthcare & Biotech",
+    "industry": "Biotecnologie",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -102,7 +102,7 @@
   "IE000NFR7C63": {
     "name": "Amundi MSCI China Tech",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Software & IT",
     "country": "China",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -120,7 +120,7 @@
   "IE00BQQP9F84": {
     "name": "iShares Gold Producers",
     "sector": "Gold Miners",
-    "industry": "Metalli Preziosi",
+    "industry": "Gold Mining",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -138,7 +138,7 @@
   "IE000P16KP52": {
     "name": "iShares Digital Security",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Software & IT",
     "country": "Global",
     "asset_type": "ETF",
     "macro_class": "Equity",
@@ -179,7 +179,7 @@
   "IT0005282865": {
     "name": "Reply",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Software & IT",
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -195,7 +195,7 @@
   "NL0010273215": {
     "name": "ASML Holding",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Semiconduttori",
     "country": "Netherlands",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -227,7 +227,7 @@
   "AT0000A2HLC4": {
     "name": "Austria 0,85% Jun 2120",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Europa",
     "country": "Austria",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -251,7 +251,7 @@
   "DE0001141836": {
     "name": "Bobl 0% Apr 2026",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Europa",
     "country": "Germany",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -263,7 +263,7 @@
   "XS2262211076": {
     "name": "Romania 1.375% Dec 2029",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Europa",
     "country": "Romania",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -287,7 +287,7 @@
   "AU000XCLWAX7": {
     "name": "Australia 2,75% Nov 2029",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Extra-EUR",
     "country": "Australia",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -299,7 +299,7 @@
   "DE000A2QP4D2": {
     "name": "iShares Brazil Govt Bond",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Extra-EUR",
     "country": "Brazil",
     "asset_type": "ETF",
     "macro_class": "Fixed Income",
@@ -311,7 +311,7 @@
   "GB00BJYDH287": {
     "name": "WisdomTree Bitcoin ETP",
     "sector": "Crypto",
-    "industry": "Crypto",
+    "industry": "Bitcoin",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -320,7 +320,7 @@
   "GB00BLD4ZM24": {
     "name": "WisdomTree Ethereum ETP",
     "sector": "Crypto",
-    "industry": "Crypto",
+    "industry": "Ethereum",
     "country": "Global",
     "asset_type": "Crypto",
     "macro_class": "Alternative",
@@ -329,7 +329,7 @@
   "IE00B579F325": {
     "name": "iShares Physical Gold",
     "sector": "Commodities",
-    "industry": "Metalli Preziosi",
+    "industry": "Oro & Argento",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -338,7 +338,7 @@
   "US37954Y8710": {
     "name": "Global X Uranium ETF",
     "sector": "Commodities",
-    "industry": "Energia",
+    "industry": "Uranio & Nucleare",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -347,7 +347,7 @@
   "GB00B15KXQ89": {
     "name": "WisdomTree Copper",
     "sector": "Commodities",
-    "industry": "Energia",
+    "industry": "Materie Prime",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -356,7 +356,7 @@
   "US9123184098": {
     "name": "United States Natural Gas Fund",
     "sector": "Commodities",
-    "industry": "Energia",
+    "industry": "Materie Prime",
     "country": "United States",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -365,7 +365,7 @@
   "DE000A1E0HS6": {
     "name": "Xtrackers Physical Silver",
     "sector": "Commodities",
-    "industry": "Metalli Preziosi",
+    "industry": "Oro & Argento",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -374,7 +374,7 @@
   "IE000M7V94E1": {
     "name": "VanEck Uranium & Nuclear",
     "sector": "Commodities",
-    "industry": "Energia",
+    "industry": "Uranio & Nucleare",
     "country": "Global",
     "asset_type": "Commodity",
     "macro_class": "Alternative",
@@ -391,7 +391,7 @@
   "AU000000EMR4": {
     "name": "Emerald Resources",
     "sector": "Materials",
-    "industry": "Metalli Preziosi",
+    "industry": "Gold Mining",
     "country": "Australia",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -399,7 +399,7 @@
   "US91324P1021": {
     "name": "UnitedHealth Group",
     "sector": "Healthcare",
-    "industry": "Healthcare & Biotech",
+    "industry": "Healthcare",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -407,7 +407,7 @@
   "US1273871087": {
     "name": "Cadence Design Systems",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Semiconduttori",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -415,7 +415,7 @@
   "US5949181045": {
     "name": "Microsoft",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Software & IT",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -431,7 +431,7 @@
   "US67066G1040": {
     "name": "Nvidia",
     "sector": "Technology",
-    "industry": "Tech & Semiconduttori",
+    "industry": "Semiconduttori",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
@@ -439,7 +439,7 @@
   "US91282CMN82": {
     "name": "US Treasury 4.25% Feb 2028",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Extra-EUR",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -451,7 +451,7 @@
   "GB00BSQNRC93": {
     "name": "UK Bond 4.375% 24/28",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Extra-EUR",
     "country": "United Kingdom",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
@@ -475,7 +475,7 @@
   "US912810PV44": {
     "name": "US TIPS 1.75% Jan 2028",
     "sector": "Government Bond",
-    "industry": "Gov. Internazionali",
+    "industry": "Gov. Extra-EUR",
     "country": "United States",
     "asset_type": "Bond",
     "macro_class": "Fixed Income",
