@@ -472,8 +472,16 @@ with st.sidebar:
                     cash = compute_cash_from_transactions()
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
-                    update_fund_info(nav, len(updated))
-                    snapshot_nav(nav)
+                    # Fetch current benchmark value for fund_info update
+                    try:
+                        from data_fetcher import get_historical_prices
+                        bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
+                        bench_data = get_historical_prices([bench_ticker], period="5d")
+                        bench_val = bench_data[bench_ticker].iloc[-1] if bench_ticker in bench_data and not bench_data[bench_ticker].empty else None
+                    except Exception:
+                        bench_val = None
+                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
+                    snapshot_nav(nav, benchmark_value=bench_val)
 
                     # Step 4: Fill missing NAV history days (incremental)
                     _status.info("Step 4/4 — Ricostruzione giorni NAV mancanti...")
@@ -739,7 +747,7 @@ if page == "🏠 Dashboard":
                 ppy, _ = detect_frequency(ns)
                 vol = annualized_volatility(nr, ppy)
                 sr = sharpe_ratio(nr, 0.03, ppy)
-                mdd = max_drawdown(nr)
+                mdd = max_drawdown(ns)
                 st.markdown(f"""
                 <div class="stat-grid" style="margin-top:0.45rem">
                     <div class="stat-item"><div class="stat-label">Volatilità Ann.</div>
@@ -1118,8 +1126,13 @@ elif page == "📊 Analytics Avanzate":
     )
 
     # ── Build or load daily NAV ──────────────────────────────────────────
-    @st.cache_data(ttl=3600, show_spinner="Ricostruendo NAV giornaliero...")
+    @st.cache_data(ttl=3600, show_spinner="Caricando NAV giornaliero...")
     def get_daily_nav():
+        # Prefer the pre-built NAV history (computed correctly with daily cash)
+        hist = load_nav_history()
+        if not hist.empty and len(hist) >= 5:
+            return hist
+        # Fallback: reconstruct from current positions (approximate)
         return build_daily_nav_series(
             positions, isin_map,
             inception_date=fund_info.get("inception_date", "2023-10-01"),
@@ -1707,6 +1720,206 @@ elif page == "🏛️ Analisi Fixed Income":
         fig_rat.update_traces(textposition="inside", textinfo="percent+label")
         st.plotly_chart(fig_rat, use_container_width=True)
 
+    # ── Cedole Attese & Scadenze ─────────────────────────────────────
+    st.divider()
+    st.markdown('<div class="section-header">Calendario Cedole & Scadenze</div>', unsafe_allow_html=True)
+    st.caption("Cedole stimate basate su cedola annuale e frequenza di pagamento. "
+               "Puoi registrare automaticamente una cedola incassata come transazione DIVIDEND.")
+
+    # Coupon frequency input in bond data form
+    with st.expander("⚙️ Configura frequenza cedole", expanded=False):
+        with st.form("coupon_freq_form"):
+            freq_isin = st.selectbox("Seleziona bond",
+                                      fi_positions["isin"].tolist(),
+                                      format_func=lambda x: f"{fi_positions[fi_positions['isin']==x]['name'].iloc[0]} ({x})",
+                                      key="freq_bond_select")
+            freq_options = {"Annuale": 1, "Semestrale": 2, "Trimestrale": 4, "Zero Coupon": 0}
+            current_freq = overrides.get(freq_isin, {}).get("coupon_frequency", 2)
+            freq_label = {v: k for k, v in freq_options.items()}.get(current_freq, "Semestrale")
+            coupon_freq = st.selectbox("Frequenza pagamento", list(freq_options.keys()),
+                                        index=list(freq_options.keys()).index(freq_label))
+            coupon_months = st.text_input("Mesi di pagamento (es. '3,9' per marzo e settembre)",
+                                           value=overrides.get(freq_isin, {}).get("coupon_months", ""),
+                                           help="Inserisci i mesi separati da virgola. Se vuoto, verranno stimati dalla data scadenza.")
+            if st.form_submit_button("💾 Salva Frequenza", use_container_width=True):
+                current_ov = get_overrides()
+                if freq_isin not in current_ov:
+                    current_ov[freq_isin] = {}
+                current_ov[freq_isin]["coupon_frequency"] = freq_options[coupon_freq]
+                current_ov[freq_isin]["coupon_months"] = coupon_months.strip()
+                save_overrides(current_ov)
+                st.success(f"✅ Frequenza aggiornata per {freq_isin}")
+                st.cache_data.clear()
+                st.rerun()
+
+    # Build coupon schedule
+    upcoming_coupons = []
+    upcoming_maturities = []
+    horizon = today + pd.Timedelta(days=365)  # Next 12 months
+
+    for _, row in fi_positions.iterrows():
+        isin = row["isin"]
+        ov = overrides.get(isin, {})
+        coupon_rate = float(ov.get("coupon_rate", 0))
+        maturity_str = ov.get("maturity_date", "")
+        freq = int(ov.get("coupon_frequency", 2))  # Default semestrale
+        coupon_months_str = ov.get("coupon_months", "")
+        qty = float(row["quantity"])
+        currency = row.get("currency", "EUR")
+        name = row["name"]
+        face_value = 100
+
+        # Parse maturity
+        mat_date = None
+        if maturity_str:
+            try:
+                mat_date = dt.strptime(maturity_str, "%Y-%m-%d")
+            except Exception:
+                pass
+
+        # Check for upcoming maturity
+        if mat_date and today <= mat_date <= horizon:
+            upcoming_maturities.append({
+                "Data": mat_date.strftime("%Y-%m-%d"),
+                "Nome": name,
+                "ISIN": isin,
+                "Tipo": "SCADENZA",
+                "Importo Stimato €": qty * face_value,
+                "Giorni": (mat_date - today).days,
+            })
+
+        # Skip zero-coupon or zero-frequency bonds
+        if coupon_rate <= 0 or freq <= 0:
+            continue
+
+        # Determine payment months
+        payment_months = []
+        if coupon_months_str:
+            try:
+                payment_months = [int(m.strip()) for m in coupon_months_str.split(",") if m.strip()]
+            except Exception:
+                pass
+
+        if not payment_months and mat_date:
+            # Estimate from maturity month and frequency
+            mat_month = mat_date.month
+            interval = 12 // freq
+            payment_months = sorted(set((mat_month + i * interval) % 12 or 12 for i in range(freq)))
+
+        if not payment_months:
+            # Fallback: evenly spaced
+            interval = 12 // freq
+            payment_months = [(i * interval + 1) for i in range(freq)]
+
+        # Generate coupon dates in the next 12 months
+        coupon_per_payment = (coupon_rate / 100 * face_value) / freq
+        amount_per_payment = qty * coupon_per_payment
+
+        for month in payment_months:
+            # Try this year and next year
+            for year in [today.year, today.year + 1]:
+                try:
+                    pay_day = mat_date.day if mat_date else 1
+                    # Clamp day to valid range for the month
+                    import calendar
+                    max_day = calendar.monthrange(year, month)[1]
+                    pay_date = dt(year, month, min(pay_day, max_day))
+                except Exception:
+                    continue
+
+                if today <= pay_date <= horizon:
+                    # Check if this coupon was already recorded as DIVIDEND
+                    already_recorded = False
+                    if not transactions.empty:
+                        tx_match = transactions[
+                            (transactions["isin"] == isin) &
+                            (transactions["transaction_type"] == "DIVIDEND") &
+                            (transactions["date"].dt.year == pay_date.year) &
+                            (transactions["date"].dt.month == pay_date.month)
+                        ]
+                        already_recorded = not tx_match.empty
+
+                    upcoming_coupons.append({
+                        "data": pay_date,
+                        "Data": pay_date.strftime("%Y-%m-%d"),
+                        "Nome": name,
+                        "ISIN": isin,
+                        "Tipo": "CEDOLA",
+                        "Cedola %": f"{coupon_rate:.3f}",
+                        "Importo Stimato €": round(amount_per_payment, 2),
+                        "Valuta": currency,
+                        "Giorni": (pay_date - today).days,
+                        "Registrata": "✅" if already_recorded else "❌",
+                        "_already": already_recorded,
+                    })
+
+    # Combine and sort
+    all_events = sorted(upcoming_coupons + upcoming_maturities, key=lambda x: x.get("Giorni", 0))
+
+    if all_events:
+        events_df = pd.DataFrame(all_events)
+        display_cols = [c for c in ["Data", "Tipo", "Nome", "ISIN", "Cedola %", "Importo Stimato €", "Valuta", "Giorni", "Registrata"] if c in events_df.columns]
+        st.dataframe(events_df[display_cols], use_container_width=True, hide_index=True,
+                     height=min(500, len(events_df) * 38 + 50))
+
+        # Summary
+        pending_coupons = [c for c in upcoming_coupons if not c.get("_already", False)]
+        total_expected = sum(c["Importo Stimato €"] for c in pending_coupons)
+        total_maturities = sum(m["Importo Stimato €"] for m in upcoming_maturities)
+
+        sc1, sc2, sc3 = st.columns(3)
+        sc1.metric("Cedole Attese (12m)", fmt_eur_full(total_expected))
+        sc2.metric("Scadenze (12m)", fmt_eur_full(total_maturities))
+        sc3.metric("Cedole da Registrare", str(len(pending_coupons)))
+
+        # One-click coupon registration
+        if pending_coupons:
+            st.divider()
+            st.markdown("**Registra cedola incassata**")
+            st.caption("Seleziona una cedola attesa per registrarla automaticamente come transazione DIVIDEND.")
+            pending_labels = [
+                f"{c['Data']} | {c['Nome']} | €{c['Importo Stimato €']:,.2f}"
+                for c in pending_coupons
+            ]
+            selected_coupon_label = st.selectbox("Cedola da registrare", pending_labels, key="coupon_register")
+            sel_coupon_idx = pending_labels.index(selected_coupon_label)
+            sel_coupon = pending_coupons[sel_coupon_idx]
+
+            rc1, rc2 = st.columns(2)
+            with rc1:
+                reg_date = st.date_input("Data incasso", value=pd.to_datetime(sel_coupon["Data"]).date(), key="coupon_reg_date")
+            with rc2:
+                reg_amount = st.number_input("Importo effettivo (€)", value=float(sel_coupon["Importo Stimato €"]),
+                                              step=0.01, key="coupon_reg_amount",
+                                              help="Modifica se l'importo netto (dopo ritenute) è diverso da quello lordo stimato")
+            reg_fx = 1.0
+            if sel_coupon.get("Valuta", "EUR") != "EUR":
+                reg_fx = st.number_input("Tasso FX", value=1.0, step=0.001, key="coupon_reg_fx",
+                                          help=f"Cambio {sel_coupon['Valuta']}/EUR al momento dell'incasso")
+
+            if st.button("✅ Registra Cedola come DIVIDEND", use_container_width=True, key="btn_register_coupon"):
+                add_transaction(
+                    date_str=str(reg_date),
+                    transaction_type="DIVIDEND",
+                    isin=sel_coupon["ISIN"],
+                    name=sel_coupon["Nome"],
+                    macro_class="Fixed Income",
+                    quantity=reg_amount,
+                    price=1.0,
+                    currency=sel_coupon.get("Valuta", "EUR"),
+                    fx_rate=reg_fx,
+                    fees=0.0,
+                    notes=f"Cedola {sel_coupon['Cedola %']}% - auto",
+                    sector="",
+                    asset_sub_type="Bond",
+                )
+                st.success(f"✅ Cedola registrata: {sel_coupon['Nome']} — €{reg_amount:,.2f}")
+                st.cache_data.clear()
+                st.rerun()
+    else:
+        st.info("Nessuna cedola o scadenza prevista nei prossimi 12 mesi. "
+                "Verifica di aver inserito cedola (%) e scadenza per ogni bond.")
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: OTTIMIZZAZIONE PTF
@@ -2175,7 +2388,8 @@ elif page == "📝 Operazioni & Import":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_operazioni")
-    if _mgmt_pw != "Maradona1":
+    _correct_pw = st.secrets.get("management", {}).get("password", "Maradona1") if hasattr(st, "secrets") else "Maradona1"
+    if _mgmt_pw != _correct_pw:
         if _mgmt_pw:
             st.warning("Password errata")
         st.stop()
@@ -2424,14 +2638,34 @@ elif page == "📝 Operazioni & Import":
                         "fees": float(edit_fees),
                         "notes": edit_notes.strip(),
                     }
-                    update_transaction(sel_idx, updates)
-                    st.success(f"✅ Operazione #{sel_idx} aggiornata!")
+                    # Reload transactions to verify the index still matches expected row
+                    fresh_tx = load_transactions()
+                    if sel_idx < len(fresh_tx):
+                        expected_isin = row.get("isin", "")
+                        actual_isin = fresh_tx.iloc[sel_idx].get("isin", "")
+                        if expected_isin == actual_isin:
+                            update_transaction(sel_idx, updates)
+                            st.success(f"✅ Operazione #{sel_idx} aggiornata!")
+                        else:
+                            st.error("⚠️ L'indice non corrisponde più alla transazione selezionata. Ricarica la pagina.")
+                    else:
+                        st.error("⚠️ Indice non valido. Ricarica la pagina.")
                     st.cache_data.clear()
                     st.rerun()
 
                 if deleted:
-                    delete_transaction(sel_idx)
-                    st.success(f"🗑️ Operazione #{sel_idx} eliminata!")
+                    # Verify index still matches before deleting
+                    fresh_tx = load_transactions()
+                    if sel_idx < len(fresh_tx):
+                        expected_isin = row.get("isin", "")
+                        actual_isin = fresh_tx.iloc[sel_idx].get("isin", "")
+                        if expected_isin == actual_isin:
+                            delete_transaction(sel_idx)
+                            st.success(f"🗑️ Operazione #{sel_idx} eliminata!")
+                        else:
+                            st.error("⚠️ L'indice non corrisponde più alla transazione selezionata. Ricarica la pagina.")
+                    else:
+                        st.error("⚠️ Indice non valido. Ricarica la pagina.")
                     st.cache_data.clear()
                     st.rerun()
         else:
@@ -2512,7 +2746,7 @@ elif page == "📝 Operazioni & Import":
                             # Recalculate current_value and P&L
                             for i in idx:
                                 qty = fresh_pos.loc[i, "quantity"]
-                                fx = fresh_pos.loc[i, "fx_rate"] if "fx_rate" in fresh_pos.columns else 1.0
+                                fx = fresh_pos.loc[i, "fx_rate_current"] if "fx_rate_current" in fresh_pos.columns else 1.0
                                 if pd.isna(fx) or fx == 0:
                                     fx = 1.0
                                 fresh_pos.loc[i, "current_value"] = qty * mp_price * fx
@@ -2557,7 +2791,7 @@ elif page == "📝 Operazioni & Import":
                                 fresh_pos.loc[idx, "current_price"] = row["price"]
                                 for i in idx:
                                     qty = fresh_pos.loc[i, "quantity"]
-                                    fx = fresh_pos.loc[i, "fx_rate"] if "fx_rate" in fresh_pos.columns else 1.0
+                                    fx = fresh_pos.loc[i, "fx_rate_current"] if "fx_rate_current" in fresh_pos.columns else 1.0
                                     if pd.isna(fx) or fx == 0:
                                         fx = 1.0
                                     fresh_pos.loc[i, "current_value"] = qty * row["price"] * fx
@@ -2593,7 +2827,8 @@ elif page == "⚙️ Gestione Info Strumenti":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_gestione_info")
-    if _mgmt_pw != "Maradona1":
+    _correct_pw = st.secrets.get("management", {}).get("password", "Maradona1") if hasattr(st, "secrets") else "Maradona1"
+    if _mgmt_pw != _correct_pw:
         if _mgmt_pw:
             st.warning("Password errata")
         st.stop()
@@ -2637,7 +2872,10 @@ elif page == "⚙️ Gestione Info Strumenti":
                         if new_country: update["country"] = new_country
                         if new_asset_type: update["asset_type"] = new_asset_type
                         if new_macro: update["macro_class"] = new_macro
-                        current_overrides[selected_isin] = update
+                        # Merge with existing override to preserve fields like coupon_rate, maturity_date
+                        existing_ov = current_overrides.get(selected_isin, {})
+                        existing_ov.update(update)
+                        current_overrides[selected_isin] = existing_ov
                         save_overrides(current_overrides)
                         st.success(f"✅ Salvato per {selected_isin}")
                         st.cache_data.clear()

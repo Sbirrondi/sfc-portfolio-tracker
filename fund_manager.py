@@ -114,8 +114,10 @@ def add_transaction(
 
 
 def delete_transaction(index: int) -> pd.DataFrame:
-    """Elimina una transazione per indice e ricalcola tutto."""
-    df = load_transactions()
+    """Elimina una transazione per indice e ricalcola tutto.
+    IMPORTANT: index refers to the sorted-by-date ascending DataFrame index.
+    """
+    df = load_transactions()  # Already sorted by date ascending
     if 0 <= index < len(df):
         df = df.drop(index).reset_index(drop=True)
         save_transactions(df)
@@ -127,9 +129,11 @@ def update_transaction(index: int, updates: dict) -> pd.DataFrame:
     """
     Modifica una transazione esistente per indice.
     updates: dict con le colonne da aggiornare (es. {"price": 105.5, "quantity": 200}).
+    IMPORTANT: index refers to the sorted-by-date ascending DataFrame index
+    from load_transactions(). The caller must ensure the index matches.
     Dopo la modifica ricalcola posizioni, cash e NAV.
     """
-    df = load_transactions()
+    df = load_transactions()  # Already sorted by date ascending
     if 0 <= index < len(df):
         for col, val in updates.items():
             if col in df.columns:
@@ -203,7 +207,13 @@ def compute_positions_from_transactions() -> pd.DataFrame:
                 if qty > 0:
                     avg_cost_per_unit = total_cost_eur / qty
                     avg_cost_local_per_unit = total_cost_local / qty if total_cost_local > 0 else avg_cost_per_unit
-                    sell_qty = min(row["quantity"], qty)
+                    sell_qty = row["quantity"]
+                    if sell_qty > qty + 1e-8:
+                        import logging
+                        logging.getLogger(__name__).warning(
+                            f"SELL qty ({sell_qty}) > position qty ({qty}) for {isin} on {row.get('date', '?')}. Clamping to {qty}."
+                        )
+                        sell_qty = qty
 
                     # Calculate realized P&L on this sale
                     sell_proceeds_local = sell_qty * row["price"]
@@ -484,7 +494,7 @@ def snapshot_nav(nav: float, benchmark_value: float = None):
     initial_nav = fund_info.get("initial_nav", 10_000_000)
     if initial_nav > 0:
         ratio = nav / initial_nav
-        if ratio > 5.0 or ratio < 0.1 or nav <= 0:
+        if ratio > 20.0 or ratio < 0.02 or nav <= 0:
             return None  # Reject obviously wrong NAV values
 
     today = datetime.now().strftime("%Y-%m-%d")
@@ -550,7 +560,7 @@ def save_fund_info(info: dict):
     _sync_to_github("fund_info.json", "Update fund info")
 
 
-def update_fund_info(nav: float, positions_count: int):
+def update_fund_info(nav: float, positions_count: int, benchmark_value: float = None):
     """Aggiorna automaticamente fund_info con NAV corrente e performance."""
     info = load_fund_info()
     initial_nav = info.get("initial_nav", 10_000_000)
@@ -558,6 +568,13 @@ def update_fund_info(nav: float, positions_count: int):
     info["positions_count"] = positions_count
     if initial_nav > 0:
         info["performance_since_inception"] = (nav - initial_nav) / initial_nav
+    # Update benchmark performance if provided
+    if benchmark_value is not None:
+        nav_history = load_nav_history()
+        if not nav_history.empty and "benchmark" in nav_history.columns:
+            first_bench = nav_history["benchmark"].dropna()
+            if not first_bench.empty and first_bench.iloc[0] > 0:
+                info["benchmark_performance"] = (benchmark_value / first_bench.iloc[0]) - 1
     info["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_fund_info(info)
     return info

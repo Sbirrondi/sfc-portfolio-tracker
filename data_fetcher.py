@@ -8,7 +8,9 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
 import time
 
 # In-memory cache
@@ -178,8 +180,8 @@ def get_historical_prices(
                     hist = t.history(period=period, auto_adjust=True)
                 if not hist.empty and "Close" in hist.columns:
                     result[ticker] = hist["Close"].dropna()
-            except:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to fetch {ticker}: {e}")
 
     _price_cache[cache_key] = result
     return result
@@ -199,7 +201,8 @@ def get_current_prices(tickers: list) -> dict:
                 hist = get_historical_prices([ticker], period="5d")
                 if ticker in hist and not hist[ticker].empty:
                     prices[ticker] = hist[ticker].iloc[-1]
-            except:
+            except Exception as e:
+                logger.warning(f"Failed to get current price for {ticker}: {e}")
                 prices[ticker] = 0
     return prices
 
@@ -242,7 +245,8 @@ def get_fx_rate(from_currency: str, to_currency: str = "EUR") -> float:
         t = yf.Ticker(pair)
         info = t.info
         return info.get("regularMarketPrice", 1.0)
-    except:
+    except Exception as e:
+        logger.warning(f"Failed to get FX rate {from_currency}/{to_currency}: {e}")
         return 1.0
 
 
