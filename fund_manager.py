@@ -253,18 +253,18 @@ def compute_positions_from_transactions() -> pd.DataFrame:
                 "avg_cost_local": round(avg_cost_local, 4),
                 "avg_fx": round(avg_fx, 6),
                 "invested_capital": round(total_cost_eur, 2),
-                "current_value": 0,
-                "current_price": 0,
+                "current_value": 0.0,
+                "current_price": 0.0,
                 "fx_rate_current": avg_fx,
-                "pnl": 0,
-                "pnl_pct": 0,
-                "unrealized_pnl": 0,
+                "pnl": 0.0,
+                "pnl_pct": 0.0,
+                "unrealized_pnl": 0.0,
                 "realized_pnl": round(realized_pnl, 2),
                 "dividends_received": round(dividends_received, 2),
-                "total_return": 0,  # unrealized + realized + dividends
-                "price_effect": 0,
-                "fx_effect": 0,
-                "weight_on_ptf": 0,
+                "total_return": 0.0,
+                "price_effect": 0.0,
+                "fx_effect": 0.0,
+                "weight_on_ptf": 0.0,
                 "asset_sub_type": last_asset_sub,
             })
 
@@ -298,12 +298,14 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
 
     df = positions.copy()
 
-    # Ensure numeric columns
+    # Ensure numeric columns are float64 (PyArrow int64 rejects float assignment)
     num_cols = ["quantity", "avg_cost", "invested_capital", "current_value",
-                "current_price", "pnl", "pnl_pct"]
+                "current_price", "pnl", "pnl_pct", "unrealized_pnl",
+                "realized_pnl", "dividends_received", "total_return",
+                "price_effect", "fx_effect", "weight_on_ptf"]
     for col in num_cols:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype("float64")
 
     # Ensure FX/decomposition columns exist
     for col in ["avg_cost_local", "avg_fx", "fx_rate_current", "price_effect", "fx_effect"]:
@@ -623,11 +625,13 @@ def enrich_positions(pos_df: pd.DataFrame, overrides: dict) -> pd.DataFrame:
 
     df = pos_df.copy()
 
-    # Ensure key columns exist
+    # Ensure key columns are float64 (PyArrow int64 rejects float assignment)
     for col in ["current_value", "invested_capital", "pnl", "pnl_pct",
-                 "weight_on_ptf", "quantity", "avg_cost", "current_price"]:
+                 "weight_on_ptf", "quantity", "avg_cost", "current_price",
+                 "unrealized_pnl", "realized_pnl", "dividends_received",
+                 "total_return", "price_effect", "fx_effect"]:
         if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype("float64")
 
     if "sector" not in df.columns:
         df["sector"] = "N/A"
