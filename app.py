@@ -440,14 +440,19 @@ with st.sidebar:
         pass
 
     st.markdown('<div style="height:0.5rem"></div>', unsafe_allow_html=True)
-    if st.button("🔄 Ricarica Dati", width="stretch"):
+    if st.button("🔄 Aggiorna Posizioni", use_container_width=True):
         _status = st.empty()
-        with st.spinner("Ricalcolando posizioni da transazioni e aggiornando prezzi..."):
+        _error_occurred = False
+        _error_msg = ""
+        with st.spinner("Ricalcolando posizioni e aggiornando prezzi..."):
             try:
                 # Step 1: Recompute positions from transactions
                 _status.info("Step 1/4 — Ricalcolo posizioni da transazioni...")
                 fresh_pos = compute_positions_from_transactions()
-                if not fresh_pos.empty:
+                if fresh_pos.empty:
+                    _error_occurred = True
+                    _error_msg = "Nessuna transazione trovata. Aggiungi transazioni prima di aggiornare."
+                else:
                     # Step 1b: Preserve existing manual prices for bonds
                     existing = load_positions()
                     if not existing.empty:
@@ -488,9 +493,14 @@ with st.sidebar:
                     fill_missing_nav_days(progress_callback=lambda msg: _status.info(f"Step 4/4 — {msg}"))
 
             except Exception as e:
-                st.warning(f"Errore aggiornamento: {e}")
-        st.cache_data.clear()
-        st.rerun()
+                _error_occurred = True
+                _error_msg = str(e)
+
+        if _error_occurred:
+            st.error(f"❌ Errore aggiornamento: {_error_msg}")
+        else:
+            st.cache_data.clear()
+            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
