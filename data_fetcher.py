@@ -237,17 +237,36 @@ def get_benchmark_prices(benchmark_key: str, start: str = None, period: str = "5
 # ── FX Rates ─────────────────────────────────────────────────────────────────
 
 def get_fx_rate(from_currency: str, to_currency: str = "EUR") -> float:
-    """Recupera il tasso di cambio corrente."""
+    """Recupera il tasso di cambio corrente. Prova coppia diretta, poi inversa."""
     if from_currency == to_currency:
         return 1.0
+
+    # Try direct pair first (e.g. HKDEUR=X)
     try:
         pair = f"{from_currency}{to_currency}=X"
         t = yf.Ticker(pair)
-        info = t.info
-        return info.get("regularMarketPrice", 1.0)
+        hist = t.history(period="5d")
+        if not hist.empty:
+            rate = float(hist["Close"].dropna().iloc[-1])
+            if rate > 0:
+                return rate
     except Exception as e:
-        logger.warning(f"Failed to get FX rate {from_currency}/{to_currency}: {e}")
-        return 1.0
+        logger.warning(f"FX direct {from_currency}{to_currency}: {e}")
+
+    # Try reverse pair and invert (e.g. EURHKD=X → 1/rate)
+    try:
+        pair_rev = f"{to_currency}{from_currency}=X"
+        t2 = yf.Ticker(pair_rev)
+        hist2 = t2.history(period="5d")
+        if not hist2.empty:
+            rate_rev = float(hist2["Close"].dropna().iloc[-1])
+            if rate_rev > 0:
+                return 1.0 / rate_rev
+    except Exception as e:
+        logger.warning(f"FX reverse {to_currency}{from_currency}: {e}")
+
+    logger.warning(f"Failed to get FX rate {from_currency}/{to_currency}, returning 1.0")
+    return 1.0
 
 
 def get_fx_history(from_currency: str, to_currency: str = "EUR", period: str = "5y") -> pd.Series:

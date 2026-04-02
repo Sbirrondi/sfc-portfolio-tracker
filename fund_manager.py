@@ -370,6 +370,12 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
                 except Exception:
                     fx_rates[yf_currency] = 1.0
             fx_now = fx_rates.get(yf_currency, 1.0)
+            # Safety: if FX rate is 1.0 for a non-EUR currency, use avg_fx as fallback
+            if abs(fx_now - 1.0) < 1e-6:
+                avg_fx_fallback = float(row.get("avg_fx", 0) or 0)
+                if avg_fx_fallback > 0 and avg_fx_fallback != 1.0:
+                    fx_now = avg_fx_fallback
+                    fx_rates[yf_currency] = fx_now
         else:
             fx_now = 1.0
         df.at[idx, "fx_rate_current"] = round(fx_now, 6)
