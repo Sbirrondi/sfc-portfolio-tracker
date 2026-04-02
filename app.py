@@ -15,6 +15,7 @@ import io
 import base64
 from streamlit_lightweight_charts import renderLightweightCharts
 
+import fund_manager as _fm
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
     delete_transaction, update_transaction, load_nav_history, load_fund_info, save_fund_info,
@@ -23,7 +24,6 @@ from fund_manager import (
     calculate_nav, snapshot_nav, update_fund_info,
     update_position_prices, compute_positions_from_transactions,
     recalculate_all, get_portfolio_summary,
-    pause_sync, resume_sync,
 )
 from build_nav_history import fill_missing_nav_days
 from analytics import (
@@ -448,7 +448,7 @@ with st.sidebar:
         with st.spinner("Ricalcolando posizioni e aggiornando prezzi..."):
             try:
                 # Pause GitHub sync to avoid triggering redeployments mid-update
-                pause_sync()
+                _fm._sync_paused = True
 
                 # Step 1: Recompute positions from transactions
                 _status.info("Step 1/4 — Ricalcolo posizioni da transazioni...")
@@ -500,7 +500,7 @@ with st.sidebar:
                 _error_occurred = True
                 _error_msg = str(e)
             finally:
-                resume_sync()
+                _fm._sync_paused = False
 
         if _error_occurred:
             st.error(f"❌ Errore aggiornamento: {_error_msg}")
