@@ -640,8 +640,13 @@ def enrich_positions(pos_df: pd.DataFrame, overrides: dict) -> pd.DataFrame:
             o = overrides[isin]
             for key, val in o.items():
                 if key not in df.columns:
-                    df[key] = "N/A"
-                df.at[idx, key] = val
+                    df[key] = pd.Series(["N/A"] * len(df), index=df.index, dtype="object")
+                try:
+                    df.at[idx, key] = val
+                except TypeError:
+                    # Column has strict dtype (e.g. PyArrow str); cast to object first
+                    df[key] = df[key].astype("object")
+                    df.at[idx, key] = val
 
     return df
 
