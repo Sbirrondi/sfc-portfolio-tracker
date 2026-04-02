@@ -475,7 +475,7 @@ with st.sidebar:
                     # Fetch current benchmark value for fund_info update
                     try:
                         from data_fetcher import get_historical_prices
-                        bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
+                        bench_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
                         bench_data = get_historical_prices([bench_ticker], period="5d")
                         bench_val = bench_data[bench_ticker].iloc[-1] if bench_ticker in bench_data and not bench_data[bench_ticker].empty else None
                     except Exception:
