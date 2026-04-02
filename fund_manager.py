@@ -29,8 +29,22 @@ def ensure_data_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+_sync_paused = False  # Flag to batch GitHub syncs during bulk operations
+
+def pause_sync():
+    """Pause GitHub sync (for bulk operations like price updates)."""
+    global _sync_paused
+    _sync_paused = True
+
+def resume_sync():
+    """Resume GitHub sync."""
+    global _sync_paused
+    _sync_paused = False
+
 def _sync_to_github(filename: str, message: str = None):
     """Sync a data file to GitHub (non-blocking, fails silently)."""
+    if _sync_paused:
+        return  # Skip individual syncs during bulk operations
     try:
         from github_sync import sync_data_file, is_enabled
         if is_enabled():

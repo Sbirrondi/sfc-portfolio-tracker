@@ -23,6 +23,7 @@ from fund_manager import (
     calculate_nav, snapshot_nav, update_fund_info,
     update_position_prices, compute_positions_from_transactions,
     recalculate_all, get_portfolio_summary,
+    pause_sync, resume_sync,
 )
 from build_nav_history import fill_missing_nav_days
 from analytics import (
@@ -446,6 +447,9 @@ with st.sidebar:
         _error_msg = ""
         with st.spinner("Ricalcolando posizioni e aggiornando prezzi..."):
             try:
+                # Pause GitHub sync to avoid triggering redeployments mid-update
+                pause_sync()
+
                 # Step 1: Recompute positions from transactions
                 _status.info("Step 1/4 — Ricalcolo posizioni da transazioni...")
                 fresh_pos = compute_positions_from_transactions()
@@ -495,10 +499,18 @@ with st.sidebar:
             except Exception as e:
                 _error_occurred = True
                 _error_msg = str(e)
+            finally:
+                resume_sync()
 
         if _error_occurred:
             st.error(f"❌ Errore aggiornamento: {_error_msg}")
         else:
+            # Batch sync all data to GitHub in one go
+            try:
+                from github_sync import sync_all_data
+                sync_all_data("Update positions and prices")
+            except Exception:
+                pass  # Non-blocking
             st.cache_data.clear()
             st.rerun()
 
