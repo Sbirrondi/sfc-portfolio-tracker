@@ -224,7 +224,7 @@ def build_daily_nav():
         return
 
     inception = pd.to_datetime(fund_info.get("inception_date", "2023-10-01"))
-    benchmark_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
+    benchmark_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
 
     # Build position events from transactions
     events = build_daily_positions_and_cash(transactions)
@@ -451,7 +451,7 @@ def fill_missing_nav_days(progress_callback=None):
             unmapped_isins.add(isin)
 
     # Download prices only for the missing range (with 5-day buffer for ffill)
-    benchmark_ticker = fund_info.get("benchmark_ticker", "VNGA60.MI")
+    benchmark_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
     all_tickers = list(set(mapped_tickers.values()))
     if benchmark_ticker:
         all_tickers.append(benchmark_ticker)

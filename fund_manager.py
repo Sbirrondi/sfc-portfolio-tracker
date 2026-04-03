@@ -492,7 +492,11 @@ def compute_cash_from_transactions() -> float:
                 proceeds = proceeds / fx
             cash += (proceeds - fees)
         elif tx_type == "DIVIDEND":
-            cash += qty * price if price > 0 else qty
+            div_amount = qty * price if price > 0 else qty
+            currency = row.get("currency", "EUR")
+            if currency != "EUR" and fx != 1.0:
+                div_amount = div_amount / fx
+            cash += div_amount
 
     return round(cash, 2)
 
