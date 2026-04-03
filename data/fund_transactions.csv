@@ -49,20 +49,20 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2024-07-17,BUY,IE00B4YBJ215,SPY4,Equity,1720.0,86.97,EUR,1.0,0.0,,US Equity,Stock
 2024-07-17,BUY,IE00BJ38QD84,Russell2000,Equity,1680.0,59.39,EUR,1.0,0.0,,US Equity,Stock
 2024-07-17,BUY,IE00B1TXK627,Ishares Global Water,Equity,1577.0,63.4,EUR,1.0,0.0,,Ishares Global Water,Stock
-2024-10-15,SELL,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,100.0,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
+2024-10-01,SELL,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,100.0,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
 2024-10-22,SELL,IT0004176001,Prysmian,Equity,5257.0,66.58,EUR,1.0,0.0,,Industrials,Stock
 2024-10-22,BUY,NL0000687663,AerCap,Equity,1291.0,96.25,USD,1.0806,0.0,,AerCap,Stock
 2024-10-25,SELL,IE00BQQP9F84,GDX,Alternative,6598.0,42.6,EUR,1.0,0.0,,Precious Metals,Commodity
 2024-10-25,BUY,IT0003549422,Sanlorenzo,Equity,770.0,36.4,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2024-11-21,SELL,PA1436583006,Carnival Corp.,Equity,13492.0,25.47,USD,1.0475,0.0,,Carnival Corp.,Stock
-2024-12-15,SELL,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,100.0,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
-2025-01-21,SELL,IE00BJK55C48,HY EU,Equity,43972.0,5.511,EUR,1.0,0.0,,HY EU,Stock
+2024-12-01,SELL,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,100.0,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
+2025-01-21,SELL,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.511,EUR,1.0,0.0,,HY EU,ETF
 2025-01-21,SELL,IE00B4KBBD01,Utilities US,Equity,43000.0,9.2,EUR,1.0,0.0,,US Equity,Stock
 2025-01-31,SELL,NO0010732555,"Norway Tf 1,75% Mz25 Nok",Fixed Income,55000.0,99.74,NOK,11.76609,0.0,,"Norway Tf 1,75% Mz25 Nok",Bond
 2025-02-10,BUY,IE000NFR7C63,MSCI China Tech UCITS ETF,Equity,35000.0,4.28,EUR,1.0,0.0,,China Equity,Stock
 2025-02-12,BUY,LU0908500753,Stoxx Europe 600,Equity,940.0,255.5,EUR,1.0,0.0,,European Equity,Stock
 2025-02-13,BUY,IT0005436693,"Btp Tf 0,6% Ag31 Eur",Fixed Income,7000.0,85.83,EUR,1.0,0.0,,Gov. Italia,Bond
-2025-02-15,SELL,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,100.0,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
+2025-02-01,SELL,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,100.0,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
 2025-02-25,BUY,US9123184098,United States Natural Gas Fund,Alternative,7231.0,21.78,USD,1.05,0.0,,Energy,Commodity
 2025-03-11,BUY,DE000A1E0HS6,Silver,Alternative,623.0,280.8,EUR,1.0,0.0,,Precious Metals,Commodity
 2025-03-12,BUY,IE00BLNMYC90,S&P500 Equal Weight,Equity,2600.0,85.33,EUR,1.0,0.0,,US Equity,Stock
@@ -112,6 +112,7 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-11-28,SELL,LU0489337690,Real Estate EU,Equity,14344.0,24.1,EUR,1.0,0.0,,European Equity,Stock
 2025-11-28,SELL,IE00BM67HK77,Healthcare,Equity,2133.0,51.24,EUR,1.0,0.0,,Healthcare,Stock
 2025-12-01,BUY,AU000000EMR4,EMR,Equity,14250.0,5.23,AUD,1.77,0.0,,Materials,Stock
+2025-12-02,DIVIDEND,XS2262211076,Cedola annuale Romania,Fixed Income,6875.0,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
 2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,71.37,HKD,9.048,0.0,,China Equity,Stock
 2025-12-05,BUY,IE000M7V94E1,Nucl,Alternative,2400.0,50.74,EUR,1.0,0.0,,Energy,Commodity
 2025-12-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Corporate Bond,Bond
@@ -136,7 +137,7 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-02-17,BUY,IE000P16KP52,CyberSecurity,Equity,5750.0,25.69,EUR,1.0,0.0,,Technology,Stock
 2026-02-17,SELL,SE0012673267,Evolution AB,Equity,765.0,529.6,SEK,10.65,0.0,,Evolution AB,Stock
 2026-02-17,BUY,US1273871087,Cadence,Equity,350.0,293.49,USD,1.118219,0.0,,Technology,Stock
-2026-02-18,BUY,AU000XCLWAX7,"Australia Tf 2,75% Nv29 Aud",Fixed Income,8500.0,94.8,AUD,1.1865,0.0,,Gov. Internazionali,Bond
+2026-02-18,BUY,AU000XCLWAX7,"Australia Tf 2,75% Nv29 Aud",Fixed Income,8500.0,94.8,AUD,1.67,0.0,,Gov. Internazionali,Bond
 2026-02-20,BUY,US5949181045,Microsoft,Equity,220.0,398.68,USD,1.17857,0.0,,Technology,Stock
 2026-03-01,SELL,IT0005640666,BOT Mz26,Fixed Income,5491.0,100.0,EUR,1.0,0.0,,Gov. Italia,Bond
 2026-03-13,BUY,US67066G1040,Nvidia,Equity,540.0,184.52,USD,1.14774,0.0,,Technology,Stock
