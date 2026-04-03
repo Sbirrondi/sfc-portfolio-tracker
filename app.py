@@ -545,6 +545,7 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 
 if page == "🏠 Dashboard":
+    import streamlit.components.v1 as components
 
     # ── Ticker Tape (TradingView) — live market context ───────────────
     ticker_tape = """
@@ -572,7 +573,7 @@ if page == "🏠 Dashboard":
         }
       </script>
     </div>"""
-    st.html(ticker_tape, height=46)
+    components.html(ticker_tape, height=46)
 
     # ── Fund Banner ───────────────────────────────────────────────────
     logo_html = ""
@@ -856,7 +857,7 @@ if page == "🏠 Dashboard":
               "studies": ["MASimple@tv-basicstudies"] }
           </script>
         </div>"""
-        st.html(tv_chart, height=520)
+        components.html(tv_chart, height=520)
 
     with tab_overview:
         tv_mkt = """
@@ -904,7 +905,7 @@ if page == "🏠 Dashboard":
               ] }
           </script>
         </div>"""
-        st.html(tv_mkt, height=520)
+        components.html(tv_mkt, height=520)
 
     with tab_cal:
         tv_cal = """
@@ -918,7 +919,7 @@ if page == "🏠 Dashboard":
               "countryFilter": "eu,us,gb,it" }
           </script>
         </div>"""
-        st.html(tv_cal, height=500)
+        components.html(tv_cal, height=500)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
