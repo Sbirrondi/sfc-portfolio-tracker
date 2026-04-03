@@ -534,7 +534,7 @@ if page == "🏠 Dashboard":
         {
           "symbols": [
             {"proName": "AMEX:SPY", "title": "S&P 500"},
-            {"proName": "NASDAQ:QQQ", "title": "Nasdaq 100"},
+            {"proName": "CME_MINI:NQ1!", "title": "Nasdaq Fut"},
             {"proName": "AMEX:EFA", "title": "EAFE"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
