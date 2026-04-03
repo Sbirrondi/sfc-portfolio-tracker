@@ -534,13 +534,13 @@ if page == "🏠 Dashboard":
         {
           "symbols": [
             {"proName": "AMEX:SPY", "title": "S&P 500"},
-            {"proName": "AMEX:QQQ", "title": "Nasdaq 100"},
+            {"proName": "NASDAQ:QQQ", "title": "Nasdaq 100"},
             {"proName": "AMEX:EFA", "title": "EAFE"},
             {"proName": "FX:EURUSD", "title": "EUR/USD"},
             {"proName": "FX:EURGBP", "title": "EUR/GBP"},
             {"proName": "TVC:GOLD", "title": "Gold"},
-            {"proName": "CBOE:TNX", "title": "US 10Y"},
-            {"proName": "AMEX:TLT", "title": "US Treasury 20Y+"},
+            {"proName": "TVC:TNX", "title": "US 10Y"},
+            {"proName": "NASDAQ:TLT", "title": "US Treasury 20Y+"},
             {"proName": "AMEX:VT", "title": "World ETF"}
           ],
           "showSymbolLogo": true,
@@ -858,14 +858,14 @@ if page == "🏠 Dashboard":
               "tabs": [
                 { "title": "Indici", "symbols": [
                     {"s": "AMEX:SPY", "d": "S&P 500"},
-                    {"s": "AMEX:QQQ", "d": "Nasdaq 100"},
+                    {"s": "NASDAQ:QQQ", "d": "Nasdaq 100"},
                     {"s": "AMEX:EFA", "d": "EAFE"},
                     {"s": "AMEX:VGK", "d": "Europe ETF"},
                     {"s": "AMEX:EWI", "d": "Italy ETF"},
                     {"s": "TVC:NI225", "d": "Nikkei 225"} ]},
                 { "title": "Bond", "symbols": [
-                    {"s": "CBOE:TNX", "d": "US 10Y Yield"},
-                    {"s": "AMEX:TLT", "d": "US Treasury 20Y+"},
+                    {"s": "TVC:TNX", "d": "US 10Y Yield"},
+                    {"s": "NASDAQ:TLT", "d": "US Treasury 20Y+"},
                     {"s": "AMEX:IEF", "d": "US Treasury 7-10Y"},
                     {"s": "AMEX:AGG", "d": "US Aggregate Bond"},
                     {"s": "AMEX:BND", "d": "Total Bond Market"} ]},
