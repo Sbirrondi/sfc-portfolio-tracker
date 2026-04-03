@@ -358,6 +358,11 @@ has_data = not positions.empty
 
 if has_data:
     positions = enrich_positions(positions, overrides)
+    # Filter out closed positions (zero quantity and zero value)
+    positions = positions[~((positions["quantity"] == 0) & (positions["current_value"] == 0))].reset_index(drop=True)
+    has_data = not positions.empty
+
+if has_data:
     # Recalculate pnl_pct if it's 0 or NaN
     mask = (positions["pnl_pct"] == 0) | positions["pnl_pct"].isna()
     positions.loc[mask, "pnl_pct"] = positions.loc[mask].apply(
@@ -371,11 +376,17 @@ if has_data:
     liquidita = cash_data.get("balance", 0) if cash_data else 0
     nav_total = total_value + liquidita
 
-    # Use NAV from history (includes realized PnL, dividends) as authoritative value
+    # Use NAV from history ONLY if it's from today (i.e., freshly snapshotted)
+    # Otherwise use the live-calculated value from positions + cash
     if not nav_history.empty and "nav" in nav_history.columns:
-        _nav_series = pd.to_numeric(nav_history["nav"], errors="coerce").dropna()
-        if len(_nav_series) >= 1:
-            nav_total = _nav_series.iloc[-1]
+        _nav_df = nav_history.copy()
+        _nav_df["date"] = pd.to_datetime(_nav_df["date"])
+        _last_date = _nav_df["date"].max()
+        _today = pd.Timestamp.now().normalize()
+        if _last_date >= _today:
+            _nav_series = pd.to_numeric(_nav_df["nav"], errors="coerce").dropna()
+            if len(_nav_series) >= 1:
+                nav_total = _nav_series.iloc[-1]
 
 
 # ── Sidebar ──────────────────────────────────────────────────────────────────
@@ -456,9 +467,14 @@ with st.sidebar:
                             "current_price": "_old_price", "fx_rate_current": "_old_fx",
                         })
                         fresh_pos = fresh_pos.merge(old_prices, on="isin", how="left")
+                        # Preserve old prices only for positions with no live price (e.g. unmapped bonds)
                         mask = (fresh_pos["current_price"] == 0) & (fresh_pos["_old_price"].fillna(0) > 0)
                         fresh_pos.loc[mask, "current_price"] = fresh_pos.loc[mask, "_old_price"]
-                        mask_fx = fresh_pos["_old_fx"].fillna(0) > 0
+                        # Preserve old FX only for unmapped positions (no ticker in isin_map)
+                        # Mapped positions will get fresh FX in step 2 (update_position_prices)
+                        _current_isin_map = get_isin_map()
+                        unmapped_mask = ~fresh_pos["isin"].map(lambda x: bool(_current_isin_map.get(x)))
+                        mask_fx = unmapped_mask & (fresh_pos["_old_fx"].fillna(0) > 0)
                         fresh_pos.loc[mask_fx, "fx_rate_current"] = fresh_pos.loc[mask_fx, "_old_fx"]
                         fresh_pos.drop(columns=["_old_price", "_old_fx"], inplace=True)
 
@@ -473,13 +489,22 @@ with st.sidebar:
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
                     # Fetch current benchmark value for fund_info update
+                    bench_val = None
                     try:
-                        from data_fetcher import get_historical_prices
+                        from data_fetcher import get_historical_prices, get_ticker_info
                         bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
+                        # Try historical prices first (most reliable for recent close)
                         bench_data = get_historical_prices([bench_ticker], period="5d")
-                        bench_val = bench_data[bench_ticker].iloc[-1] if bench_ticker in bench_data and not bench_data[bench_ticker].empty else None
+                        if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
+                            bench_val = float(bench_data[bench_ticker].iloc[-1])
+                        # Fallback: use get_ticker_info for current price
+                        if bench_val is None or bench_val <= 0:
+                            bench_info = get_ticker_info(bench_ticker)
+                            bp = bench_info.get("current_price", 0)
+                            if bp and bp > 0:
+                                bench_val = float(bp)
                     except Exception:
-                        bench_val = None
+                        pass
                     update_fund_info(nav, len(updated), benchmark_value=bench_val)
                     snapshot_nav(nav, benchmark_value=bench_val)
 
@@ -498,7 +523,6 @@ with st.sidebar:
 # ══════════════════════════════════════════════════════════════════════════════
 
 if page == "🏠 Dashboard":
-    import streamlit.components.v1 as components
 
     # ── Ticker Tape (TradingView) — live market context ───────────────
     ticker_tape = """
@@ -526,7 +550,7 @@ if page == "🏠 Dashboard":
         }
       </script>
     </div>"""
-    components.html(ticker_tape, height=46)
+    st.html(ticker_tape, height=46)
 
     # ── Fund Banner ───────────────────────────────────────────────────
     logo_html = ""
@@ -703,8 +727,8 @@ if page == "🏠 Dashboard":
     with col_right:
         st.markdown('<div class="section-header">Asset Allocation</div>', unsafe_allow_html=True)
         macro = positions.groupby("macro_class")["current_value"].sum().reset_index()
-        macro["pct"] = macro["current_value"] / nav_total * 100
-        if liquidita > 0:
+        macro["pct"] = (macro["current_value"] / nav_total * 100) if nav_total > 0 else 0
+        if liquidita > 0 and nav_total > 0:
             liq_row = pd.DataFrame([{"macro_class": "Liquidità", "current_value": liquidita, "pct": liquidita / nav_total * 100}])
             macro = pd.concat([macro, liq_row], ignore_index=True)
 
@@ -757,7 +781,7 @@ if page == "🏠 Dashboard":
                     <div class="stat-item"><div class="stat-label">Max Drawdown</div>
                         <div class="stat-value" style="color:#ef4444">{mdd*100:.1f}%</div></div>
                     <div class="stat-item"><div class="stat-label">Equity / Fixed Inc.</div>
-                        <div class="stat-value">{positions[positions["macro_class"]=="Equity"]["current_value"].sum()/nav_total*100:.0f}% / {positions[positions["macro_class"]=="Fixed Income"]["current_value"].sum()/nav_total*100:.0f}%</div></div>
+                        <div class="stat-value">{positions[positions["macro_class"]=="Equity"]["current_value"].sum()/nav_total*100 if nav_total > 0 else 0:.0f}% / {positions[positions["macro_class"]=="Fixed Income"]["current_value"].sum()/nav_total*100 if nav_total > 0 else 0:.0f}%</div></div>
                 </div>""", unsafe_allow_html=True)
 
     with col_b:
@@ -810,7 +834,7 @@ if page == "🏠 Dashboard":
               "studies": ["MASimple@tv-basicstudies"] }
           </script>
         </div>"""
-        components.html(tv_chart, height=520)
+        st.html(tv_chart, height=520)
 
     with tab_overview:
         tv_mkt = """
@@ -858,7 +882,7 @@ if page == "🏠 Dashboard":
               ] }
           </script>
         </div>"""
-        components.html(tv_mkt, height=520)
+        st.html(tv_mkt, height=520)
 
     with tab_cal:
         tv_cal = """
@@ -872,7 +896,7 @@ if page == "🏠 Dashboard":
               "countryFilter": "eu,us,gb,it" }
           </script>
         </div>"""
-        components.html(tv_cal, height=500)
+        st.html(tv_cal, height=500)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -905,7 +929,7 @@ elif page == "📋 Posizioni":
         class_invested = df["invested_capital"].sum()
         class_pnl = class_value - class_invested
         class_pnl_pct = (class_pnl / class_invested * 100) if class_invested > 0 else 0
-        class_weight = class_value / nav_total * 100
+        class_weight = (class_value / nav_total * 100) if nav_total > 0 else 0
 
         ca, cb, cc, cd = st.columns(4)
         ca.metric(f"Valore {title}", fmt_eur_full(class_value))
@@ -921,7 +945,7 @@ elif page == "📋 Posizioni":
             base_cols += ["price_effect", "fx_effect"]
         display = df[[c for c in base_cols if c in df.columns]].copy()
         # Weight on asset class (not on total ptf)
-        display["weight_class"] = (display["current_value"] / class_value * 100).round(2)
+        display["weight_class"] = (display["current_value"] / class_value * 100).round(2) if class_value > 0 else 0
         display["pnl_pct_d"] = (display["pnl_pct"] * 100).round(2)
         display = display.sort_values("current_value", ascending=False)
 
@@ -1332,10 +1356,10 @@ elif page == "🏆 Contribuzione P&L":
 
     contrib_pos = positions[["name", "isin", "macro_class", "sector", "invested_capital",
                               "current_value", "pnl", "pnl_pct"]].copy()
-    contrib_pos["weight_ptf"] = contrib_pos["current_value"] / nav_total
+    contrib_pos["weight_ptf"] = (contrib_pos["current_value"] / nav_total) if nav_total > 0 else 0
     # Contribution to portfolio P&L = weight × individual return
     total_invested = contrib_pos["invested_capital"].sum()
-    contrib_pos["contrib_pnl_pct"] = contrib_pos["pnl"] / total_invested * 100  # contribution in pp
+    contrib_pos["contrib_pnl_pct"] = (contrib_pos["pnl"] / total_invested * 100) if total_invested > 0 else 0
 
     # Top gainers & losers
     top_gain = contrib_pos.nlargest(10, "pnl")
@@ -1397,7 +1421,7 @@ elif page == "🏆 Contribuzione P&L":
         positions=("name", "count")
     ).reset_index()
     by_sector["pnl_pct"] = ((by_sector["value"] / by_sector["invested"] - 1) * 100).round(2)
-    by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2)
+    by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
     by_sector = by_sector.sort_values("pnl", ascending=True)
 
     colors_s = ["#ef4444" if x < 0 else "#22c55e" for x in by_sector["pnl"]]
@@ -1431,11 +1455,11 @@ elif page == "🏆 Contribuzione P&L":
         positions=("name", "count")
     ).reset_index()
     by_macro["pnl_pct"] = ((by_macro["value"] / by_macro["invested"] - 1) * 100).round(2)
-    by_macro["weight"] = (by_macro["value"] / nav_total * 100).round(2)
+    by_macro["weight"] = (by_macro["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
     # Add liquidità row
     liq_row = pd.DataFrame([{"macro_class": "Liquidità", "invested": 0, "value": liquidita,
                               "pnl": 0, "positions": 0, "pnl_pct": 0,
-                              "weight": round(liquidita / nav_total * 100, 2)}])
+                              "weight": round(liquidita / nav_total * 100, 2) if nav_total > 0 else 0}])
     by_macro = pd.concat([by_macro, liq_row], ignore_index=True)
 
     col_pie, col_bar = st.columns(2)
@@ -1490,7 +1514,7 @@ elif page == "🏛️ Analisi Fixed Income":
     fi_value = fi_positions["current_value"].sum()
     fi_invested = fi_positions["invested_capital"].sum()
     fi_pnl = fi_value - fi_invested
-    fi_weight = fi_value / nav_total * 100
+    fi_weight = (fi_value / nav_total * 100) if nav_total > 0 else 0
 
     # ── KPIs ──────────────────────────────────────────────────────────
     f1, f2, f3, f4, f5 = st.columns(5)
@@ -2241,7 +2265,7 @@ elif page == "🔬 X-Ray Esposizioni":
     with tab6:
         st.markdown('<div class="section-header">Top 20 Posizioni</div>', unsafe_allow_html=True)
         top20 = positions.nlargest(20, "current_value")[["name", "macro_class", "current_value"]].copy()
-        top20["weight"] = (top20["current_value"] / nav_total * 100).round(2)
+        top20["weight"] = (top20["current_value"] / nav_total * 100).round(2) if nav_total > 0 else 0
         # Sort by value for clean display
         top20 = top20.sort_values("current_value", ascending=True)
 
@@ -2388,7 +2412,10 @@ elif page == "📝 Operazioni & Import":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_operazioni")
-    _correct_pw = st.secrets.get("management", {}).get("password", "Maradona1") if hasattr(st, "secrets") else "Maradona1"
+    _correct_pw = st.secrets.get("management", {}).get("password") if hasattr(st, "secrets") else None
+    if not _correct_pw:
+        st.error("Password di gestione non configurata. Imposta [management] password in Streamlit Secrets.")
+        st.stop()
     if _mgmt_pw != _correct_pw:
         if _mgmt_pw:
             st.warning("Password errata")
@@ -2827,7 +2854,10 @@ elif page == "⚙️ Gestione Info Strumenti":
 
     # Password gate for management pages
     _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_gestione_info")
-    _correct_pw = st.secrets.get("management", {}).get("password", "Maradona1") if hasattr(st, "secrets") else "Maradona1"
+    _correct_pw = st.secrets.get("management", {}).get("password") if hasattr(st, "secrets") else None
+    if not _correct_pw:
+        st.error("Password di gestione non configurata. Imposta [management] password in Streamlit Secrets.")
+        st.stop()
     if _mgmt_pw != _correct_pw:
         if _mgmt_pw:
             st.warning("Password errata")

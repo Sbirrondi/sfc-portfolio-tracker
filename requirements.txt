@@ -9,3 +9,5 @@ pyportfolioopt>=1.5.5
 scipy>=1.10.0
 matplotlib>=3.7.0
 streamlit-lightweight-charts>=0.7.0
+requests>=2.28.0
+beautifulsoup4>=4.11.0
