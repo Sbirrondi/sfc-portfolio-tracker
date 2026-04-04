@@ -686,7 +686,7 @@ if page == "🏠 Dashboard":
             _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
                             "color": "#22c55e", "type": "Line", "lineWidth": 2})
         # Chart legend
-        _bench_label = fund_info.get("benchmark_name", "VNGA60")
+        _bench_label = fund_info.get("benchmark", "VNGA60")
         st.markdown(f"""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
             <span><span style="display:inline-block;width:12px;height:3px;background:#6366f1;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">SFC Fund</span></span>
             <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark ({_bench_label})</span></span>
