@@ -23,6 +23,20 @@ from datetime import datetime, timedelta
 
 DATA_DIR = Path(__file__).parent / "data"
 
+# Module-level constants for ticker/currency overrides
+CRYPTO_PROXY = {
+    "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
+    "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
+}
+# Tickers whose yfinance currency differs from transaction currency
+TICKER_CURRENCY = {
+    "BTEC.L": "USD",
+    "JD.L": "GBX",
+    "EVO.ST": "SEK",
+    "RTO1.F": "EUR",
+    "CTEC.AS": "EUR",
+}
+
 
 def load_transactions():
     df = pd.read_csv(DATA_DIR / "fund_transactions.csv")
@@ -247,20 +261,7 @@ def build_daily_nav():
             if info["currency"] != "EUR":
                 all_currencies.add(info["currency"])
 
-    # Map ISINs to tickers
-    # For .SG tickers (Stuttgart) that lack historical data on yfinance,
-    # use underlying crypto price (BTC-EUR, ETH-EUR) with a scale factor.
-    CRYPTO_PROXY = {
-        "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
-        "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
-    }
-    # Tickers whose yfinance currency differs from transaction currency
-    # GBX = GBP pence, divide by 100 to get GBP
-    TICKER_CURRENCY = {
-        "BTEC.L": "USD",
-        "JD.L": "GBX",
-        "EVO.ST": "SEK",
-    }
+    # Map ISINs to tickers (using module-level CRYPTO_PROXY and TICKER_CURRENCY)
     mapped_tickers = {}
     unmapped_isins = set()
     crypto_scale = {}
@@ -487,15 +488,7 @@ def fill_missing_nav_days(progress_callback=None):
                 all_currencies.add(info["currency"])
 
     isin_map = load_isin_map()
-    CRYPTO_PROXY = {
-        "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
-        "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
-    }
-    TICKER_CURRENCY = {
-        "BTEC.L": "USD",
-        "JD.L": "GBX",
-        "EVO.ST": "SEK",
-    }
+    # Uses module-level CRYPTO_PROXY and TICKER_CURRENCY
     mapped_tickers = {}
     unmapped_isins = set()
     crypto_scale = {}

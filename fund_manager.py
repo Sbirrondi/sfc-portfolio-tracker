@@ -201,7 +201,9 @@ def compute_positions_from_transactions() -> pd.DataFrame:
 
         for _, row in isin_tx.iterrows():
             tx_type = row.get("transaction_type", "")
-            last_name = row.get("name", "") or last_name
+            # Only update name from BUY/SELL (not dividends which have "Cedola..." names)
+            if tx_type in ("BUY", "SELL"):
+                last_name = row.get("name", "") or last_name
             last_macro = row.get("macro_class", "") or last_macro
             last_currency = row.get("currency", "EUR") or last_currency
             last_sector = row.get("sector", "") or last_sector
@@ -345,6 +347,12 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
         currency = row.get("currency", "EUR")
         qty = float(row["quantity"])
 
+        # Tickers whose actual trading currency differs from yfinance report
+        _TICKER_CURRENCY_OVERRIDE = {
+            "RTO1.F": "EUR",   # Frankfurt, already EUR
+            "CTEC.AS": "EUR",  # Euronext Amsterdam, EUR
+        }
+
         live_price = None
         yf_currency = currency  # Will be updated from yfinance if available
         if ticker:
@@ -355,10 +363,13 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
                     live_price = lp
                     df.at[idx, "current_price"] = round(live_price, 4)
                 # Use the actual trading currency from yfinance for FX conversion
-                # This ensures correct conversion even if transaction currency was wrong
-                reported_ccy = info.get("currency", "")
-                if reported_ccy and reported_ccy != "":
-                    yf_currency = reported_ccy
+                # But respect overrides for tickers with known currency
+                if ticker in _TICKER_CURRENCY_OVERRIDE:
+                    yf_currency = _TICKER_CURRENCY_OVERRIDE[ticker]
+                else:
+                    reported_ccy = info.get("currency", "")
+                    if reported_ccy and reported_ccy != "":
+                        yf_currency = reported_ccy
             except Exception:
                 pass
 
@@ -574,7 +585,7 @@ def load_fund_info() -> dict:
         "inception_date": "2023-10-01",
         "initial_nav": 10_000_000,
         "currency": "EUR",
-        "benchmark": "S&P 500 Equal Weight",
+        "benchmark": "VNGA60",
     }
 
 
@@ -600,7 +611,8 @@ def update_fund_info(nav: float, positions_count: int, benchmark_value: float = 
         if not nav_history.empty and "benchmark" in nav_history.columns:
             first_bench = nav_history["benchmark"].dropna()
             if not first_bench.empty and first_bench.iloc[0] > 0:
-                info["benchmark_performance"] = (benchmark_value / first_bench.iloc[0]) - 1
+                bp = (benchmark_value / first_bench.iloc[0]) - 1
+                info["benchmark_performance"] = round(float(bp), 6)
     info["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     save_fund_info(info)
     return info
@@ -748,10 +760,35 @@ def recalculate_all():
                     value_eur = qty * cp * fx_now
                     invested = float(row.get("invested_capital", 0) or 0)
                     unrealized = value_eur - invested
+                    realized = float(row.get("realized_pnl", 0) or 0)
+                    dividends = float(row.get("dividends_received", 0) or 0)
                     positions.at[idx, "current_value"] = round(value_eur, 2)
                     positions.at[idx, "pnl"] = round(unrealized, 2)
                     positions.at[idx, "unrealized_pnl"] = round(unrealized, 2)
                     positions.at[idx, "pnl_pct"] = round(unrealized / invested, 6) if invested > 0 else 0
+                    positions.at[idx, "total_return"] = round(unrealized + realized + dividends, 2)
+
+                    # Price/FX effect decomposition
+                    effective_ccy = ccy
+                    if effective_ccy != "EUR":
+                        avg_fx_purchase = float(row.get("avg_fx", 1.0) or 1.0)
+                        avg_local = float(row.get("avg_cost_local", 0) or 0)
+                        if avg_fx_purchase > 0 and abs(avg_fx_purchase - 1.0) > 1e-6 and avg_local > 0:
+                            p_effect = qty * (cp - avg_local) * avg_fx_purchase
+                            f_effect = qty * cp * (fx_now - avg_fx_purchase)
+                            positions.at[idx, "price_effect"] = round(p_effect, 2)
+                            positions.at[idx, "fx_effect"] = round(f_effect, 2)
+                        else:
+                            positions.at[idx, "price_effect"] = round(unrealized, 2)
+                            positions.at[idx, "fx_effect"] = 0.0
+                    else:
+                        positions.at[idx, "price_effect"] = round(unrealized, 2)
+                        positions.at[idx, "fx_effect"] = 0.0
+
+            # Recalculate weights
+            total_value = positions["current_value"].sum()
+            if total_value > 0:
+                positions["weight_on_ptf"] = (positions["current_value"] / total_value).round(6)
 
         save_positions(positions)
 
