@@ -172,6 +172,12 @@ def download_prices(tickers: list, start_date: str):
             print(f"Batch download failed for {batch}: {e}")
 
     if not all_close.empty:
+        # Remove single-day spikes (>5x median in rolling window)
+        for col in all_close.columns:
+            series = all_close[col]
+            median = series.rolling(10, min_periods=3, center=True).median()
+            spike = (series > median * 5) | (series < median / 5)
+            all_close.loc[spike, col] = np.nan
         all_close = all_close.ffill()
 
     return all_close
@@ -242,14 +248,39 @@ def build_daily_nav():
                 all_currencies.add(info["currency"])
 
     # Map ISINs to tickers
+    # For .SG tickers (Stuttgart) that lack historical data on yfinance,
+    # use underlying crypto price (BTC-EUR, ETH-EUR) with a scale factor.
+    CRYPTO_PROXY = {
+        "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
+        "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
+    }
+    # Tickers whose yfinance currency differs from transaction currency
+    # GBX = GBP pence, divide by 100 to get GBP
+    TICKER_CURRENCY = {
+        "BTEC.L": "USD",
+        "JD.L": "GBX",
+        "EVO.ST": "SEK",
+    }
     mapped_tickers = {}
     unmapped_isins = set()
+    crypto_scale = {}
     for isin in all_isins:
         ticker = isin_map.get(isin)
         if ticker:
-            mapped_tickers[isin] = ticker
+            cp = CRYPTO_PROXY.get(ticker)
+            if cp:
+                mapped_tickers[isin] = cp["proxy"]
+                crypto_scale[cp["proxy"]] = cp["scale"]
+            else:
+                mapped_tickers[isin] = ticker
         else:
             unmapped_isins.add(isin)
+
+    # Ensure all needed currencies are downloaded
+    for t, ccy in TICKER_CURRENCY.items():
+        actual = "GBP" if ccy == "GBX" else ccy
+        if actual != "EUR":
+            all_currencies.add(actual)
 
     print(f"Mapped tickers: {len(mapped_tickers)}, Unmapped (bonds etc): {len(unmapped_isins)}")
 
@@ -314,10 +345,19 @@ def build_daily_nav():
                 if date in prices.index:
                     p = prices.loc[date, ticker]
                     if pd.notna(p) and p > 0:
-                        fx_rate = get_fx_rate(currency)
-                        if fx_rate is None:
-                            fx_rate = 1.0  # fallback
-                        value = qty * float(p) * fx_rate
+                        if ticker in crypto_scale:
+                            value = qty * float(p) * crypto_scale[ticker]
+                        else:
+                            # Use actual yfinance currency if known
+                            price_ccy = TICKER_CURRENCY.get(ticker, currency)
+                            px = float(p)
+                            if price_ccy == "GBX":
+                                px /= 100.0
+                                price_ccy = "GBP"
+                            fx_rate = get_fx_rate(price_ccy)
+                            if fx_rate is None:
+                                fx_rate = 1.0
+                            value = qty * px * fx_rate
                         port_value += value
                         price_found = True
 
@@ -441,14 +481,34 @@ def fill_missing_nav_days(progress_callback=None):
                 all_currencies.add(info["currency"])
 
     isin_map = load_isin_map()
+    CRYPTO_PROXY = {
+        "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
+        "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
+    }
+    TICKER_CURRENCY = {
+        "BTEC.L": "USD",
+        "JD.L": "GBX",
+        "EVO.ST": "SEK",
+    }
     mapped_tickers = {}
     unmapped_isins = set()
+    crypto_scale = {}
     for isin in all_isins:
         ticker = isin_map.get(isin)
         if ticker:
-            mapped_tickers[isin] = ticker
+            cp = CRYPTO_PROXY.get(ticker)
+            if cp:
+                mapped_tickers[isin] = cp["proxy"]
+                crypto_scale[cp["proxy"]] = cp["scale"]
+            else:
+                mapped_tickers[isin] = ticker
         else:
             unmapped_isins.add(isin)
+
+    for t, ccy in TICKER_CURRENCY.items():
+        actual = "GBP" if ccy == "GBX" else ccy
+        if actual != "EUR":
+            all_currencies.add(actual)
 
     # Download prices only for the missing range (with 5-day buffer for ffill)
     benchmark_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
@@ -500,8 +560,16 @@ def fill_missing_nav_days(progress_callback=None):
                 if date in prices.index:
                     p = prices.loc[date, ticker]
                     if pd.notna(p) and p > 0:
-                        fx_rate = get_fx_rate(currency) or 1.0
-                        port_value += qty * float(p) * fx_rate
+                        if ticker in crypto_scale:
+                            port_value += qty * float(p) * crypto_scale[ticker]
+                        else:
+                            price_ccy = TICKER_CURRENCY.get(ticker, currency)
+                            px = float(p)
+                            if price_ccy == "GBX":
+                                px /= 100.0
+                                price_ccy = "GBP"
+                            fx_rate = get_fx_rate(price_ccy) or 1.0
+                            port_value += qty * px * fx_rate
                         price_found = True
 
             if not price_found:
