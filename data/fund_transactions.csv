@@ -43,7 +43,6 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2024-04-15,BUY,NL0015435975,Campari,Equity,5000.0,8.954,EUR,1.0,0.0,,Consumer Staples,Stock
 2024-04-15,SELL,IT0004176001,Prysmian,Equity,3800.0,50.0,EUR,1.0,0.0,,Industrials,Stock
 2024-05-01,BUY,GB00BM8Q5M07,JD Sports,Equity,76620.0,1.131,GBP,0.8547,0.0,,JD Sports,Stock
-2024-05-07,BUY,GB00B082RF11,Rentokil,Equity,15725.0,4.183,GBP,0.8596,0.0,,Business Services,Stock
 2024-05-22,SELL,US3364331070,First Solar,Equity,1298.0,248.88,USD,1.083,0.0,,First Solar,Stock
 2024-06-04,BUY,IT0003549422,Sanlorenzo,Equity,1200.0,41.95,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2024-07-17,BUY,IE00B4YBJ215,SPY4,Equity,1720.0,86.97,EUR,1.0,0.0,,US Equity,Stock
@@ -140,6 +139,8 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-02-18,BUY,AU000XCLWAX7,"Australia Tf 2,75% Nv29 Aud",Fixed Income,8500.0,94.8,AUD,1.67,0.0,,Gov. Internazionali,Bond
 2026-02-20,BUY,US5949181045,Microsoft,Equity,220.0,398.68,USD,1.17857,0.0,,Technology,Stock
 2026-03-01,SELL,IT0005640666,BOT Mz26,Fixed Income,5491.0,100.0,EUR,1.0,0.0,,Gov. Italia,Bond
+2026-03-03,DIVIDEND,XS2262211076,Cedola annuale Romania Q1,Fixed Income,2114.06,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
+2026-03-03,DIVIDEND,XS2262211076,Cedola annuale Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
 2026-03-13,BUY,US67066G1040,Nvidia,Equity,540.0,184.52,USD,1.14774,0.0,,Technology,Stock
 2026-03-13,SELL,IT0003856405,Leonardo,Equity,700.0,63.82,EUR,1.0,0.0,,Leonardo,Stock
 2026-03-13,BUY,US58733R1023,MercadoLibre,Equity,60.0,1663.91,USD,1.14774,0.0,,Technology,Stock
