@@ -595,16 +595,9 @@ if page == "🏠 Dashboard":
         st.stop()
 
     # ── Compute Dashboard Data ────────────────────────────────────────
-    # Use nav_history as single source of truth for all performance calcs
+    # Use initial deposit (10M) as base for inception performance, not first NAV snapshot
     nav = nav_total
-    if not nav_history.empty and "nav" in nav_history.columns:
-        _nav_clean = pd.to_numeric(nav_history["nav"], errors="coerce").dropna()
-        if len(_nav_clean) >= 2:
-            initial_nav = _nav_clean.iloc[0]
-        else:
-            initial_nav = fund_info.get("initial_nav", 10_000_000)
-    else:
-        initial_nav = fund_info.get("initial_nav", 10_000_000)
+    initial_nav = fund_info.get("initial_nav", 10_000_000)
     inception_perf = (nav - initial_nav) / initial_nav if initial_nav > 0 else total_pnl_pct
 
     # Compute benchmark performance from nav_history (live, not from stale JSON)
@@ -691,14 +684,19 @@ if page == "🏠 Dashboard":
             _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
                             "color": "#22c55e", "type": "Line", "lineWidth": 2})
         # Chart legend
-        st.markdown("""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
+        _bench_label = fund_info.get("benchmark_name", "VNGA60")
+        st.markdown(f"""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
             <span><span style="display:inline-block;width:12px;height:3px;background:#6366f1;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">SFC Fund</span></span>
-            <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark ({fund_info.get("benchmark_name", "VNGA60")})</span></span>
+            <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark ({_bench_label})</span></span>
         </div>""", unsafe_allow_html=True)
         tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
 
         # Period performance summary
-        _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
+        # For "Dall'Inizio", use initial deposit (10M) as base, not first NAV snapshot
+        if dash_period == "Dall'Inizio":
+            _fund_p = nav_df_filtered["nav"].iloc[-1] / fund_info.get("initial_nav", 10_000_000) - 1
+        else:
+            _fund_p = nav_df_filtered["nav"].iloc[-1] / nav_df_filtered["nav"].iloc[0] - 1
         _cp = st.columns(3)
         _cp[0].metric(f"SFC Fund ({dash_period})", f"{_fund_p:+.2%}")
         if "benchmark" in nav_df_filtered.columns:
@@ -720,6 +718,7 @@ if page == "🏠 Dashboard":
             bv = pd.to_numeric(nav_df.get("benchmark", pd.Series(dtype=float)), errors="coerce")
 
             rows_html = ""
+            _initial_nav_ref = fund_info.get("initial_nav", 10_000_000)
             for label, start_dt in {
                 "YTD": pd.Timestamp(latest_date.year, 1, 1),
                 "1M": latest_date - pd.DateOffset(months=1),
@@ -731,7 +730,8 @@ if page == "🏠 Dashboard":
                 mask = nav_df["date"] >= start_dt
                 subset = nav_df[mask]
                 if len(subset) >= 1:
-                    sn = subset["nav"].iloc[0]
+                    # For "Since Inception", use the actual initial deposit (10M)
+                    sn = _initial_nav_ref if label == "Since Inception" else subset["nav"].iloc[0]
                     fp = (latest_nav_v / sn - 1) if sn > 0 else 0
                     bs = bv[mask].dropna()
                     bp = ((bs.iloc[-1] / bs.iloc[0] - 1) if len(bs) >= 2 and bs.iloc[0] > 0 else None)
