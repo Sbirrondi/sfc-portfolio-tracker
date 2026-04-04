@@ -70,7 +70,26 @@ st.markdown("""
 
     /* ── KPI Cards ── */
     .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.7rem; margin-bottom:0.8rem; }
-    @media(max-width:768px){ .kpi-grid{grid-template-columns:repeat(2,1fr);} }
+    @media(max-width:768px){
+        .kpi-grid{grid-template-columns:repeat(2,1fr); gap:0.4rem;}
+        .kpi-value { font-size:1.1rem; }
+        .kpi-label { font-size:0.58rem; }
+        .kpi-delta { font-size:0.65rem; }
+        .fund-banner { flex-direction:column; text-align:center; padding:0.8rem; gap:0.6rem; }
+        .fund-banner img { width:44px; height:44px; }
+        .fund-banner h1 { font-size:1.05rem; }
+        .section-header { font-size:0.72rem; }
+        .stat-grid { grid-template-columns:1fr; }
+        .perf-table { font-size:0.7rem; }
+        .perf-table thead th { font-size:0.58rem; padding:0.4rem; }
+        .perf-table tbody td { padding:0.35rem 0.4rem; }
+        .mover-name { max-width:55%; font-size:0.72rem; }
+        .main .block-container { padding-left:0.5rem; padding-right:0.5rem; }
+    }
+    @media(max-width:480px){
+        .kpi-grid { grid-template-columns:1fr; }
+        .kpi-value { font-size:1rem; }
+    }
     .kpi-card {
         background: linear-gradient(135deg, #0d0d1a 0%, #13132a 100%);
         border: 1px solid rgba(99,102,241,0.10); border-radius:10px;
