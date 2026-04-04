@@ -304,6 +304,12 @@ def build_daily_nav():
     end_date = pd.Timestamp.today()
     all_dates = pd.date_range(inception, end_date, freq="B")  # Business days
 
+    # Reindex prices and FX data to cover ALL business days (holidays included)
+    # so that holidays get ffilled from the previous trading day
+    prices = prices.reindex(all_dates).ffill()
+    for pair in fx_data:
+        fx_data[pair] = fx_data[pair].reindex(all_dates).ffill()
+
     # For each date, find the applicable position state using bisect
     event_dates = [e[0] for e in events]
 
@@ -526,6 +532,13 @@ def fill_missing_nav_days(progress_callback=None):
     fx_data = download_fx_rates(all_currencies, dl_start) if all_currencies else {}
     manual_prices = load_manual_bond_prices()
     end_date = today
+
+    # Reindex prices and FX to cover missing dates (holidays get ffilled)
+    missing_idx = pd.DatetimeIndex(missing_dates)
+    if not prices.empty:
+        prices = prices.reindex(prices.index.union(missing_idx)).ffill()
+    for pair in fx_data:
+        fx_data[pair] = fx_data[pair].reindex(fx_data[pair].index.union(missing_idx)).ffill()
 
     # Calculate NAV only for missing dates
     new_records = []
