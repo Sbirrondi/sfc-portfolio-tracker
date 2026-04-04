@@ -671,7 +671,7 @@ if page == "🏠 Dashboard":
         # Chart legend
         st.markdown("""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
             <span><span style="display:inline-block;width:12px;height:3px;background:#6366f1;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">SFC Fund</span></span>
-            <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark (VNGA60)</span></span>
+            <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark ({fund_info.get("benchmark_name", "VNGA60")})</span></span>
         </div>""", unsafe_allow_html=True)
         tv_line_chart(_series, height=370, key=f"dash_nav_{dash_period}")
 
@@ -712,7 +712,7 @@ if page == "🏠 Dashboard":
                     sn = subset["nav"].iloc[0]
                     fp = (latest_nav_v / sn - 1) if sn > 0 else 0
                     bs = bv[mask].dropna()
-                    bp = ((bs.iloc[-1] / bs.iloc[0] - 1) if len(bs) >= 1 and bs.iloc[0] > 0 else None)
+                    bp = ((bs.iloc[-1] / bs.iloc[0] - 1) if len(bs) >= 2 and bs.iloc[0] > 0 else None)
                     dp = (fp - bp) if bp is not None else None
                     b_str = f'<span class="{_pc(bp)}">{bp:+.2%}</span>' if bp is not None else '<span style="color:#475569">N/A</span>'
                     d_str = f'<span class="{_pc(dp)}">{dp:+.2%}</span>' if dp is not None else '<span style="color:#475569">N/A</span>'
@@ -1204,7 +1204,7 @@ elif page == "📊 Analytics Avanzate":
         elif period == "1Y":
             start_date = today - pd.DateOffset(years=1)
         else:
-            start_date = pd.Timestamp("2023-10-01")
+            start_date = pd.Timestamp(fund_info.get("inception_date", "2023-10-01"))
 
         mask = daily_nav["date"] >= start_date
         filtered = daily_nav[mask].copy()
@@ -2546,6 +2546,10 @@ elif page == "📝 Operazioni & Import":
                 if st.button("🔴 Chiudi Posizione", key="close_btn"):
                     if close_isin and close_price > 0:
                         row = positions[positions["isin"] == close_isin].iloc[0]
+                        # Get current FX rate for non-EUR positions
+                        close_fx = float(row.get("fx_rate_current", 1.0) or 1.0)
+                        if row.get("currency", "EUR") == "EUR":
+                            close_fx = 1.0
                         add_transaction(
                             date_str=str(pd.Timestamp.today().date()),
                             transaction_type="SELL",
@@ -2555,6 +2559,7 @@ elif page == "📝 Operazioni & Import":
                             quantity=float(row["quantity"]),
                             price=close_price,
                             currency=row.get("currency", "EUR"),
+                            fx_rate=close_fx,
                             sector=row.get("sector", ""),
                             asset_sub_type=row.get("asset_sub_type", "Stock"),
                         )
@@ -2705,18 +2710,51 @@ elif page == "📝 Operazioni & Import":
 
         if st.button("🔄 Aggiorna Prezzi Live", width="stretch"):
             with st.spinner("Recuperando prezzi da Yahoo Finance..."):
-                fresh_positions = load_positions()
+                fresh_positions = compute_positions_from_transactions()
                 if not fresh_positions.empty:
+                    # Preserve old prices for unmapped bonds
+                    existing = load_positions()
+                    if not existing.empty:
+                        old_prices = existing[["isin", "current_price", "fx_rate_current"]].copy()
+                        old_prices = old_prices.rename(columns={
+                            "current_price": "_old_price", "fx_rate_current": "_old_fx",
+                        })
+                        fresh_positions = fresh_positions.merge(old_prices, on="isin", how="left")
+                        mask = (fresh_positions["current_price"] == 0) & (fresh_positions["_old_price"].fillna(0) > 0)
+                        fresh_positions.loc[mask, "current_price"] = fresh_positions.loc[mask, "_old_price"]
+                        fresh_positions.loc[mask, "fx_rate_current"] = fresh_positions.loc[mask, "_old_fx"]
+                        fresh_positions = fresh_positions.drop(columns=["_old_price", "_old_fx"], errors="ignore")
+
                     updated = update_position_prices(fresh_positions, get_isin_map())
                     save_positions(updated)
 
                     # Recalculate cash and NAV
                     cash = compute_cash_from_transactions()
+                    save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
-                    update_fund_info(nav, len(updated))
 
-                    # Save NAV snapshot
-                    snapshot_nav(nav)
+                    # Fetch benchmark value
+                    bench_val = None
+                    try:
+                        from data_fetcher import get_historical_prices, get_ticker_info
+                        bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
+                        bench_data = get_historical_prices([bench_ticker], period="5d")
+                        if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
+                            bench_val = float(bench_data[bench_ticker].iloc[-1])
+                        if bench_val is None or bench_val <= 0:
+                            bench_info_d = get_ticker_info(bench_ticker)
+                            bp = bench_info_d.get("current_price", 0)
+                            if bp and bp > 0:
+                                bench_val = float(bp)
+                    except Exception:
+                        pass
+
+                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
+                    snapshot_nav(nav, benchmark_value=bench_val)
+
+                    # Fill missing NAV history days
+                    from build_nav_history import fill_missing_nav_days
+                    fill_missing_nav_days()
 
                     st.success(f"✅ Prezzi aggiornati! NAV: {fmt_eur_full(nav)}")
                     st.cache_data.clear()
@@ -2785,13 +2823,14 @@ elif page == "📝 Operazioni & Import":
                                     fresh_pos.loc[i, "pnl_pct"] = fresh_pos.loc[i, "pnl"] / invested
                             save_positions(fresh_pos)
 
-                            # Recalculate NAV and mark manual update timestamp
+                            # Recalculate NAV, snapshot, and mark manual update timestamp
                             cash = compute_cash_from_transactions()
                             nav = calculate_nav(fresh_pos, cash)
                             info = update_fund_info(nav, len(fresh_pos))
                             from datetime import datetime as _dt
                             info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
                             save_fund_info(info)
+                            snapshot_nav(nav)
 
                             name = positions[positions["isin"] == mp_isin]["name"].iloc[0]
                             st.success(f"✅ Prezzo aggiornato: **{name}** — {old_price:.4f} → {mp_price:.4f}")
@@ -2835,6 +2874,7 @@ elif page == "📝 Operazioni & Import":
                         from datetime import datetime as _dt
                         info["last_manual_update"] = _dt.now().strftime("%Y-%m-%d %H:%M:%S")
                         save_fund_info(info)
+                        snapshot_nav(nav)
                         st.success(f"✅ Aggiornati {updated_count} prezzi. NAV: {fmt_eur_full(nav)}")
                         st.cache_data.clear()
                         st.rerun()
