@@ -48,7 +48,10 @@ st.markdown("""
         padding-top: 0.5rem; max-width: 1600px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    #MainMenu, footer, header { visibility: hidden; }
+    #MainMenu, footer { visibility: hidden; }
+    header { visibility: hidden; }
+    /* Keep sidebar toggle (hamburger) visible on mobile */
+    [data-testid="stSidebarCollapsedControl"] { visibility: visible !important; z-index: 999; }
 
     /* ── Sidebar ── */
     [data-testid="stSidebar"] {
