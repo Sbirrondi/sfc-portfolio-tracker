@@ -672,7 +672,9 @@ if page == "🏠 Dashboard":
         if len(nav_df_filtered) < 2:
             nav_df_filtered = nav_df.copy()
 
-        nav_df_filtered["nav_index"] = nav_df_filtered["nav"] / nav_df_filtered["nav"].iloc[0] * 100
+        # For "Dall'Inizio", rebase from initial deposit (10M) for consistency
+        _nav_base = fund_info.get("initial_nav", 10_000_000) if dash_period == "Dall'Inizio" else nav_df_filtered["nav"].iloc[0]
+        nav_df_filtered["nav_index"] = nav_df_filtered["nav"] / _nav_base * 100
         if "benchmark" in nav_df_filtered.columns:
             bp = pd.to_numeric(nav_df_filtered["benchmark"], errors="coerce")
             fv = bp.dropna().iloc[0] if not bp.dropna().empty else 1
