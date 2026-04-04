@@ -49,33 +49,32 @@ st.markdown("""
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     #MainMenu, footer { visibility: hidden; }
-    header { visibility: hidden; }
-    /* Sidebar toggle always visible and styled */
-    [data-testid="stSidebarCollapsedControl"] {
-        visibility: visible !important;
-        z-index: 9999;
+    /* Hide header text but keep the bar for sidebar toggle */
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        border-bottom: none !important;
+    }
+    /* Custom floating sidebar button when sidebar is collapsed */
+    .sidebar-toggle-btn {
         position: fixed;
-        top: 0.5rem;
-        left: 0.5rem;
+        top: 0.6rem;
+        left: 0.6rem;
+        z-index: 999999;
+        background: rgba(99,102,241,0.2);
+        border: 1px solid rgba(99,102,241,0.4);
+        border-radius: 10px;
+        padding: 0.5rem 0.6rem;
+        cursor: pointer;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+        transition: all 0.2s;
+        display: none;  /* shown via JS when sidebar closed */
     }
-    [data-testid="stSidebarCollapsedControl"] button {
-        background: rgba(99,102,241,0.15) !important;
-        border: 1px solid rgba(99,102,241,0.3) !important;
-        border-radius: 8px !important;
-        padding: 0.45rem !important;
-        color: #e2e8f0 !important;
-        backdrop-filter: blur(8px);
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    .sidebar-toggle-btn:hover {
+        background: rgba(99,102,241,0.4);
+        border-color: rgba(99,102,241,0.6);
     }
-    [data-testid="stSidebarCollapsedControl"] button:hover {
-        background: rgba(99,102,241,0.3) !important;
-        border-color: rgba(99,102,241,0.5) !important;
-    }
-    [data-testid="stSidebarCollapsedControl"] svg {
-        width: 20px !important;
-        height: 20px !important;
-        fill: #e2e8f0 !important;
-    }
+    .sidebar-toggle-btn svg { width:22px; height:22px; }
 
     /* ── Sidebar ── */
     [data-testid="stSidebar"] {
@@ -202,6 +201,38 @@ st.markdown("""
     ::-webkit-scrollbar-track { background:#0a0a14; }
     ::-webkit-scrollbar-thumb { background:#2a2a4a; border-radius:3px; }
 </style>
+""", unsafe_allow_html=True)
+
+# Floating sidebar toggle button (visible when sidebar is collapsed)
+st.markdown("""
+<div class="sidebar-toggle-btn" id="sidebarToggle" onclick="
+    var btn = window.parent.document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\'] button')
+        || window.parent.document.querySelector('[data-testid=\\'collapsedControl\\'] button')
+        || window.parent.document.querySelector('button[aria-label*=\\'sidebar\\']')
+        || window.parent.document.querySelector('header button');
+    if(btn) btn.click();
+    else { window.parent.document.querySelector('[data-testid=\\'stSidebar\\']').style.display='block'; }
+">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round">
+        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+    </svg>
+</div>
+<script>
+(function() {
+    function checkSidebar() {
+        var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        var toggle = document.getElementById('sidebarToggle');
+        if (!sidebar || !toggle) return;
+        var collapsed = sidebar.getAttribute('aria-expanded') === 'false'
+                     || sidebar.offsetWidth < 50
+                     || sidebar.style.display === 'none'
+                     || sidebar.classList.contains('st-emotion-cache-1cypcdb');
+        toggle.style.display = collapsed ? 'block' : 'none';
+    }
+    setInterval(checkSidebar, 500);
+    checkSidebar();
+})();
+</script>
 """, unsafe_allow_html=True)
 
 
