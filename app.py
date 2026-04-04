@@ -50,8 +50,32 @@ st.markdown("""
     }
     #MainMenu, footer { visibility: hidden; }
     header { visibility: hidden; }
-    /* Keep sidebar toggle (hamburger) visible on mobile */
-    [data-testid="stSidebarCollapsedControl"] { visibility: visible !important; z-index: 999; }
+    /* Sidebar toggle always visible and styled */
+    [data-testid="stSidebarCollapsedControl"] {
+        visibility: visible !important;
+        z-index: 9999;
+        position: fixed;
+        top: 0.5rem;
+        left: 0.5rem;
+    }
+    [data-testid="stSidebarCollapsedControl"] button {
+        background: rgba(99,102,241,0.15) !important;
+        border: 1px solid rgba(99,102,241,0.3) !important;
+        border-radius: 8px !important;
+        padding: 0.45rem !important;
+        color: #e2e8f0 !important;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    [data-testid="stSidebarCollapsedControl"] button:hover {
+        background: rgba(99,102,241,0.3) !important;
+        border-color: rgba(99,102,241,0.5) !important;
+    }
+    [data-testid="stSidebarCollapsedControl"] svg {
+        width: 20px !important;
+        height: 20px !important;
+        fill: #e2e8f0 !important;
+    }
 
     /* ── Sidebar ── */
     [data-testid="stSidebar"] {
