@@ -872,7 +872,7 @@ if page == "🏠 Dashboard":
                 nr = calculate_returns(ns)
                 ppy, _ = detect_frequency(ns)
                 vol = annualized_volatility(nr, ppy)
-                sr = sharpe_ratio(nr, 0.03, ppy)
+                sr = sharpe_ratio(nr, 0.02, ppy)
                 mdd = max_drawdown(ns)
                 st.markdown(f"""
                 <div class="stat-grid" style="margin-top:0.45rem">

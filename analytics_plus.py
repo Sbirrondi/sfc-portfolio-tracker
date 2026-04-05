@@ -392,9 +392,9 @@ def optimize_max_sharpe(prices: pd.DataFrame, current_weights: dict = None) -> d
         S = risk_mod.CovarianceShrinkage(prices).ledoit_wolf()
 
         ef = EF(mu, S)
-        ef.max_sharpe(risk_free_rate=0.03)
+        ef.max_sharpe(risk_free_rate=0.02)
         weights = ef.clean_weights()
-        perf = ef.portfolio_performance(verbose=False, risk_free_rate=0.03)
+        perf = ef.portfolio_performance(verbose=False, risk_free_rate=0.02)
 
         return {
             "weights": {k: round(v, 4) for k, v in weights.items() if v > 0.001},
@@ -422,7 +422,7 @@ def optimize_min_volatility(prices: pd.DataFrame) -> dict:
         ef = EF(mu, S)
         ef.min_volatility()
         weights = ef.clean_weights()
-        perf = ef.portfolio_performance(verbose=False, risk_free_rate=0.03)
+        perf = ef.portfolio_performance(verbose=False, risk_free_rate=0.02)
 
         return {
             "weights": {k: round(v, 4) for k, v in weights.items() if v > 0.001},
@@ -449,7 +449,7 @@ def optimize_hrp(prices: pd.DataFrame) -> dict:
         hrp = HRPOpt(returns)
         hrp.optimize()
         weights = hrp.clean_weights()
-        perf = hrp.portfolio_performance(verbose=False, risk_free_rate=0.03)
+        perf = hrp.portfolio_performance(verbose=False, risk_free_rate=0.02)
 
         return {
             "weights": {k: round(v, 4) for k, v in weights.items() if v > 0.001},

@@ -82,7 +82,7 @@ def annualized_volatility(returns: pd.Series, periods_per_year: int = 252) -> fl
 
 # ── Risk Metrics ─────────────────────────────────────────────────────────────
 
-def sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.04, periods_per_year: int = 252) -> float:
+def sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.02, periods_per_year: int = 252) -> float:
     """Sharpe Ratio annualizzato."""
     ann_ret = annualized_return(returns, periods_per_year)
     ann_vol = annualized_volatility(returns, periods_per_year)
@@ -91,13 +91,14 @@ def sharpe_ratio(returns: pd.Series, risk_free_rate: float = 0.04, periods_per_y
     return (ann_ret - risk_free_rate) / ann_vol
 
 
-def sortino_ratio(returns: pd.Series, risk_free_rate: float = 0.04, periods_per_year: int = 252) -> float:
-    """Sortino Ratio (usa solo downside deviation)."""
+def sortino_ratio(returns: pd.Series, risk_free_rate: float = 0.02, periods_per_year: int = 252) -> float:
+    """Sortino Ratio (usa downside deviation calcolata su tutta la serie)."""
     ann_ret = annualized_return(returns, periods_per_year)
-    downside = returns[returns < 0]
-    if downside.empty:
-        return float('inf')
-    downside_vol = downside.std() * np.sqrt(periods_per_year)
+    # MAR = risk-free rate per period
+    mar = (1 + risk_free_rate) ** (1 / periods_per_year) - 1
+    diff = returns - mar
+    downside_diff = np.minimum(diff, 0)
+    downside_vol = np.sqrt(np.mean(downside_diff ** 2)) * np.sqrt(periods_per_year)
     if downside_vol == 0:
         return float('inf')
     return (ann_ret - risk_free_rate) / downside_vol
@@ -191,15 +192,18 @@ def calculate_alpha_beta(
 
 def rolling_metrics(
     returns: pd.Series,
-    window: int = 63  # ~3 months
+    window: int = 63,  # ~3 months
+    periods_per_year: int = 252,
+    risk_free_rate: float = 0.02
 ) -> pd.DataFrame:
     """Calcola metriche rolling."""
+    rf_period = (1 + risk_free_rate) ** (1 / periods_per_year) - 1
     rolling_ret = returns.rolling(window).apply(
         lambda x: (1 + x).prod() - 1, raw=False
     )
-    rolling_vol = returns.rolling(window).std() * np.sqrt(252)
+    rolling_vol = returns.rolling(window).std() * np.sqrt(periods_per_year)
     rolling_sharpe = returns.rolling(window).apply(
-        lambda x: (x.mean() * 252) / (x.std() * np.sqrt(252)) if x.std() > 0 else 0,
+        lambda x: ((x.mean() - rf_period) * periods_per_year) / (x.std() * np.sqrt(periods_per_year)) if x.std() > 0 else 0,
         raw=False
     )
 
@@ -229,10 +233,18 @@ def monthly_returns_table(prices: pd.Series) -> pd.DataFrame:
                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
     table.columns = [month_names[m - 1] for m in table.columns.get_level_values("Month")]
 
-    # Add YTD column
-    yearly = prices.resample("YE").last().pct_change(fill_method=None).dropna()
-    yearly.index = yearly.index.year
-    table["YTD"] = yearly
+    # Add YTD column: for each year, compute return from Dec 31 prior year to last available date
+    ytd_values = {}
+    for year in table.index:
+        # Find last price of previous year (or first price if first year)
+        prev_year_end = prices[prices.index < pd.Timestamp(year, 1, 1)]
+        year_prices = prices[(prices.index >= pd.Timestamp(year, 1, 1)) &
+                             (prices.index < pd.Timestamp(year + 1, 1, 1))]
+        if not prev_year_end.empty and not year_prices.empty:
+            ytd_values[year] = year_prices.iloc[-1] / prev_year_end.iloc[-1] - 1
+        elif not year_prices.empty and len(year_prices) > 1:
+            ytd_values[year] = year_prices.iloc[-1] / year_prices.iloc[0] - 1
+    table["YTD"] = pd.Series(ytd_values)
 
     return table
 
@@ -242,7 +254,7 @@ def monthly_returns_table(prices: pd.Series) -> pd.DataFrame:
 def performance_report(
     portfolio_prices: pd.Series,
     benchmark_prices: pd.Series = None,
-    risk_free_rate: float = 0.04
+    risk_free_rate: float = 0.02
 ) -> dict:
     """Genera un report completo delle performance con frequenza auto-rilevata."""
     # Auto-detect frequency from portfolio data
