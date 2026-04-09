@@ -432,6 +432,15 @@ def _interpolate_nav_to_daily(nav_history: pd.DataFrame) -> pd.DataFrame:
 
 
 positions, overrides, isin_map, fund_info, nav_history, transactions, cash_data = load_all_data()
+
+# Handle deferred GitHub sync (after rerun from "Aggiorna Posizioni")
+if st.session_state.pop("_pending_github_sync", False):
+    try:
+        from github_sync import sync_all_data
+        sync_all_data("Update positions and prices")
+    except Exception:
+        pass  # Non-blocking
+
 has_data = not positions.empty
 
 if has_data:
@@ -607,12 +616,10 @@ with st.sidebar:
         if _error_occurred:
             st.error(f"❌ Errore aggiornamento: {_error_msg}")
         else:
-            # Batch sync all data to GitHub in one go
-            try:
-                from github_sync import sync_all_data
-                sync_all_data("Update positions and prices")
-            except Exception:
-                pass  # Non-blocking
+            # Defer GitHub sync to after rerun so the user sees updated data immediately.
+            # sync_all_data() pushes files one-by-one, each triggering a Streamlit Cloud
+            # redeploy that can overwrite local files before the remaining pushes complete.
+            st.session_state["_pending_github_sync"] = True
             st.cache_data.clear()
             st.rerun()
 

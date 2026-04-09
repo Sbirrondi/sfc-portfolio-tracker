@@ -97,9 +97,16 @@ def _get_file_sha(file_path: str) -> Optional[str]:
     return None
 
 
-def push_file(local_path: Path, repo_path: str, message: str = "Auto-sync data") -> bool:
-    """Push a single file to GitHub."""
-    if not is_enabled() or not local_path.exists():
+def push_file(local_path: Path, repo_path: str, message: str = "Auto-sync data",
+              content_bytes: bytes = None) -> bool:
+    """Push a single file to GitHub.
+
+    If content_bytes is provided, push that content instead of reading from disk.
+    This avoids race conditions when Streamlit Cloud pulls overwrite local files.
+    """
+    if not is_enabled():
+        return False
+    if content_bytes is None and not local_path.exists():
         return False
 
     global _last_sync
@@ -108,7 +115,7 @@ def push_file(local_path: Path, repo_path: str, message: str = "Auto-sync data")
         time.sleep(_MIN_SYNC_INTERVAL - (now - _last_sync))
 
     try:
-        content = local_path.read_bytes()
+        content = content_bytes if content_bytes is not None else local_path.read_bytes()
         encoded = base64.b64encode(content).decode()
 
         # Get current SHA (needed for update, None for create)
@@ -159,16 +166,31 @@ def sync_data_file(filename: str, message: str = None):
 
 
 def sync_all_data(message: str = "Sync all data"):
-    """Push all data files to GitHub."""
+    """Push all data files to GitHub.
+
+    Pre-reads all file contents before pushing to avoid race conditions:
+    each push triggers a Streamlit Cloud redeploy that can overwrite local
+    files via git pull before the remaining pushes complete.
+    """
     if not is_enabled():
         return
 
     from fund_manager import DATA_DIR
+
+    # Pre-read all files into memory before any push
+    files_to_push = []
     for repo_path in SYNC_FILES:
         filename = repo_path.split("/")[-1]
         local_path = DATA_DIR / filename
         if local_path.exists():
-            sync_file(local_path, repo_path, message)
+            files_to_push.append((local_path, repo_path, local_path.read_bytes()))
+
+    # Push using pre-read content (immune to SC pull overwrites)
+    for local_path, repo_path, content in files_to_push:
+        try:
+            push_file(local_path, repo_path, message, content_bytes=content)
+        except Exception as e:
+            print(f"Sync error (non-blocking): {e}")
 
 
 def get_sync_status() -> dict:
