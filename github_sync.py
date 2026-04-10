@@ -166,31 +166,98 @@ def sync_data_file(filename: str, message: str = None):
 
 
 def sync_all_data(message: str = "Sync all data"):
-    """Push all data files to GitHub.
+    """Push all data files to GitHub in a SINGLE commit.
 
-    Pre-reads all file contents before pushing to avoid race conditions:
-    each push triggers a Streamlit Cloud redeploy that can overwrite local
-    files via git pull before the remaining pushes complete.
+    Uses the Git Data API (blobs → tree → commit → update ref) so only one
+    commit is created. This avoids triggering multiple Streamlit Cloud
+    redeploys that would kill the script mid-sync and cause race conditions
+    (KeyError on module reload, stale NAV, etc.).
     """
     if not is_enabled():
         return
 
     from fund_manager import DATA_DIR
 
-    # Pre-read all files into memory before any push
+    # Pre-read all files into memory
     files_to_push = []
     for repo_path in SYNC_FILES:
         filename = repo_path.split("/")[-1]
         local_path = DATA_DIR / filename
         if local_path.exists():
-            files_to_push.append((local_path, repo_path, local_path.read_bytes()))
+            files_to_push.append((repo_path, local_path.read_bytes()))
 
-    # Push using pre-read content (immune to SC pull overwrites)
-    for local_path, repo_path, content in files_to_push:
-        try:
-            push_file(local_path, repo_path, message, content_bytes=content)
-        except Exception as e:
-            print(f"Sync error (non-blocking): {e}")
+    if not files_to_push:
+        return
+
+    global _last_sync
+    now = time.time()
+    if now - _last_sync < _MIN_SYNC_INTERVAL:
+        time.sleep(_MIN_SYNC_INTERVAL - (now - _last_sync))
+
+    try:
+        # 1. Get current branch ref
+        ref_data = _api_request("GET", "git/ref/heads/main")
+        if "object" not in ref_data:
+            print(f"sync_all_data: failed to get ref: {ref_data}")
+            return
+        current_commit_sha = ref_data["object"]["sha"]
+
+        # 2. Get current commit to find its tree
+        commit_data = _api_request("GET", f"git/commits/{current_commit_sha}")
+        if "tree" not in commit_data:
+            print(f"sync_all_data: failed to get commit: {commit_data}")
+            return
+        base_tree_sha = commit_data["tree"]["sha"]
+
+        # 3. Create a blob for each file
+        tree_entries = []
+        for repo_path, content in files_to_push:
+            blob_data = _api_request("POST", "git/blobs", {
+                "content": base64.b64encode(content).decode(),
+                "encoding": "base64",
+            })
+            if "sha" not in blob_data:
+                print(f"sync_all_data: failed to create blob for {repo_path}: {blob_data}")
+                return
+            tree_entries.append({
+                "path": repo_path,
+                "mode": "100644",
+                "type": "blob",
+                "sha": blob_data["sha"],
+            })
+
+        # 4. Create a new tree based on the current one
+        tree_data = _api_request("POST", "git/trees", {
+            "base_tree": base_tree_sha,
+            "tree": tree_entries,
+        })
+        if "sha" not in tree_data:
+            print(f"sync_all_data: failed to create tree: {tree_data}")
+            return
+        new_tree_sha = tree_data["sha"]
+
+        # 5. Create a new commit
+        new_commit_data = _api_request("POST", "git/commits", {
+            "message": message,
+            "tree": new_tree_sha,
+            "parents": [current_commit_sha],
+        })
+        if "sha" not in new_commit_data:
+            print(f"sync_all_data: failed to create commit: {new_commit_data}")
+            return
+        new_commit_sha = new_commit_data["sha"]
+
+        # 6. Update branch ref to point to the new commit
+        update_data = _api_request("PATCH", "git/refs/heads/main", {
+            "sha": new_commit_sha,
+        })
+        if "error" in update_data:
+            print(f"sync_all_data: failed to update ref: {update_data}")
+            return
+
+        _last_sync = time.time()
+    except Exception as e:
+        print(f"sync_all_data error (non-blocking): {e}")
 
 
 def get_sync_status() -> dict:
