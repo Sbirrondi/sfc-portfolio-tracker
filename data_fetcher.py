@@ -38,7 +38,7 @@ def get_ticker_info(ticker: str) -> dict:
             "sector": info.get("sector", "N/A"),
             "industry": info.get("industry", "N/A"),
             "country": info.get("country", "N/A"),
-            "currency": info.get("currency", "USD"),
+            "currency": info.get("currency", ""),
             "exchange": info.get("exchange", "N/A"),
             "market_cap": info.get("marketCap", 0),
             "asset_type": _classify_asset(info, ticker),
@@ -86,7 +86,7 @@ def get_ticker_info(ticker: str) -> dict:
     except Exception as e:
         fallback = {
             "ticker": ticker, "name": ticker, "sector": "N/A",
-            "industry": "N/A", "country": "N/A", "currency": "USD",
+            "industry": "N/A", "country": "N/A", "currency": "",
             "exchange": "N/A", "market_cap": 0, "asset_type": "Unknown",
             "trailing_pe": None, "forward_pe": None, "price_to_book": None,
             "ev_to_ebitda": None, "ev_to_revenue": None, "peg_ratio": None,
