@@ -33,6 +33,7 @@ from analytics import (
     calculate_alpha_beta, monthly_returns_table,
     performance_report, var_historical, cvar
 )
+from xray_utils import add_xray_sector, build_country_exposure, build_exposure_table
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -2312,69 +2313,154 @@ elif page == "🔬 X-Ray Esposizioni":
     c4.metric("HHI Index", f"{hhi:.4f}")
     st.divider()
 
-    tab1, tab_ind, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        ["🏢 Settore", "🔎 Industry", "🌍 Geografia", "💱 Valuta", "📊 Macro Classe", "🏭 Tipo Asset", "📈 Top Holdings"])
+    xray_positions = add_xray_sector(positions)
 
-    def exposure_chart(df, group_col, label):
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+        ["🏢 Settore", "🌍 Geografia", "💱 Valuta", "📊 Macro Classe", "🏭 Tipo Asset", "📈 Top Holdings"])
+
+    def exposure_chart(df, group_col, label, chart_type="pie"):
         if df.empty:
             st.info("Nessun dato.")
             return
-        grouped = df.groupby(group_col).agg(
-            value=("current_value", "sum"), count=("isin", "count"),
-            names=("name", lambda x: ", ".join(x.head(5)))).reset_index()
-        grouped["weight"] = (grouped["value"] / _xray_total * 100).round(2)
+        grouped = build_exposure_table(df, group_col, total_value=_xray_total)
+        if grouped.empty:
+            st.info("Nessun dato.")
+            return
         grouped["value_fmt"] = grouped["value"].apply(lambda x: fmt_num(x, 2))
-        grouped = grouped.sort_values("weight", ascending=False)
 
         cl, cr = st.columns([1, 1])
         with cl:
-            fig = px.pie(grouped, values="weight", names=group_col, hole=0.45,
-                         color_discrete_sequence=px.colors.qualitative.Set3)
-            fig.update_layout(height=400, margin=dict(t=20, b=20), template="plotly_dark",
-                              plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-            fig.update_traces(textposition="outside", textinfo="percent+label", textfont_size=10)
+            if chart_type == "bar":
+                chart_df = grouped.sort_values("weight", ascending=True)
+                fig = go.Figure(go.Bar(
+                    x=chart_df["weight"].values,
+                    y=chart_df[group_col].values,
+                    orientation="h",
+                    marker_color="#6366f1",
+                    customdata=chart_df["value"].values,
+                    hovertemplate="<b>%{y}</b><br>Peso: %{x:.2f}%<br>Valore: €%{customdata:,.0f}<extra></extra>",
+                ))
+                fig.update_layout(
+                    height=max(420, len(chart_df) * 34),
+                    margin=dict(t=10, b=35, l=160, r=30),
+                    template="plotly_dark",
+                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                    xaxis_title="Peso su NAV %",
+                    yaxis_title="",
+                )
+            else:
+                fig = px.pie(grouped, values="value", names=group_col, hole=0.45,
+                             color_discrete_sequence=px.colors.qualitative.Set3)
+                fig.update_layout(height=400, margin=dict(t=20, b=20), template="plotly_dark",
+                                  plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+                fig.update_traces(textposition="outside", textinfo="percent+label", textfont_size=10)
             st.plotly_chart(fig, use_container_width=True)
         with cr:
             show_g = grouped[[group_col, "weight", "value_fmt", "count", "names"]].copy()
             show_g.columns = [label, "Peso %", "Valore €", "# Strumenti", "Strumenti"]
             st.dataframe(show_g, use_container_width=True, hide_index=True)
 
-    with tab1:
-        if "sector" in positions.columns:
-            exposure_chart(positions, "sector", "Settore")
+    def sector_exposure_chart(df):
+        grouped = build_exposure_table(df, "xray_sector", total_value=_xray_total)
+        if grouped.empty:
+            st.info("Nessun dato settoriale.")
+            return
 
-    with tab_ind:
-        if "industry" in positions.columns:
-            exposure_chart(positions, "industry", "Industry")
+        meta = df.groupby("xray_sector").agg(
+            macro_mix=("macro_class", lambda x: ", ".join(sorted(set(x.dropna().astype(str))))),
+            method=("xray_sector_method", lambda x: ", ".join(sorted(set(x.dropna().astype(str))))),
+        ).reset_index()
+        grouped = grouped.merge(meta, on="xray_sector", how="left")
+        grouped["value_fmt"] = grouped["value"].apply(lambda x: fmt_num(x, 2))
+
+        cl, cr = st.columns([1.05, 0.95])
+        with cl:
+            chart_df = grouped.sort_values("weight", ascending=True)
+            fig = go.Figure(go.Bar(
+                x=chart_df["weight"].values,
+                y=chart_df["xray_sector"].values,
+                orientation="h",
+                marker_color=[
+                    "#6366f1" if str(label).startswith("Equity") or label in {"Technology", "Healthcare", "Industrials", "Consumer Discretionary", "Consumer Staples", "Financials", "Materials", "Materials / Gold Miners", "Real Estate", "Utilities"} else
+                    "#22c55e" if str(label).startswith("Fixed Income") else
+                    "#f59e0b" if str(label).startswith("Alternative") else "#64748b"
+                    for label in chart_df["xray_sector"]
+                ],
+                customdata=chart_df[["value", "count"]].values,
+                hovertemplate="<b>%{y}</b><br>Peso: %{x:.2f}%<br>Valore: €%{customdata[0]:,.0f}<br>Strumenti: %{customdata[1]}<extra></extra>",
+            ))
+            fig.update_layout(
+                height=max(460, len(chart_df) * 34),
+                margin=dict(t=10, b=35, l=190, r=30),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Peso su NAV %",
+                yaxis_title="",
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        with cr:
+            show_g = grouped[["xray_sector", "weight", "value_fmt", "count", "macro_mix", "method", "names"]].copy()
+            show_g.columns = ["Settore", "Peso %", "Valore €", "# Strumenti", "Macro", "Criterio", "Strumenti"]
+            st.dataframe(show_g, use_container_width=True, hide_index=True, height=min(560, len(show_g) * 38 + 70))
+
+    def render_country_map(df, title, color_scale):
+        country_data = build_country_exposure(df)
+        st.markdown(f"**{title}**")
+        if country_data.empty:
+            st.info("Nessun dato geografico.")
+            return
+
+        mapped = country_data[country_data["is_mappable"]].copy()
+        if not mapped.empty:
+            fig_map = px.choropleth(
+                mapped,
+                locations="iso3",
+                locationmode="ISO-3",
+                color="weight",
+                color_continuous_scale=color_scale,
+                hover_name="country",
+                hover_data={"iso3": False, "weight": ":.2f", "value": ":,.0f", "count": True},
+                labels={"weight": "Peso %", "value": "Valore €", "count": "# Strumenti"},
+            )
+            fig_map.update_layout(
+                height=360,
+                margin=dict(t=10, b=10, l=0, r=0),
+                template="plotly_dark",
+                geo=dict(showframe=False, bgcolor="rgba(0,0,0,0)"),
+                paper_bgcolor="rgba(0,0,0,0)",
+            )
+            st.plotly_chart(fig_map, use_container_width=True)
         else:
-            st.info("Nessun dato di industry disponibile. Configura le industry in overrides.json.")
+            st.info("Nessun paese mappabile.")
+
+        unmapped = country_data[~country_data["is_mappable"]].copy()
+        if not unmapped.empty:
+            unmapped["Valore €"] = unmapped["value"].apply(lambda x: fmt_num(x, 2))
+            show_unmapped = unmapped[["country", "weight", "Valore €", "count"]].copy()
+            show_unmapped.columns = ["Area aggregata", "Peso %", "Valore €", "# Strumenti"]
+            with st.expander("Aree aggregate non disegnate sulla mappa", expanded=False):
+                st.dataframe(show_unmapped, use_container_width=True, hide_index=True)
+
+    with tab1:
+        sector_exposure_chart(xray_positions)
 
     with tab2:
-        if "country" in positions.columns:
-            exposure_chart(positions, "country", "Paese")
-            country_iso_map = {
-                "United States": "USA", "Italy": "ITA", "France": "FRA", "Netherlands": "NLD",
-                "United Kingdom": "GBR", "Germany": "DEU", "Australia": "AUS", "Austria": "AUT",
-                "Romania": "ROU", "Brazil": "BRA", "China": "CHN", "Argentina": "ARG",
-            }
-            country_data = positions.groupby("country")["current_value"].sum().reset_index()
-            country_data["weight"] = (country_data["current_value"] / country_data["current_value"].sum() * 100).round(2)
-            country_data["iso3"] = country_data["country"].map(country_iso_map)
-            mapped = country_data.dropna(subset=["iso3"])
-            if not mapped.empty:
-                fig_map = px.choropleth(mapped, locations="iso3", locationmode="ISO-3", color="weight",
-                                         color_continuous_scale="Blues", hover_name="country", labels={"weight": "Peso %"})
-                fig_map.update_layout(height=350, margin=dict(t=10, b=10, l=0, r=0), template="plotly_dark",
-                                       geo=dict(showframe=False, bgcolor="rgba(0,0,0,0)"), paper_bgcolor="rgba(0,0,0,0)")
-                st.plotly_chart(fig_map, use_container_width=True)
+        exposure_chart(xray_positions, "country", "Paese")
+        st.divider()
+        render_country_map(xray_positions, "Mappa geografica totale", "Blues")
+        geo_left, geo_right = st.columns(2)
+        with geo_left:
+            render_country_map(xray_positions[xray_positions["macro_class"] == "Equity"], "Mappa geografica Equity", "Purples")
+        with geo_right:
+            render_country_map(xray_positions[xray_positions["macro_class"] == "Fixed Income"], "Mappa geografica Fixed Income", "Greens")
 
     with tab3:
-        exposure_chart(positions, "currency", "Valuta")
+        exposure_chart(xray_positions, "currency", "Valuta")
     with tab4:
-        exposure_chart(positions, "macro_class", "Macro Classe")
+        exposure_chart(xray_positions, "macro_class", "Macro Classe")
     with tab5:
-        if "asset_sub_type" in positions.columns:
-            exposure_chart(positions, "asset_sub_type", "Tipo Asset")
+        if "asset_sub_type" in xray_positions.columns:
+            exposure_chart(xray_positions, "asset_sub_type", "Tipo Asset")
 
     with tab6:
         st.markdown('<div class="section-header">Top 20 Posizioni</div>', unsafe_allow_html=True)
