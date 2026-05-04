@@ -34,7 +34,11 @@ from analytics import (
     performance_report, var_historical, cvar
 )
 from performance_contribution import (
-    compute_period_contributions, period_bounds, summarize_contributions
+    benchmark_period_comparison,
+    compute_period_contributions,
+    contribution_waterfall_items,
+    period_bounds,
+    summarize_contributions,
 )
 from xray_utils import add_xray_sector, build_country_exposure, build_exposure_table
 
@@ -1835,6 +1839,15 @@ elif page == "📊 Performance Contribution":
     residual = fund_return_eur - contribution_sum
     residual_pp = (residual / nav_start * 100) if nav_start > 0 else 0
 
+    benchmark_label = fund_info.get("benchmark", "VNGA60") or "VNGA60"
+    benchmark_cmp = benchmark_period_comparison(
+        nav_clean,
+        start_date=start_date,
+        end_date=end_date,
+        fund_return_pct=fund_return_pp,
+        nav_start=nav_start,
+    )
+
     k1, k2, k3, k4 = st.columns(4)
     k1.metric("NAV Iniziale", fmt_eur_full(nav_start))
     k2.metric("NAV Finale", fmt_eur_full(nav_end))
@@ -1850,33 +1863,64 @@ elif page == "📊 Performance Contribution":
         "tra NAV storico e valorizzazioni ricostruite per ISIN."
     )
 
-    st.markdown('<div class="section-header">Waterfall NAV</div>', unsafe_allow_html=True)
-    top_waterfall = contrib.reindex(contrib["contribution_eur"].abs().sort_values(ascending=False).index).head(8)
-    other_contrib = contribution_sum - top_waterfall["contribution_eur"].sum()
-    wf_x = ["NAV iniziale"] + top_waterfall["name"].tolist()
-    wf_y = [nav_start] + top_waterfall["contribution_eur"].tolist()
-    wf_measure = ["absolute"] + ["relative"] * len(top_waterfall)
-    if abs(other_contrib) > 1:
-        wf_x.append("Altri strumenti")
-        wf_y.append(other_contrib)
-        wf_measure.append("relative")
-    if abs(residual) > 1:
-        wf_x.append("Residuo/Cash")
-        wf_y.append(residual)
-        wf_measure.append("relative")
-    wf_x.append("NAV finale")
-    wf_y.append(nav_end)
-    wf_measure.append("total")
+    st.markdown(f'<div class="section-header">Confronto Benchmark {benchmark_label}</div>', unsafe_allow_html=True)
+    if benchmark_cmp:
+        b1, b2, b3, b4 = st.columns(4)
+        b1.metric("Fondo", f"{benchmark_cmp['fund_return_pct']:+.2f}%")
+        b2.metric(benchmark_label, f"{benchmark_cmp['benchmark_return_pct']:+.2f}%")
+        b3.metric("Active Return", f"{benchmark_cmp['active_return_pp']:+.2f} pp")
+        b4.metric("Extra Performance", fmt_eur_full(benchmark_cmp["active_return_eur"]))
+
+        bench_chart = nav_clean.copy()
+        bench_chart["date"] = pd.to_datetime(bench_chart["date"], errors="coerce")
+        bench_chart["nav"] = pd.to_numeric(bench_chart["nav"], errors="coerce")
+        bench_chart["benchmark"] = pd.to_numeric(bench_chart.get("benchmark"), errors="coerce")
+        bench_chart = bench_chart[(bench_chart["date"] >= pd.to_datetime(start_date)) &
+                                  (bench_chart["date"] <= pd.to_datetime(end_date))]
+        bench_chart = bench_chart.sort_values("date")
+        bench_chart["benchmark"] = bench_chart["benchmark"].ffill()
+        if len(bench_chart) >= 2 and bench_chart["benchmark"].dropna().size >= 2:
+            fund_base = bench_chart["nav"].dropna().iloc[0]
+            bench_base = bench_chart["benchmark"].dropna().iloc[0]
+            bench_chart["fondo_rebased"] = (bench_chart["nav"] / fund_base - 1) * 100 if fund_base > 0 else np.nan
+            bench_chart["bench_rebased"] = (bench_chart["benchmark"] / bench_base - 1) * 100 if bench_base > 0 else np.nan
+            fig_bench = go.Figure()
+            fig_bench.add_trace(go.Scatter(
+                x=bench_chart["date"], y=bench_chart["fondo_rebased"],
+                mode="lines", name="SFC Fund",
+                line=dict(color="#6366f1", width=3),
+            ))
+            fig_bench.add_trace(go.Scatter(
+                x=bench_chart["date"], y=bench_chart["bench_rebased"],
+                mode="lines", name=benchmark_label,
+                line=dict(color="#22c55e", width=2),
+            ))
+            fig_bench.add_hline(y=0, line_color="rgba(148,163,184,0.35)", line_width=1)
+            fig_bench.update_layout(
+                height=330,
+                margin=dict(t=20, b=30, l=40, r=20),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                yaxis_title="Performance % rebased",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                hovermode="x unified",
+            )
+            st.plotly_chart(fig_bench, use_container_width=True)
+    else:
+        st.info(f"Benchmark {benchmark_label} non disponibile per il periodo selezionato.")
+
+    st.markdown('<div class="section-header">Contributi al Periodo</div>', unsafe_allow_html=True)
+    waterfall_df = contribution_waterfall_items(contrib, residual=residual, limit=8)
 
     fig_wf = go.Figure(go.Waterfall(
-        x=wf_x,
-        y=wf_y,
-        measure=wf_measure,
+        x=waterfall_df["label"],
+        y=waterfall_df["value"],
+        measure=waterfall_df["measure"],
         connector={"line": {"color": "rgba(148,163,184,0.45)"}},
         increasing={"marker": {"color": "#22c55e"}},
         decreasing={"marker": {"color": "#ef4444"}},
-        totals={"marker": {"color": "#6366f1"}},
-        text=[fmt_eur_short(v) for v in wf_y],
+        text=[fmt_eur_short(v) for v in waterfall_df["value"]],
         textposition="outside",
     ))
     fig_wf.update_layout(
@@ -1888,7 +1932,10 @@ elif page == "📊 Performance Contribution":
         yaxis_title="EUR",
         xaxis_tickangle=-35,
     )
-    st.plotly_chart(fig_wf, use_container_width=True)
+    if waterfall_df.empty:
+        st.info("Nessun contributo significativo da mostrare nel grafico.")
+    else:
+        st.plotly_chart(fig_wf, use_container_width=True)
 
     tab_titles, tab_groups, tab_fx, tab_table = st.tabs(["Titoli", "Macro & Settori", "Valuta", "Dettaglio"])
 

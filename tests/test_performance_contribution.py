@@ -2,7 +2,13 @@ import unittest
 
 import pandas as pd
 
-from performance_contribution import compute_period_contributions, period_bounds, summarize_contributions
+from performance_contribution import (
+    benchmark_period_comparison,
+    compute_period_contributions,
+    contribution_waterfall_items,
+    period_bounds,
+    summarize_contributions,
+)
 
 
 class PerformanceContributionTests(unittest.TestCase):
@@ -156,6 +162,39 @@ class PerformanceContributionTests(unittest.TestCase):
         self.assertEqual(result["end_date"], pd.Timestamp("2026-05-04"))
         self.assertEqual(result["nav_start"], 108.0)
         self.assertEqual(result["nav_end"], 112.0)
+
+    def test_contribution_waterfall_excludes_nav_start_and_end(self):
+        contrib = pd.DataFrame([
+            {"name": "Big Winner", "contribution_eur": 100.0},
+            {"name": "Loser", "contribution_eur": -40.0},
+            {"name": "Small", "contribution_eur": 5.0},
+        ])
+
+        result = contribution_waterfall_items(contrib, residual=10.0, limit=2)
+
+        self.assertNotIn("NAV iniziale", result["label"].tolist())
+        self.assertNotIn("NAV finale", result["label"].tolist())
+        self.assertEqual(result["measure"].tolist(), ["relative", "relative", "relative", "relative"])
+        self.assertIn("Altri strumenti", result["label"].tolist())
+        self.assertIn("Residuo/Cash", result["label"].tolist())
+
+    def test_benchmark_period_comparison_computes_active_return(self):
+        nav = pd.DataFrame([
+            {"date": "2026-01-01", "nav": 10_000.0, "benchmark": 100.0},
+            {"date": "2026-03-31", "nav": 10_500.0, "benchmark": 108.0},
+        ])
+
+        result = benchmark_period_comparison(
+            nav,
+            start_date="2026-01-01",
+            end_date="2026-03-31",
+            fund_return_pct=5.0,
+            nav_start=10_000,
+        )
+
+        self.assertAlmostEqual(result["benchmark_return_pct"], 8.0)
+        self.assertAlmostEqual(result["active_return_pp"], -3.0)
+        self.assertAlmostEqual(result["active_return_eur"], -300.0)
 
 
 if __name__ == "__main__":

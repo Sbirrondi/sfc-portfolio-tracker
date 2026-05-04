@@ -233,6 +233,38 @@ def summarize_contributions(contributions: pd.DataFrame, group_col: str, nav_end
     return grouped.sort_values("contribution_eur", ascending=False).reset_index(drop=True)
 
 
+def contribution_waterfall_items(contributions: pd.DataFrame, residual: float = 0.0, limit: int = 8) -> pd.DataFrame:
+    """Build relative-only waterfall items for readable contribution charts."""
+    columns = ["label", "value", "measure"]
+    if contributions is None or contributions.empty:
+        return pd.DataFrame(columns=columns)
+
+    df = contributions.copy()
+    df["contribution_eur"] = pd.to_numeric(df["contribution_eur"], errors="coerce").fillna(0.0)
+    if "name" not in df.columns:
+        df["name"] = ""
+    df["name"] = df["name"].fillna("")
+    df = df[df["contribution_eur"].abs() > 1.0]
+    if df.empty:
+        return pd.DataFrame(columns=columns)
+
+    top = df.reindex(df["contribution_eur"].abs().sort_values(ascending=False).index).head(limit)
+    rows = [
+        {"label": row["name"] or row.get("isin", "Strumento"), "value": float(row["contribution_eur"]), "measure": "relative"}
+        for _, row in top.iterrows()
+    ]
+
+    other = float(df["contribution_eur"].sum() - top["contribution_eur"].sum())
+    if abs(other) > 1.0:
+        rows.append({"label": "Altri strumenti", "value": other, "measure": "relative"})
+
+    residual = _safe_float(residual)
+    if abs(residual) > 1.0:
+        rows.append({"label": "Residuo/Cash", "value": residual, "measure": "relative"})
+
+    return pd.DataFrame(rows, columns=columns)
+
+
 def period_bounds(nav_history: pd.DataFrame, period: str, end_date: date | str | None = None):
     """Return start/end NAV rows for a standard contribution period."""
     if nav_history is None or nav_history.empty:
@@ -276,4 +308,53 @@ def period_bounds(nav_history: pd.DataFrame, period: str, end_date: date | str |
         "end_date": end_row["date"],
         "nav_start": float(start_row["nav"]),
         "nav_end": float(end_row["nav"]),
+    }
+
+
+def benchmark_period_comparison(
+    nav_history: pd.DataFrame,
+    start_date,
+    end_date,
+    fund_return_pct: float,
+    nav_start: float,
+) -> dict | None:
+    """Compare fund period return with the benchmark stored in NAV history."""
+    if nav_history is None or nav_history.empty or "benchmark" not in nav_history.columns:
+        return None
+
+    nav = nav_history.copy()
+    nav["date"] = pd.to_datetime(nav["date"], errors="coerce").dt.normalize()
+    nav["benchmark"] = pd.to_numeric(nav["benchmark"], errors="coerce")
+    nav = nav.dropna(subset=["date", "benchmark"]).sort_values("date")
+    if nav.empty:
+        return None
+
+    start = _to_timestamp(start_date)
+    end = _to_timestamp(end_date)
+    start_candidates = nav[nav["date"] <= start]
+    end_candidates = nav[nav["date"] <= end]
+    if start_candidates.empty or end_candidates.empty:
+        return None
+
+    start_row = start_candidates.iloc[-1]
+    end_row = end_candidates.iloc[-1]
+    bench_start = _safe_float(start_row["benchmark"])
+    bench_end = _safe_float(end_row["benchmark"])
+    if bench_start <= 0 or bench_end <= 0:
+        return None
+
+    fund_return_pct = _safe_float(fund_return_pct)
+    nav_start = _safe_float(nav_start)
+    benchmark_return_pct = (bench_end / bench_start - 1.0) * 100
+    active_return_pp = fund_return_pct - benchmark_return_pct
+
+    return {
+        "benchmark_start_date": start_row["date"],
+        "benchmark_end_date": end_row["date"],
+        "benchmark_start": bench_start,
+        "benchmark_end": bench_end,
+        "benchmark_return_pct": benchmark_return_pct,
+        "fund_return_pct": fund_return_pct,
+        "active_return_pp": active_return_pp,
+        "active_return_eur": nav_start * active_return_pp / 100 if nav_start > 0 else 0.0,
     }
