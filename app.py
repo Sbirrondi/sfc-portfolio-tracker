@@ -33,6 +33,9 @@ from analytics import (
     calculate_alpha_beta, monthly_returns_table,
     performance_report, var_historical, cvar
 )
+from performance_contribution import (
+    compute_period_contributions, period_bounds, summarize_contributions
+)
 from xray_utils import add_xray_sector, build_country_exposure, build_exposure_table
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -384,6 +387,166 @@ def format_table_numbers(df, euro_cols=None, pct_cols=None, price_cols=None):
     return result
 
 
+def _series_value_on_or_before(series: pd.Series, target_date):
+    if series is None or len(series) == 0:
+        return None
+    s = series.dropna().copy()
+    if s.empty:
+        return None
+    s.index = pd.to_datetime(s.index).tz_localize(None).normalize()
+    s = s.sort_index()
+    s = s[s.index <= pd.to_datetime(target_date).normalize()]
+    if s.empty:
+        return None
+    return float(s.iloc[-1])
+
+
+def _tx_amount_eur(row, dividend=False):
+    qty = float(row.get("quantity", 0) or 0)
+    price = float(row.get("price", 0) or 0)
+    amount = qty if dividend and price <= 0 else qty * price
+    currency = str(row.get("currency", "EUR") or "EUR").upper()
+    fx = float(row.get("fx_rate", 1.0) or 1.0)
+    if currency != "EUR" and fx > 0 and fx != 1.0:
+        amount = amount / fx
+    return amount
+
+
+def _position_state_at_date(transactions: pd.DataFrame, target_date):
+    if transactions is None or transactions.empty:
+        return {}
+
+    tx = transactions.copy()
+    tx["date"] = pd.to_datetime(tx["date"], errors="coerce").dt.normalize()
+    tx = tx[(tx["date"].notna()) & (tx["date"] <= pd.to_datetime(target_date).normalize())]
+    tx = tx.sort_values("date")
+    state = {}
+
+    for _, row in tx.iterrows():
+        isin = str(row.get("isin", "") or "").strip()
+        if not isin:
+            continue
+        tx_type = str(row.get("transaction_type", "")).upper()
+        if tx_type not in ("BUY", "SELL"):
+            continue
+
+        item = state.setdefault(isin, {
+            "qty": 0.0,
+            "cost_local": 0.0,
+            "cost_eur": 0.0,
+            "currency": row.get("currency", "EUR") or "EUR",
+            "name": row.get("name", isin) or isin,
+            "macro_class": row.get("macro_class", "N/A") or "N/A",
+            "sector": row.get("sector", "N/A") or "N/A",
+        })
+
+        qty = float(row.get("quantity", 0) or 0)
+        local_amount = qty * float(row.get("price", 0) or 0)
+        eur_amount = _tx_amount_eur(row)
+        if tx_type == "BUY":
+            item["qty"] += qty
+            item["cost_local"] += local_amount
+            item["cost_eur"] += eur_amount + float(row.get("fees", 0) or 0)
+            item["currency"] = row.get("currency", item["currency"]) or item["currency"]
+        elif tx_type == "SELL" and item["qty"] > 0:
+            sell_qty = min(qty, item["qty"])
+            ratio = sell_qty / item["qty"] if item["qty"] else 0
+            item["cost_local"] -= item["cost_local"] * ratio
+            item["cost_eur"] -= item["cost_eur"] * ratio
+            item["qty"] -= sell_qty
+
+    return {isin: item for isin, item in state.items() if item["qty"] > 1e-8}
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def _estimate_values_on_date(transactions: pd.DataFrame, positions: pd.DataFrame, isin_map: dict, target_date):
+    """Estimate EUR market value per ISIN at a past date for contribution analysis."""
+    from data_fetcher import get_historical_prices
+    from build_nav_history import CRYPTO_PROXY, TICKER_CURRENCY
+
+    target = pd.to_datetime(target_date).normalize()
+    state = _position_state_at_date(transactions, target)
+    if not state:
+        return {}
+
+    pos_lookup = {}
+    if positions is not None and not positions.empty and "isin" in positions.columns:
+        pos_lookup = positions.set_index("isin").to_dict("index")
+
+    price_start = (target - pd.Timedelta(days=14)).strftime("%Y-%m-%d")
+    price_end = (target + pd.Timedelta(days=3)).strftime("%Y-%m-%d")
+    ticker_by_isin = {}
+    price_tickers = []
+    for isin in state:
+        ticker = isin_map.get(isin) if isinstance(isin_map, dict) else None
+        if ticker:
+            proxy = CRYPTO_PROXY.get(ticker, {}).get("proxy")
+            fetch_ticker = proxy or ticker
+            ticker_by_isin[isin] = (ticker, fetch_ticker)
+            price_tickers.append(fetch_ticker)
+
+    price_data = get_historical_prices(sorted(set(price_tickers)), start=price_start, end=price_end) if price_tickers else {}
+    currencies = set()
+    for isin, (ticker, _) in ticker_by_isin.items():
+        ccy = TICKER_CURRENCY.get(ticker, state[isin].get("currency", "EUR"))
+        if ccy == "GBX":
+            ccy = "GBP"
+        if ccy != "EUR":
+            currencies.add(ccy)
+    for item in state.values():
+        if item.get("currency") != "EUR":
+            currencies.add(item.get("currency"))
+
+    fx_tickers = [f"{ccy}EUR=X" for ccy in currencies]
+    fx_data = get_historical_prices(fx_tickers, start=price_start, end=price_end) if fx_tickers else {}
+
+    values = {}
+    for isin, item in state.items():
+        qty = float(item.get("qty", 0) or 0)
+        if qty <= 0:
+            continue
+
+        price = None
+        price_ccy = item.get("currency", "EUR") or "EUR"
+        mapped = ticker_by_isin.get(isin)
+        if mapped:
+            ticker, fetch_ticker = mapped
+            price = _series_value_on_or_before(price_data.get(fetch_ticker), target)
+            if price is not None and ticker in CRYPTO_PROXY:
+                price *= float(CRYPTO_PROXY[ticker].get("scale", 1.0))
+                price_ccy = "EUR"
+            else:
+                price_ccy = TICKER_CURRENCY.get(ticker, price_ccy)
+                if price_ccy == "GBX" and price is not None:
+                    price = price / 100.0
+                    price_ccy = "GBP"
+
+        if price is None:
+            current = pos_lookup.get(isin, {})
+            price = float(current.get("avg_cost_local", 0) or 0)
+            if price <= 0:
+                price = float(current.get("current_price", 0) or 0)
+            if price <= 0:
+                price = item["cost_local"] / qty if item.get("cost_local", 0) > 0 else 0
+
+        fx = 1.0
+        if price_ccy != "EUR":
+            fx = _series_value_on_or_before(fx_data.get(f"{price_ccy}EUR=X"), target)
+            if fx is None:
+                current = pos_lookup.get(isin, {})
+                fx = float(current.get("avg_fx", 0) or 0)
+            if not fx or fx <= 0:
+                cost_local = float(item.get("cost_local", 0) or 0)
+                cost_eur = float(item.get("cost_eur", 0) or 0)
+                fx = cost_eur / cost_local if cost_local > 0 else 0
+            if not fx or fx <= 0:
+                fx = 1.0
+
+        values[isin] = round(qty * price * fx, 2)
+
+    return values
+
+
 # ── Load Data ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
@@ -498,6 +661,7 @@ with st.sidebar:
         "Navigazione",
         ["🏠 Dashboard", "📋 Posizioni", "📈 Performance",
          "📊 Analytics Avanzate", "🏆 Contribuzione P&L",
+         "📊 Performance Contribution",
          "🏛️ Analisi Fixed Income",
          "🎯 Ottimizzazione PTF",
          "🔬 X-Ray Esposizioni", "💹 Multipli & Fondamentali",
@@ -1607,6 +1771,253 @@ elif page == "🏆 Contribuzione P&L":
     macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
     macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
     st.dataframe(macro_show, use_container_width=True, hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: PERFORMANCE CONTRIBUTION
+# ══════════════════════════════════════════════════════════════════════════════
+
+elif page == "📊 Performance Contribution":
+    st.markdown('<div class="section-header">Performance Contribution per Periodo</div>', unsafe_allow_html=True)
+
+    if not has_data or nav_history.empty:
+        st.info("Dati NAV insufficienti. Aggiorna i prezzi dalla pagina Operazioni & Import.")
+        st.stop()
+
+    nav_clean = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+    period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
+    pc1, pc2 = st.columns([1, 3])
+    with pc1:
+        selected_period = st.selectbox("Time frame", period_options, index=3)
+
+    bounds = period_bounds(nav_clean, selected_period)
+    if bounds is None:
+        st.warning("Servono almeno due punti NAV per calcolare la contribution.")
+        st.stop()
+
+    start_date = bounds["start_date"]
+    end_date = bounds["end_date"]
+    nav_start = bounds["nav_start"]
+    nav_end = bounds["nav_end"]
+
+    with pc2:
+        st.caption(
+            f"Periodo analizzato: **{pd.to_datetime(start_date).date()} → {pd.to_datetime(end_date).date()}** · "
+            "contributi calcolati in EUR includendo acquisti, vendite e dividendi/cedole del periodo."
+        )
+
+    start_values = _estimate_values_on_date(transactions, positions, isin_map, start_date)
+    end_values = {}
+    if not positions.empty and "isin" in positions.columns:
+        end_values = dict(zip(positions["isin"], pd.to_numeric(positions["current_value"], errors="coerce").fillna(0)))
+
+    contrib = compute_period_contributions(
+        transactions=transactions,
+        positions=positions,
+        start_date=start_date,
+        end_date=end_date,
+        nav_start=nav_start,
+        nav_end=nav_end,
+        start_values=start_values,
+        end_values=end_values,
+    )
+
+    tx_period = transactions.copy()
+    if not tx_period.empty:
+        tx_period["date"] = pd.to_datetime(tx_period["date"], errors="coerce").dt.normalize()
+        tx_period = tx_period[(tx_period["date"] > pd.to_datetime(start_date).normalize()) &
+                              (tx_period["date"] <= pd.to_datetime(end_date).normalize())]
+    deposits = tx_period.loc[tx_period["transaction_type"].eq("DEPOSIT"), "quantity"].sum() if not tx_period.empty else 0
+    withdrawals = tx_period.loc[tx_period["transaction_type"].eq("WITHDRAWAL"), "quantity"].sum() if not tx_period.empty else 0
+    fund_return_eur = nav_end - nav_start - deposits + withdrawals
+    fund_return_pp = (fund_return_eur / nav_start * 100) if nav_start > 0 else 0
+    contribution_sum = contrib["contribution_eur"].sum() if not contrib.empty else 0
+    residual = fund_return_eur - contribution_sum
+    residual_pp = (residual / nav_start * 100) if nav_start > 0 else 0
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("NAV Iniziale", fmt_eur_full(nav_start))
+    k2.metric("NAV Finale", fmt_eur_full(nav_end))
+    k3.metric("Performance Periodo", f"{fund_return_pp:+.2f}%", delta=fmt_eur_full(fund_return_eur))
+    k4.metric("Residuo Riconciliazione", f"{residual_pp:+.2f} pp", delta=fmt_eur_full(residual))
+
+    if contrib.empty:
+        st.info("Nessun contributo calcolabile per il periodo selezionato.")
+        st.stop()
+
+    st.caption(
+        "Il residuo include liquidità, approssimazioni su strumenti senza storico prezzi e piccoli scostamenti "
+        "tra NAV storico e valorizzazioni ricostruite per ISIN."
+    )
+
+    st.markdown('<div class="section-header">Waterfall NAV</div>', unsafe_allow_html=True)
+    top_waterfall = contrib.reindex(contrib["contribution_eur"].abs().sort_values(ascending=False).index).head(8)
+    other_contrib = contribution_sum - top_waterfall["contribution_eur"].sum()
+    wf_x = ["NAV iniziale"] + top_waterfall["name"].tolist()
+    wf_y = [nav_start] + top_waterfall["contribution_eur"].tolist()
+    wf_measure = ["absolute"] + ["relative"] * len(top_waterfall)
+    if abs(other_contrib) > 1:
+        wf_x.append("Altri strumenti")
+        wf_y.append(other_contrib)
+        wf_measure.append("relative")
+    if abs(residual) > 1:
+        wf_x.append("Residuo/Cash")
+        wf_y.append(residual)
+        wf_measure.append("relative")
+    wf_x.append("NAV finale")
+    wf_y.append(nav_end)
+    wf_measure.append("total")
+
+    fig_wf = go.Figure(go.Waterfall(
+        x=wf_x,
+        y=wf_y,
+        measure=wf_measure,
+        connector={"line": {"color": "rgba(148,163,184,0.45)"}},
+        increasing={"marker": {"color": "#22c55e"}},
+        decreasing={"marker": {"color": "#ef4444"}},
+        totals={"marker": {"color": "#6366f1"}},
+        text=[fmt_eur_short(v) for v in wf_y],
+        textposition="outside",
+    ))
+    fig_wf.update_layout(
+        height=420,
+        margin=dict(t=20, b=80, l=40, r=30),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        yaxis_title="EUR",
+        xaxis_tickangle=-35,
+    )
+    st.plotly_chart(fig_wf, use_container_width=True)
+
+    tab_titles, tab_groups, tab_fx, tab_table = st.tabs(["Titoli", "Macro & Settori", "Valuta", "Dettaglio"])
+
+    with tab_titles:
+        st.markdown('<div class="section-header">Top / Bottom Contributor</div>', unsafe_allow_html=True)
+        nonzero = contrib[contrib["contribution_eur"].abs() > 1].copy()
+        top = nonzero.nlargest(10, "contribution_eur")
+        bottom = nonzero.nsmallest(10, "contribution_eur")
+        combined = pd.concat([top, bottom]).drop_duplicates(subset=["isin"]).sort_values("contribution_eur")
+        if combined.empty:
+            st.info("Nessun contributo significativo nel periodo.")
+        else:
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in combined["contribution_eur"]]
+            fig_titles = go.Figure(go.Bar(
+                x=combined["contribution_eur"],
+                y=combined["name"],
+                orientation="h",
+                marker_color=colors,
+                text=[fmt_eur_short(x) for x in combined["contribution_eur"]],
+                textposition="outside",
+                customdata=combined[["contribution_pp", "period_return_pct"]],
+                hovertemplate="%{y}<br>Contributo: %{x:,.0f} EUR<br>Contributo: %{customdata[0]:+.2f} pp<br>Return: %{customdata[1]:+.2f}%<extra></extra>",
+            ))
+            fig_titles.update_layout(
+                height=max(420, len(combined) * 34),
+                margin=dict(t=10, b=30, l=220, r=80),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Contributo EUR",
+                yaxis=dict(autorange="reversed"),
+            )
+            st.plotly_chart(fig_titles, use_container_width=True)
+
+    with tab_groups:
+        macro_df = summarize_contributions(contrib, "macro_class", nav_end)
+        sector_df = summarize_contributions(contrib, "sector", nav_end)
+        gm1, gm2 = st.columns(2)
+        for container, df_group, label_col, title in [
+            (gm1, macro_df, "macro_class", "Contributo per Macro Classe"),
+            (gm2, sector_df, "sector", "Contributo per Settore"),
+        ]:
+            with container:
+                st.markdown(f"**{title}**")
+                if not df_group.empty:
+                    df_plot = df_group.sort_values("contribution_eur")
+                    colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
+                    fig_group = go.Figure(go.Bar(
+                        x=df_plot["contribution_eur"],
+                        y=df_plot[label_col],
+                        orientation="h",
+                        marker_color=colors,
+                        text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
+                        textposition="outside",
+                    ))
+                    fig_group.update_layout(
+                        height=max(360, len(df_plot) * 32),
+                        margin=dict(t=10, b=30, l=170, r=70),
+                        template="plotly_dark",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(fig_group, use_container_width=True)
+
+        st.markdown("**Tabella Aggregata**")
+        agg_choice = st.radio("Aggregazione", ["Macro Classe", "Settore"], horizontal=True, label_visibility="collapsed")
+        agg_df = macro_df if agg_choice == "Macro Classe" else sector_df
+        agg_label = "macro_class" if agg_choice == "Macro Classe" else "sector"
+        agg_show = agg_df[[agg_label, "positions", "end_value", "contribution_eur", "contribution_pp",
+                           "period_return_pct", "end_weight_pct"]].copy()
+        agg_show.columns = [agg_choice, "# Pos.", "Valore Finale", "Contributo EUR",
+                            "Contributo pp", "Return %", "Peso Finale %"]
+        agg_show["Contributo pp"] = agg_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+        agg_show["Return %"] = agg_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+        agg_show["Peso Finale %"] = agg_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
+        agg_show = format_table_numbers(agg_show, euro_cols=["Valore Finale", "Contributo EUR"])
+        st.dataframe(agg_show, use_container_width=True, hide_index=True)
+
+    with tab_fx:
+        currency_df = summarize_contributions(contrib, "currency", nav_end)
+        if currency_df.empty:
+            st.info("Dati valuta non disponibili.")
+        else:
+            df_plot = currency_df.sort_values("contribution_eur")
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
+            fig_fx = go.Figure(go.Bar(
+                x=df_plot["contribution_eur"],
+                y=df_plot["currency"],
+                orientation="h",
+                marker_color=colors,
+                text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
+                textposition="outside",
+            ))
+            fig_fx.update_layout(
+                height=max(360, len(df_plot) * 42),
+                margin=dict(t=10, b=30, l=90, r=80),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Contributo EUR",
+            )
+            st.plotly_chart(fig_fx, use_container_width=True)
+
+            fx_show = currency_df[["currency", "positions", "end_value", "contribution_eur",
+                                   "contribution_pp", "period_return_pct", "end_weight_pct"]].copy()
+            fx_show.columns = ["Valuta", "# Pos.", "Valore Finale", "Contributo EUR",
+                               "Contributo pp", "Return %", "Peso Finale %"]
+            fx_show["Contributo pp"] = fx_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+            fx_show["Return %"] = fx_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+            fx_show["Peso Finale %"] = fx_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
+            fx_show = format_table_numbers(fx_show, euro_cols=["Valore Finale", "Contributo EUR"])
+            st.dataframe(fx_show, use_container_width=True, hide_index=True)
+
+    with tab_table:
+        detail = contrib.copy()
+        detail["contribution_pp_fmt"] = detail["contribution_pp"].apply(lambda x: f"{x:+.2f} pp")
+        detail["period_return_fmt"] = detail["period_return_pct"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+        detail["end_weight_fmt"] = detail["end_weight_pct"].apply(lambda x: f"{x:.2f}%")
+        detail_show = detail[["name", "isin", "macro_class", "sector", "currency",
+                              "start_value", "end_value", "buys_eur", "sells_eur", "dividends_eur",
+                              "contribution_eur", "contribution_pp_fmt", "period_return_fmt", "end_weight_fmt"]].copy()
+        detail_show.columns = ["Nome", "ISIN", "Classe", "Settore", "Valuta", "Valore Iniziale",
+                               "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole",
+                               "Contributo EUR", "Contributo pp", "Return %", "Peso Finale"]
+        detail_show = format_table_numbers(
+            detail_show,
+            euro_cols=["Valore Iniziale", "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole", "Contributo EUR"],
+        )
+        st.dataframe(detail_show, use_container_width=True, hide_index=True, height=min(700, len(detail_show) * 35 + 60))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
