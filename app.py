@@ -2375,27 +2375,24 @@ elif page == "🔬 X-Ray Esposizioni":
 
         cl, cr = st.columns([1.05, 0.95])
         with cl:
-            chart_df = grouped.sort_values("weight", ascending=True)
-            fig = go.Figure(go.Bar(
-                x=chart_df["weight"].values,
-                y=chart_df["xray_sector"].values,
-                orientation="h",
-                marker_color=[
-                    "#6366f1" if str(label).startswith("Equity") or label in {"Technology", "Healthcare", "Industrials", "Consumer Discretionary", "Consumer Staples", "Financials", "Materials", "Materials / Gold Miners", "Real Estate", "Utilities"} else
-                    "#22c55e" if str(label).startswith("Fixed Income") else
-                    "#f59e0b" if str(label).startswith("Alternative") else "#64748b"
-                    for label in chart_df["xray_sector"]
-                ],
-                customdata=chart_df[["value", "count"]].values,
-                hovertemplate="<b>%{y}</b><br>Peso: %{x:.2f}%<br>Valore: €%{customdata[0]:,.0f}<br>Strumenti: %{customdata[1]}<extra></extra>",
-            ))
+            fig = px.pie(
+                grouped,
+                values="value",
+                names="xray_sector",
+                hole=0.45,
+                color_discrete_sequence=px.colors.qualitative.Set3,
+            )
             fig.update_layout(
-                height=max(460, len(chart_df) * 34),
-                margin=dict(t=10, b=35, l=190, r=30),
+                height=460,
+                margin=dict(t=20, b=20, l=10, r=10),
                 template="plotly_dark",
                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                xaxis_title="Peso su NAV %",
-                yaxis_title="",
+            )
+            fig.update_traces(
+                textposition="outside",
+                textinfo="percent+label",
+                textfont_size=10,
+                hovertemplate="<b>%{label}</b><br>Peso: %{percent}<br>Valore: €%{value:,.0f}<extra></extra>",
             )
             st.plotly_chart(fig, use_container_width=True)
         with cr:
