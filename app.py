@@ -15,6 +15,9 @@ import io
 import base64
 from streamlit_lightweight_charts import renderLightweightCharts
 
+from benchmark_lookthrough import (
+    compare_group_exposures, fund_level1_holdings, load_vnga60_holdings
+)
 import fund_manager as _fm
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
@@ -549,6 +552,11 @@ def _estimate_values_on_date(transactions: pd.DataFrame, positions: pd.DataFrame
         values[isin] = round(qty * price * fx, 2)
 
     return values
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def _load_vnga60_lookthrough():
+    return load_vnga60_holdings()
 
 
 # ── Load Data ────────────────────────────────────────────────────────────────
@@ -1909,6 +1917,99 @@ elif page == "📊 Performance Contribution":
             st.plotly_chart(fig_bench, use_container_width=True)
     else:
         st.info(f"Benchmark {benchmark_label} non disponibile per il periodo selezionato.")
+
+    st.markdown('<div class="section-header">Spaccato Sottostanti Fondo vs VNGA60</div>', unsafe_allow_html=True)
+    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
+    fund_lookthrough = fund_level1_holdings(positions, nav_total=nav_total, cash=liquidita)
+
+    source_text = {
+        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
+        "cache": "VNGA60 holdings letti dalla cache",
+        "fallback": "VNGA60 holdings da fallback locale",
+    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
+    st.caption(source_text)
+
+    macro_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "macro_class")
+    region_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "region")
+
+    tab_lt_macro, tab_lt_region, tab_lt_holdings = st.tabs(["Macro", "Aree", "Sottostanti"])
+
+    with tab_lt_macro:
+        macro_plot = macro_comp.sort_values("fund_weight_pct", ascending=False)
+        fig_macro_lt = go.Figure()
+        fig_macro_lt.add_trace(go.Bar(
+            x=macro_plot["macro_class"], y=macro_plot["fund_weight_pct"],
+            name="SFC Fund", marker_color="#6366f1",
+            text=[f"{x:.1f}%" for x in macro_plot["fund_weight_pct"]], textposition="outside",
+        ))
+        fig_macro_lt.add_trace(go.Bar(
+            x=macro_plot["macro_class"], y=macro_plot["benchmark_weight_pct"],
+            name="VNGA60", marker_color="#22c55e",
+            text=[f"{x:.1f}%" for x in macro_plot["benchmark_weight_pct"]], textposition="outside",
+        ))
+        fig_macro_lt.update_layout(
+            height=380,
+            barmode="group",
+            margin=dict(t=20, b=40, l=40, r=20),
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            yaxis_title="Peso su NAV %",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_macro_lt, use_container_width=True)
+
+        macro_show = macro_comp.copy()
+        macro_show.columns = ["Macro Classe", "Fondo %", "VNGA60 %", "Active Weight"]
+        for col in ["Fondo %", "VNGA60 %"]:
+            macro_show[col] = macro_show[col].apply(lambda x: f"{x:.2f}%")
+        macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        st.dataframe(macro_show, use_container_width=True, hide_index=True)
+
+    with tab_lt_region:
+        region_plot = region_comp.reindex(region_comp["active_weight_pct"].abs().sort_values(ascending=True).index)
+        colors = ["#ef4444" if x < 0 else "#22c55e" for x in region_plot["active_weight_pct"]]
+        fig_region_lt = go.Figure(go.Bar(
+            x=region_plot["active_weight_pct"],
+            y=region_plot["region"],
+            orientation="h",
+            marker_color=colors,
+            text=[f"{x:+.1f} pp" for x in region_plot["active_weight_pct"]],
+            textposition="outside",
+            customdata=region_plot[["fund_weight_pct", "benchmark_weight_pct"]],
+            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f} pp<extra></extra>",
+        ))
+        fig_region_lt.update_layout(
+            height=max(420, len(region_plot) * 36),
+            margin=dict(t=20, b=30, l=170, r=80),
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Active weight vs VNGA60",
+        )
+        st.plotly_chart(fig_region_lt, use_container_width=True)
+
+        region_show = region_comp.copy()
+        region_show.columns = ["Area", "Fondo %", "VNGA60 %", "Active Weight"]
+        for col in ["Fondo %", "VNGA60 %"]:
+            region_show[col] = region_show[col].apply(lambda x: f"{x:.2f}%")
+        region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        st.dataframe(region_show, use_container_width=True, hide_index=True)
+
+    with tab_lt_holdings:
+        fh, bh = st.columns(2)
+        with fh:
+            st.markdown("**SFC Fund - sottostanti diretti**")
+            fund_show = fund_lookthrough[["name", "macro_class", "region", "currency", "weight_pct"]].copy()
+            fund_show.columns = ["Nome", "Classe", "Area", "Valuta", "Peso"]
+            fund_show["Peso"] = fund_show["Peso"].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(fund_show.head(30), use_container_width=True, hide_index=True, height=520)
+        with bh:
+            st.markdown("**VNGA60 - fondi sottostanti**")
+            bench_show = benchmark_holdings[["ticker", "name", "macro_class", "region", "weight_pct"]].copy()
+            bench_show.columns = ["Ticker", "Nome", "Classe", "Area", "Peso"]
+            bench_show["Peso"] = bench_show["Peso"].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(bench_show, use_container_width=True, hide_index=True, height=520)
 
     st.markdown('<div class="section-header">Contributi al Periodo</div>', unsafe_allow_html=True)
     waterfall_df = contribution_waterfall_items(contrib, residual=residual, limit=8)
