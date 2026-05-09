@@ -681,7 +681,7 @@ def _render_contribution_snapshot(positions: pd.DataFrame, nav_total: float, liq
                                   "current_value", "pnl", "pnl_pct_d", "contrib_pnl_pct",
                                   "weight_ptf_d"]].copy()
     show_contrib.columns = ["Nome", "Classe", "Settore", "Investito", "Controvalore",
-                            "P&L €", "P&L %", "Contrib. PTF (pp)", "Peso PTF %"]
+                            "P&L €", "P&L %", "Contrib. PTF (%)", "Peso PTF %"]
     show_contrib = format_table_numbers(show_contrib, euro_cols=["Investito", "Controvalore", "P&L €"])
     st.dataframe(show_contrib, use_container_width=True, hide_index=True,
                  height=min(600, len(show_contrib) * 38 + 50))
@@ -862,7 +862,7 @@ def _render_contribution_period(context: dict):
     k2.metric("NAV Finale", fmt_eur_full(context["nav_end"]))
     k3.metric("Performance Periodo", f"{context['fund_return_pp']:+.2f}%",
               delta=fmt_eur_full(context["fund_return_eur"]))
-    k4.metric("Residuo Riconciliazione", f"{context['residual_pp']:+.2f} pp",
+    k4.metric("Residuo Riconciliazione", f"{context['residual_pp']:+.2f}%",
               delta=fmt_eur_full(context["residual"]))
 
     contrib = context["contrib"]
@@ -917,7 +917,7 @@ def _render_contribution_benchmark(context: dict, benchmark_label: str):
     b1, b2, b3, b4 = st.columns(4)
     b1.metric("Fondo", f"{benchmark_cmp['fund_return_pct']:+.2f}%")
     b2.metric(benchmark_label, f"{benchmark_cmp['benchmark_return_pct']:+.2f}%")
-    b3.metric("Active Return", f"{benchmark_cmp['active_return_pp']:+.2f} pp")
+    b3.metric("Active Return", f"{benchmark_cmp['active_return_pp']:+.2f}%")
     b4.metric("Extra Performance", fmt_eur_full(benchmark_cmp["active_return_eur"]))
 
     bench_chart = context["nav_clean"].copy()
@@ -991,7 +991,7 @@ def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str
         orientation="h",
         name="SFC Fund",
         marker_color="#6366f1",
-        text=[f"{x:+.2f} pp" for x in plot_df["fund_contribution_pp"]],
+        text=[f"{x:+.2f}%" for x in plot_df["fund_contribution_pp"]],
         textposition="outside",
     ))
     fig.add_trace(go.Bar(
@@ -1000,7 +1000,7 @@ def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str
         orientation="h",
         name="VNGA60",
         marker_color="#22c55e",
-        text=[f"{x:+.2f} pp" for x in plot_df["benchmark_contribution_pp"]],
+        text=[f"{x:+.2f}%" for x in plot_df["benchmark_contribution_pp"]],
         textposition="outside",
     ))
     fig.update_layout(
@@ -1017,9 +1017,9 @@ def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str
 
     show = summary[[group_col, "fund_contribution_pp", "benchmark_contribution_pp",
                     "active_contribution_pp", "benchmark_weight_pct"]].copy()
-    show.columns = [title, "Fondo pp", "VNGA60 pp", "Active pp", "Peso VNGA60 %"]
-    for col in ["Fondo pp", "VNGA60 pp", "Active pp"]:
-        show[col] = show[col].apply(lambda x: f"{x:+.2f} pp")
+    show.columns = [title, "Fondo %", "VNGA60 %", "Active %", "Peso VNGA60 %"]
+    for col in ["Fondo %", "VNGA60 %", "Active %"]:
+        show[col] = show[col].apply(lambda x: f"{x:+.2f}%")
     show["Peso VNGA60 %"] = show["Peso VNGA60 %"].apply(lambda x: f"{x:.2f}%")
     st.dataframe(show, use_container_width=True, hide_index=True)
 
@@ -1081,8 +1081,8 @@ def _render_benchmark_underlying_drivers(
     k1, k2, k3, k4 = st.columns(4)
     k1.metric(f"{benchmark_label} Reale", f"{benchmark_return_pct:+.2f}%")
     k2.metric("Ricostruito Sottostanti", f"{drivers['reconstructed_return_pct']:+.2f}%")
-    k3.metric("Residuo", f"{drivers['residual_pp']:+.2f} pp")
-    k4.metric("Active Return Fondo", f"{active_return:+.2f} pp")
+    k3.metric("Residuo", f"{drivers['residual_pp']:+.2f}%")
+    k4.metric("Active Return Fondo", f"{active_return:+.2f}%")
 
     if ok_count < total_count:
         st.warning("Alcuni sottostanti non hanno prezzi storici disponibili: restano in tabella ma non entrano nella ricostruzione.")
@@ -1101,10 +1101,10 @@ def _render_benchmark_underlying_drivers(
             y=combined["name"],
             orientation="h",
             marker_color=colors,
-            text=[f"{x:+.2f} pp" for x in combined["contribution_pp"]],
+            text=[f"{x:+.2f}%" for x in combined["contribution_pp"]],
             textposition="outside",
             customdata=combined[["weight_pct", "period_return_pct", "yahoo_ticker"]],
-            hovertemplate="%{customdata[2]}<br>Peso: %{customdata[0]:.2f}%<br>Return: %{customdata[1]:+.2f}%<br>Contributo: %{x:+.2f} pp<extra></extra>",
+            hovertemplate="%{customdata[2]}<br>Peso: %{customdata[0]:.2f}%<br>Return: %{customdata[1]:+.2f}%<br>Contributo: %{x:+.2f}%<extra></extra>",
         ))
         fig.update_layout(
             height=max(420, len(combined) * 34),
@@ -1127,10 +1127,10 @@ def _render_benchmark_underlying_drivers(
     st.markdown('<div class="section-header">Dettaglio Sottostanti VNGA60</div>', unsafe_allow_html=True)
     show = detail[["yahoo_ticker", "name", "weight_pct", "period_return_pct", "contribution_pp",
                    "macro_class", "region", "data_status"]].copy()
-    show.columns = ["Ticker", "Nome", "Peso", "Return %", "Contributo pp", "Macro Classe", "Area", "Dato"]
+    show.columns = ["Ticker", "Nome", "Peso", "Return %", "Contributo %", "Macro Classe", "Area", "Dato"]
     show["Peso"] = show["Peso"].apply(lambda x: f"{x:.2f}%")
     show["Return %"] = show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
-    show["Contributo pp"] = show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+    show["Contributo %"] = show["Contributo %"].apply(lambda x: f"{x:+.2f}%")
     st.dataframe(show, use_container_width=True, hide_index=True, height=min(620, len(show) * 35 + 60))
 
 
@@ -1180,7 +1180,7 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
         macro_show.columns = ["Macro Classe", "Fondo %", "VNGA60 %", "Active Weight"]
         for col in ["Fondo %", "VNGA60 %"]:
             macro_show[col] = macro_show[col].apply(lambda x: f"{x:.2f}%")
-        macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f}%")
         st.dataframe(macro_show, use_container_width=True, hide_index=True)
 
     with tab_lt_region:
@@ -1191,10 +1191,10 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
             y=region_plot["region"],
             orientation="h",
             marker_color=colors,
-            text=[f"{x:+.1f} pp" for x in region_plot["active_weight_pct"]],
+            text=[f"{x:+.1f}%" for x in region_plot["active_weight_pct"]],
             textposition="outside",
             customdata=region_plot[["fund_weight_pct", "benchmark_weight_pct"]],
-            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f} pp<extra></extra>",
+            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f}%<extra></extra>",
         ))
         fig_region_lt.update_layout(
             height=max(420, len(region_plot) * 36),
@@ -1210,7 +1210,7 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
         region_show.columns = ["Area", "Fondo %", "VNGA60 %", "Active Weight"]
         for col in ["Fondo %", "VNGA60 %"]:
             region_show[col] = region_show[col].apply(lambda x: f"{x:.2f}%")
-        region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f}%")
         st.dataframe(region_show, use_container_width=True, hide_index=True)
 
     with tab_lt_holdings:
@@ -1259,7 +1259,7 @@ def _render_contribution_detail(context: dict):
                 text=[fmt_eur_short(x) for x in combined["contribution_eur"]],
                 textposition="outside",
                 customdata=combined[["contribution_pp", "period_return_pct"]],
-                hovertemplate="%{y}<br>Contributo: %{x:,.0f} EUR<br>Contributo: %{customdata[0]:+.2f} pp<br>Return: %{customdata[1]:+.2f}%<extra></extra>",
+                hovertemplate="%{y}<br>Contributo: %{x:,.0f} EUR<br>Contributo: %{customdata[0]:+.2f}%<br>Return: %{customdata[1]:+.2f}%<extra></extra>",
             ))
             fig_titles.update_layout(
                 height=max(420, len(combined) * 34),
@@ -1309,8 +1309,8 @@ def _render_contribution_detail(context: dict):
         agg_show = agg_df[[agg_label, "positions", "end_value", "contribution_eur", "contribution_pp",
                            "period_return_pct", "end_weight_pct"]].copy()
         agg_show.columns = [agg_choice, "# Pos.", "Valore Finale", "Contributo EUR",
-                            "Contributo pp", "Return %", "Peso Finale %"]
-        agg_show["Contributo pp"] = agg_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+                            "Contributo %", "Return %", "Peso Finale %"]
+        agg_show["Contributo %"] = agg_show["Contributo %"].apply(lambda x: f"{x:+.2f}%")
         agg_show["Return %"] = agg_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
         agg_show["Peso Finale %"] = agg_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
         agg_show = format_table_numbers(agg_show, euro_cols=["Valore Finale", "Contributo EUR"])
@@ -1344,8 +1344,8 @@ def _render_contribution_detail(context: dict):
             fx_show = currency_df[["currency", "positions", "end_value", "contribution_eur",
                                    "contribution_pp", "period_return_pct", "end_weight_pct"]].copy()
             fx_show.columns = ["Valuta", "# Pos.", "Valore Finale", "Contributo EUR",
-                               "Contributo pp", "Return %", "Peso Finale %"]
-            fx_show["Contributo pp"] = fx_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+                               "Contributo %", "Return %", "Peso Finale %"]
+            fx_show["Contributo %"] = fx_show["Contributo %"].apply(lambda x: f"{x:+.2f}%")
             fx_show["Return %"] = fx_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
             fx_show["Peso Finale %"] = fx_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
             fx_show = format_table_numbers(fx_show, euro_cols=["Valore Finale", "Contributo EUR"])
@@ -1353,7 +1353,7 @@ def _render_contribution_detail(context: dict):
 
     with tab_table:
         detail = contrib.copy()
-        detail["contribution_pp_fmt"] = detail["contribution_pp"].apply(lambda x: f"{x:+.2f} pp")
+        detail["contribution_pp_fmt"] = detail["contribution_pp"].apply(lambda x: f"{x:+.2f}%")
         detail["period_return_fmt"] = detail["period_return_pct"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
         detail["end_weight_fmt"] = detail["end_weight_pct"].apply(lambda x: f"{x:.2f}%")
         detail_show = detail[["name", "isin", "macro_class", "sector", "currency",
@@ -1361,7 +1361,7 @@ def _render_contribution_detail(context: dict):
                               "contribution_eur", "contribution_pp_fmt", "period_return_fmt", "end_weight_fmt"]].copy()
         detail_show.columns = ["Nome", "ISIN", "Classe", "Settore", "Valuta", "Valore Iniziale",
                                "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole",
-                               "Contributo EUR", "Contributo pp", "Return %", "Peso Finale"]
+                               "Contributo EUR", "Contributo %", "Return %", "Peso Finale"]
         detail_show = format_table_numbers(
             detail_show,
             euro_cols=["Valore Iniziale", "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole", "Contributo EUR"],

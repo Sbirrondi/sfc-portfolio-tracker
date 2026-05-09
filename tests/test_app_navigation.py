@@ -1,5 +1,6 @@
 import ast
 from pathlib import Path
+import re
 import unittest
 
 
@@ -44,6 +45,19 @@ class AppNavigationTests(unittest.TestCase):
         self.assertNotIn('elif page == "📊 Performance Contribution":', source)
         for tab_label in ["Snapshot P&L", "Periodo", "Benchmark", "Driver VNGA60", "Lookthrough", "Dettaglio"]:
             self.assertIn(f'"{tab_label}"', source)
+
+    def test_contribution_page_uses_percent_labels_instead_of_pp(self):
+        source = APP_PATH.read_text()
+        visible_strings = [
+            node.value
+            for node in ast.walk(ast.parse(source))
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        ]
+
+        for text in visible_strings:
+            self.assertIsNone(re.search(r"\bpp\b|\(pp\)", text, flags=re.IGNORECASE))
+        self.assertIn("Contributo %", source)
+        self.assertIn("Active %", source)
 
 
 if __name__ == "__main__":
