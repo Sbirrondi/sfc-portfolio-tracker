@@ -607,6 +607,630 @@ def _interpolate_nav_to_daily(nav_history: pd.DataFrame) -> pd.DataFrame:
     return daily
 
 
+def _render_contribution_snapshot(positions: pd.DataFrame, nav_total: float, liquidita: float):
+    st.markdown('<div class="section-header">Contributo per Singolo Titolo</div>', unsafe_allow_html=True)
+
+    contrib_pos = positions[["name", "isin", "macro_class", "sector", "invested_capital",
+                              "current_value", "pnl", "pnl_pct"]].copy()
+    contrib_pos["weight_ptf"] = (contrib_pos["current_value"] / nav_total) if nav_total > 0 else 0
+    total_invested = contrib_pos["invested_capital"].sum()
+    contrib_pos["contrib_pnl_pct"] = (contrib_pos["pnl"] / total_invested * 100) if total_invested > 0 else 0
+
+    top_gain = contrib_pos.nlargest(10, "pnl")
+    top_loss = contrib_pos.nsmallest(10, "pnl")
+
+    col_g, col_l = st.columns(2)
+    with col_g:
+        st.markdown("**🟢 Top 10 Contributori Positivi**")
+        fig_g = go.Figure(go.Bar(
+            x=top_gain["pnl"].values,
+            y=top_gain["name"].values,
+            orientation="h", marker_color="#22c55e",
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_gain["pnl"]],
+            textposition="outside"))
+        fig_g.update_layout(
+            height=max(350, len(top_gain) * 35),
+            margin=dict(t=10, b=30, l=180, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_g, use_container_width=True)
+
+    with col_l:
+        st.markdown("**🔴 Top 10 Contributori Negativi**")
+        fig_l = go.Figure(go.Bar(
+            x=top_loss["pnl"].values,
+            y=top_loss["name"].values,
+            orientation="h", marker_color="#ef4444",
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_loss["pnl"]],
+            textposition="outside"))
+        fig_l.update_layout(
+            height=max(350, len(top_loss) * 35),
+            margin=dict(t=10, b=30, l=180, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig_l, use_container_width=True)
+
+    contrib_table = contrib_pos.sort_values("pnl", ascending=False).copy()
+    contrib_table["pnl_pct_d"] = (contrib_table["pnl_pct"] * 100).round(2)
+    contrib_table["contrib_pnl_pct"] = contrib_table["contrib_pnl_pct"].round(3)
+    contrib_table["weight_ptf_d"] = (contrib_table["weight_ptf"] * 100).round(2)
+    show_contrib = contrib_table[["name", "macro_class", "sector", "invested_capital",
+                                  "current_value", "pnl", "pnl_pct_d", "contrib_pnl_pct",
+                                  "weight_ptf_d"]].copy()
+    show_contrib.columns = ["Nome", "Classe", "Settore", "Investito", "Controvalore",
+                            "P&L €", "P&L %", "Contrib. PTF (pp)", "Peso PTF %"]
+    show_contrib = format_table_numbers(show_contrib, euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(show_contrib, use_container_width=True, hide_index=True,
+                 height=min(600, len(show_contrib) * 38 + 50))
+
+    st.divider()
+    st.markdown('<div class="section-header">Contributo per Settore</div>', unsafe_allow_html=True)
+
+    by_sector = contrib_pos.groupby("sector").agg(
+        invested=("invested_capital", "sum"),
+        value=("current_value", "sum"),
+        pnl=("pnl", "sum"),
+        positions=("name", "count")
+    ).reset_index()
+    by_sector["pnl_pct"] = ((by_sector["value"] / by_sector["invested"] - 1) * 100).round(2)
+    by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
+    by_sector = by_sector.sort_values("pnl", ascending=True)
+
+    colors_s = ["#ef4444" if x < 0 else "#22c55e" for x in by_sector["pnl"]]
+    fig_sec = go.Figure(go.Bar(
+        x=by_sector["pnl"].values,
+        y=by_sector["sector"].values,
+        orientation="h", marker_color=colors_s,
+        text=[f"€{x:+,.0f}".replace(",", "'") for x in by_sector["pnl"]],
+        textposition="outside"))
+    fig_sec.update_layout(
+        height=max(400, len(by_sector) * 30),
+        margin=dict(t=10, b=30, l=200, r=80),
+        template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+    st.plotly_chart(fig_sec, use_container_width=True)
+
+    sec_table = by_sector.sort_values("pnl", ascending=False)
+    sec_show = sec_table[["sector", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
+    sec_show.columns = ["Settore", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
+    sec_show = format_table_numbers(sec_show, euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(sec_show, use_container_width=True, hide_index=True)
+
+    st.divider()
+    st.markdown('<div class="section-header">Contributo per Macro Classe</div>', unsafe_allow_html=True)
+
+    by_macro = contrib_pos.groupby("macro_class").agg(
+        invested=("invested_capital", "sum"),
+        value=("current_value", "sum"),
+        pnl=("pnl", "sum"),
+        positions=("name", "count")
+    ).reset_index()
+    by_macro["pnl_pct"] = ((by_macro["value"] / by_macro["invested"] - 1) * 100).round(2)
+    by_macro["weight"] = (by_macro["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
+    liq_row = pd.DataFrame([{"macro_class": "Liquidità", "invested": 0, "value": liquidita,
+                             "pnl": 0, "positions": 0, "pnl_pct": 0,
+                             "weight": round(liquidita / nav_total * 100, 2) if nav_total > 0 else 0}])
+    by_macro = pd.concat([by_macro, liq_row], ignore_index=True)
+
+    col_pie, col_bar = st.columns(2)
+    with col_pie:
+        fig_mp = px.pie(by_macro, values="value", names="macro_class", hole=0.5,
+                        color="macro_class",
+                        color_discrete_map={"Equity": "#6366f1", "Fixed Income": "#22c55e",
+                                            "Alternative": "#f59e0b", "Liquidità": "#64748b"})
+        fig_mp.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
+                             template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                             paper_bgcolor="rgba(0,0,0,0)", title="Allocazione per Valore")
+        fig_mp.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
+        st.plotly_chart(fig_mp, use_container_width=True)
+
+    with col_bar:
+        by_macro_sorted = by_macro[by_macro["macro_class"] != "Liquidità"].sort_values("pnl")
+        colors_m = ["#ef4444" if x < 0 else "#22c55e" for x in by_macro_sorted["pnl"]]
+        fig_mb = go.Figure(go.Bar(
+            x=by_macro_sorted["pnl"].values,
+            y=by_macro_sorted["macro_class"].values,
+            orientation="h", marker_color=colors_m,
+            text=[f"€{x:+,.0f}".replace(",", "'") for x in by_macro_sorted["pnl"]],
+            textposition="outside"))
+        fig_mb.update_layout(
+            height=350, margin=dict(t=20, b=30, l=120, r=80),
+            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+            title="P&L per Macro Classe")
+        st.plotly_chart(fig_mb, use_container_width=True)
+
+    macro_show = by_macro[["macro_class", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
+    macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
+    macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
+    st.dataframe(macro_show, use_container_width=True, hide_index=True)
+
+
+def _period_contribution_context(
+    transactions: pd.DataFrame,
+    positions: pd.DataFrame,
+    isin_map: dict,
+    nav_history: pd.DataFrame,
+    selected_period: str,
+):
+    if nav_history.empty:
+        return {
+            "ready": False,
+            "message": "Dati NAV insufficienti. Aggiorna i prezzi dalla pagina Operazioni & Import.",
+        }
+
+    nav_clean = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+    bounds = period_bounds(nav_clean, selected_period)
+    if bounds is None:
+        return {
+            "ready": False,
+            "message": "Servono almeno due punti NAV per calcolare la contribution.",
+            "nav_clean": nav_clean,
+        }
+
+    start_date = bounds["start_date"]
+    end_date = bounds["end_date"]
+    nav_start = bounds["nav_start"]
+    nav_end = bounds["nav_end"]
+
+    start_values = _estimate_values_on_date(transactions, positions, isin_map, start_date)
+    end_values = {}
+    if not positions.empty and "isin" in positions.columns:
+        end_values = dict(zip(positions["isin"], pd.to_numeric(positions["current_value"], errors="coerce").fillna(0)))
+
+    contrib = compute_period_contributions(
+        transactions=transactions,
+        positions=positions,
+        start_date=start_date,
+        end_date=end_date,
+        nav_start=nav_start,
+        nav_end=nav_end,
+        start_values=start_values,
+        end_values=end_values,
+    )
+
+    tx_period = transactions.copy()
+    if not tx_period.empty:
+        tx_period["date"] = pd.to_datetime(tx_period["date"], errors="coerce").dt.normalize()
+        tx_period = tx_period[(tx_period["date"] > pd.to_datetime(start_date).normalize()) &
+                              (tx_period["date"] <= pd.to_datetime(end_date).normalize())]
+    if not tx_period.empty and "transaction_type" in tx_period.columns:
+        deposits = tx_period.loc[tx_period["transaction_type"].eq("DEPOSIT"), "quantity"].sum()
+        withdrawals = tx_period.loc[tx_period["transaction_type"].eq("WITHDRAWAL"), "quantity"].sum()
+    else:
+        deposits = 0
+        withdrawals = 0
+
+    fund_return_eur = nav_end - nav_start - deposits + withdrawals
+    fund_return_pp = (fund_return_eur / nav_start * 100) if nav_start > 0 else 0
+    contribution_sum = contrib["contribution_eur"].sum() if not contrib.empty else 0
+    residual = fund_return_eur - contribution_sum
+    residual_pp = (residual / nav_start * 100) if nav_start > 0 else 0
+
+    benchmark_cmp = benchmark_period_comparison(
+        nav_clean,
+        start_date=start_date,
+        end_date=end_date,
+        fund_return_pct=fund_return_pp,
+        nav_start=nav_start,
+    )
+
+    return {
+        "ready": True,
+        "nav_clean": nav_clean,
+        "start_date": start_date,
+        "end_date": end_date,
+        "nav_start": nav_start,
+        "nav_end": nav_end,
+        "contrib": contrib,
+        "fund_return_eur": fund_return_eur,
+        "fund_return_pp": fund_return_pp,
+        "residual": residual,
+        "residual_pp": residual_pp,
+        "benchmark_cmp": benchmark_cmp,
+    }
+
+
+def _render_contribution_period(context: dict):
+    if not context.get("ready"):
+        st.info(context.get("message", "Dati insufficienti per calcolare la contribution."))
+        return
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("NAV Iniziale", fmt_eur_full(context["nav_start"]))
+    k2.metric("NAV Finale", fmt_eur_full(context["nav_end"]))
+    k3.metric("Performance Periodo", f"{context['fund_return_pp']:+.2f}%",
+              delta=fmt_eur_full(context["fund_return_eur"]))
+    k4.metric("Residuo Riconciliazione", f"{context['residual_pp']:+.2f} pp",
+              delta=fmt_eur_full(context["residual"]))
+
+    contrib = context["contrib"]
+    if contrib.empty:
+        st.info("Nessun contributo calcolabile per il periodo selezionato.")
+        return
+
+    st.caption(
+        "Il residuo include liquidità, approssimazioni su strumenti senza storico prezzi e piccoli scostamenti "
+        "tra NAV storico e valorizzazioni ricostruite per ISIN."
+    )
+
+    st.markdown('<div class="section-header">Contributi al Periodo</div>', unsafe_allow_html=True)
+    waterfall_df = contribution_waterfall_items(contrib, residual=context["residual"], limit=8)
+    if waterfall_df.empty:
+        st.info("Nessun contributo significativo da mostrare nel grafico.")
+        return
+
+    fig_wf = go.Figure(go.Waterfall(
+        x=waterfall_df["label"],
+        y=waterfall_df["value"],
+        measure=waterfall_df["measure"],
+        connector={"line": {"color": "rgba(148,163,184,0.45)"}},
+        increasing={"marker": {"color": "#22c55e"}},
+        decreasing={"marker": {"color": "#ef4444"}},
+        text=[fmt_eur_short(v) for v in waterfall_df["value"]],
+        textposition="outside",
+    ))
+    fig_wf.update_layout(
+        height=420,
+        margin=dict(t=20, b=80, l=40, r=30),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        yaxis_title="EUR",
+        xaxis_tickangle=-35,
+    )
+    st.plotly_chart(fig_wf, use_container_width=True)
+
+
+def _render_contribution_benchmark(context: dict, benchmark_label: str):
+    if not context.get("ready"):
+        st.info(context.get("message", "Dati insufficienti per confrontare il benchmark."))
+        return
+
+    st.markdown(f'<div class="section-header">Confronto Benchmark {benchmark_label}</div>', unsafe_allow_html=True)
+    benchmark_cmp = context.get("benchmark_cmp")
+    if not benchmark_cmp:
+        st.info(f"Benchmark {benchmark_label} non disponibile per il periodo selezionato.")
+        return
+
+    b1, b2, b3, b4 = st.columns(4)
+    b1.metric("Fondo", f"{benchmark_cmp['fund_return_pct']:+.2f}%")
+    b2.metric(benchmark_label, f"{benchmark_cmp['benchmark_return_pct']:+.2f}%")
+    b3.metric("Active Return", f"{benchmark_cmp['active_return_pp']:+.2f} pp")
+    b4.metric("Extra Performance", fmt_eur_full(benchmark_cmp["active_return_eur"]))
+
+    bench_chart = context["nav_clean"].copy()
+    bench_chart["date"] = pd.to_datetime(bench_chart["date"], errors="coerce")
+    bench_chart["nav"] = pd.to_numeric(bench_chart["nav"], errors="coerce")
+    benchmark_raw = bench_chart["benchmark"] if "benchmark" in bench_chart.columns else np.nan
+    bench_chart["benchmark"] = pd.to_numeric(benchmark_raw, errors="coerce")
+    bench_chart = bench_chart[(bench_chart["date"] >= pd.to_datetime(context["start_date"])) &
+                              (bench_chart["date"] <= pd.to_datetime(context["end_date"]))]
+    bench_chart = bench_chart.sort_values("date")
+    bench_chart["benchmark"] = bench_chart["benchmark"].ffill()
+    if len(bench_chart) < 2 or bench_chart["nav"].dropna().size < 2 or bench_chart["benchmark"].dropna().size < 2:
+        return
+
+    fund_base = bench_chart["nav"].dropna().iloc[0]
+    bench_base = bench_chart["benchmark"].dropna().iloc[0]
+    bench_chart["fondo_rebased"] = (bench_chart["nav"] / fund_base - 1) * 100 if fund_base > 0 else np.nan
+    bench_chart["bench_rebased"] = (bench_chart["benchmark"] / bench_base - 1) * 100 if bench_base > 0 else np.nan
+    fig_bench = go.Figure()
+    fig_bench.add_trace(go.Scatter(
+        x=bench_chart["date"], y=bench_chart["fondo_rebased"],
+        mode="lines", name="SFC Fund",
+        line=dict(color="#6366f1", width=3),
+    ))
+    fig_bench.add_trace(go.Scatter(
+        x=bench_chart["date"], y=bench_chart["bench_rebased"],
+        mode="lines", name=benchmark_label,
+        line=dict(color="#22c55e", width=2),
+    ))
+    fig_bench.add_hline(y=0, line_color="rgba(148,163,184,0.35)", line_width=1)
+    fig_bench.update_layout(
+        height=330,
+        margin=dict(t=20, b=30, l=40, r=20),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        yaxis_title="Performance % rebased",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig_bench, use_container_width=True)
+
+
+def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, liquidita: float):
+    st.markdown('<div class="section-header">Spaccato Sottostanti Fondo vs VNGA60</div>', unsafe_allow_html=True)
+    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
+    fund_lookthrough = fund_level1_holdings(positions, nav_total=nav_total, cash=liquidita)
+
+    source_text = {
+        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
+        "cache": "VNGA60 holdings letti dalla cache",
+        "fallback": "VNGA60 holdings da fallback locale",
+    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
+    st.caption(source_text)
+
+    macro_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "macro_class")
+    region_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "region")
+
+    tab_lt_macro, tab_lt_region, tab_lt_holdings = st.tabs(["Macro", "Aree", "Sottostanti"])
+
+    with tab_lt_macro:
+        macro_plot = macro_comp.sort_values("fund_weight_pct", ascending=False)
+        fig_macro_lt = go.Figure()
+        fig_macro_lt.add_trace(go.Bar(
+            x=macro_plot["macro_class"], y=macro_plot["fund_weight_pct"],
+            name="SFC Fund", marker_color="#6366f1",
+            text=[f"{x:.1f}%" for x in macro_plot["fund_weight_pct"]], textposition="outside",
+        ))
+        fig_macro_lt.add_trace(go.Bar(
+            x=macro_plot["macro_class"], y=macro_plot["benchmark_weight_pct"],
+            name="VNGA60", marker_color="#22c55e",
+            text=[f"{x:.1f}%" for x in macro_plot["benchmark_weight_pct"]], textposition="outside",
+        ))
+        fig_macro_lt.update_layout(
+            height=380,
+            barmode="group",
+            margin=dict(t=20, b=40, l=40, r=20),
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            yaxis_title="Peso su NAV %",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_macro_lt, use_container_width=True)
+
+        macro_show = macro_comp.copy()
+        macro_show.columns = ["Macro Classe", "Fondo %", "VNGA60 %", "Active Weight"]
+        for col in ["Fondo %", "VNGA60 %"]:
+            macro_show[col] = macro_show[col].apply(lambda x: f"{x:.2f}%")
+        macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        st.dataframe(macro_show, use_container_width=True, hide_index=True)
+
+    with tab_lt_region:
+        region_plot = region_comp.reindex(region_comp["active_weight_pct"].abs().sort_values(ascending=True).index)
+        colors = ["#ef4444" if x < 0 else "#22c55e" for x in region_plot["active_weight_pct"]]
+        fig_region_lt = go.Figure(go.Bar(
+            x=region_plot["active_weight_pct"],
+            y=region_plot["region"],
+            orientation="h",
+            marker_color=colors,
+            text=[f"{x:+.1f} pp" for x in region_plot["active_weight_pct"]],
+            textposition="outside",
+            customdata=region_plot[["fund_weight_pct", "benchmark_weight_pct"]],
+            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f} pp<extra></extra>",
+        ))
+        fig_region_lt.update_layout(
+            height=max(420, len(region_plot) * 36),
+            margin=dict(t=20, b=30, l=170, r=80),
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Active weight vs VNGA60",
+        )
+        st.plotly_chart(fig_region_lt, use_container_width=True)
+
+        region_show = region_comp.copy()
+        region_show.columns = ["Area", "Fondo %", "VNGA60 %", "Active Weight"]
+        for col in ["Fondo %", "VNGA60 %"]:
+            region_show[col] = region_show[col].apply(lambda x: f"{x:.2f}%")
+        region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
+        st.dataframe(region_show, use_container_width=True, hide_index=True)
+
+    with tab_lt_holdings:
+        fh, bh = st.columns(2)
+        with fh:
+            st.markdown("**SFC Fund - sottostanti diretti**")
+            fund_show = fund_lookthrough[["name", "macro_class", "region", "currency", "weight_pct"]].copy()
+            fund_show.columns = ["Nome", "Classe", "Area", "Valuta", "Peso"]
+            fund_show["Peso"] = fund_show["Peso"].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(fund_show.head(30), use_container_width=True, hide_index=True, height=520)
+        with bh:
+            st.markdown("**VNGA60 - fondi sottostanti**")
+            bench_show = benchmark_holdings[["ticker", "name", "macro_class", "region", "weight_pct"]].copy()
+            bench_show.columns = ["Ticker", "Nome", "Classe", "Area", "Peso"]
+            bench_show["Peso"] = bench_show["Peso"].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(bench_show, use_container_width=True, hide_index=True, height=520)
+
+
+def _render_contribution_detail(context: dict):
+    if not context.get("ready"):
+        st.info(context.get("message", "Dati insufficienti per mostrare il dettaglio periodo."))
+        return
+
+    contrib = context["contrib"]
+    if contrib.empty:
+        st.info("Nessun contributo calcolabile per il periodo selezionato.")
+        return
+
+    tab_titles, tab_groups, tab_fx, tab_table = st.tabs(["Titoli", "Macro & Settori", "Valuta", "Dettaglio"])
+
+    with tab_titles:
+        st.markdown('<div class="section-header">Top / Bottom Contributor</div>', unsafe_allow_html=True)
+        nonzero = contrib[contrib["contribution_eur"].abs() > 1].copy()
+        top = nonzero.nlargest(10, "contribution_eur")
+        bottom = nonzero.nsmallest(10, "contribution_eur")
+        combined = pd.concat([top, bottom]).drop_duplicates(subset=["isin"]).sort_values("contribution_eur")
+        if combined.empty:
+            st.info("Nessun contributo significativo nel periodo.")
+        else:
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in combined["contribution_eur"]]
+            fig_titles = go.Figure(go.Bar(
+                x=combined["contribution_eur"],
+                y=combined["name"],
+                orientation="h",
+                marker_color=colors,
+                text=[fmt_eur_short(x) for x in combined["contribution_eur"]],
+                textposition="outside",
+                customdata=combined[["contribution_pp", "period_return_pct"]],
+                hovertemplate="%{y}<br>Contributo: %{x:,.0f} EUR<br>Contributo: %{customdata[0]:+.2f} pp<br>Return: %{customdata[1]:+.2f}%<extra></extra>",
+            ))
+            fig_titles.update_layout(
+                height=max(420, len(combined) * 34),
+                margin=dict(t=10, b=30, l=220, r=80),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Contributo EUR",
+                yaxis=dict(autorange="reversed"),
+            )
+            st.plotly_chart(fig_titles, use_container_width=True)
+
+    with tab_groups:
+        macro_df = summarize_contributions(contrib, "macro_class", context["nav_end"])
+        sector_df = summarize_contributions(contrib, "sector", context["nav_end"])
+        gm1, gm2 = st.columns(2)
+        for container, df_group, label_col, title in [
+            (gm1, macro_df, "macro_class", "Contributo per Macro Classe"),
+            (gm2, sector_df, "sector", "Contributo per Settore"),
+        ]:
+            with container:
+                st.markdown(f"**{title}**")
+                if not df_group.empty:
+                    df_plot = df_group.sort_values("contribution_eur")
+                    colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
+                    fig_group = go.Figure(go.Bar(
+                        x=df_plot["contribution_eur"],
+                        y=df_plot[label_col],
+                        orientation="h",
+                        marker_color=colors,
+                        text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
+                        textposition="outside",
+                    ))
+                    fig_group.update_layout(
+                        height=max(360, len(df_plot) * 32),
+                        margin=dict(t=10, b=30, l=170, r=70),
+                        template="plotly_dark",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                    )
+                    st.plotly_chart(fig_group, use_container_width=True)
+
+        st.markdown("**Tabella Aggregata**")
+        agg_choice = st.radio("Aggregazione", ["Macro Classe", "Settore"], horizontal=True, label_visibility="collapsed")
+        agg_df = macro_df if agg_choice == "Macro Classe" else sector_df
+        agg_label = "macro_class" if agg_choice == "Macro Classe" else "sector"
+        agg_show = agg_df[[agg_label, "positions", "end_value", "contribution_eur", "contribution_pp",
+                           "period_return_pct", "end_weight_pct"]].copy()
+        agg_show.columns = [agg_choice, "# Pos.", "Valore Finale", "Contributo EUR",
+                            "Contributo pp", "Return %", "Peso Finale %"]
+        agg_show["Contributo pp"] = agg_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+        agg_show["Return %"] = agg_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+        agg_show["Peso Finale %"] = agg_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
+        agg_show = format_table_numbers(agg_show, euro_cols=["Valore Finale", "Contributo EUR"])
+        st.dataframe(agg_show, use_container_width=True, hide_index=True)
+
+    with tab_fx:
+        currency_df = summarize_contributions(contrib, "currency", context["nav_end"])
+        if currency_df.empty:
+            st.info("Dati valuta non disponibili.")
+        else:
+            df_plot = currency_df.sort_values("contribution_eur")
+            colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
+            fig_fx = go.Figure(go.Bar(
+                x=df_plot["contribution_eur"],
+                y=df_plot["currency"],
+                orientation="h",
+                marker_color=colors,
+                text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
+                textposition="outside",
+            ))
+            fig_fx.update_layout(
+                height=max(360, len(df_plot) * 42),
+                margin=dict(t=10, b=30, l=90, r=80),
+                template="plotly_dark",
+                plot_bgcolor="rgba(0,0,0,0)",
+                paper_bgcolor="rgba(0,0,0,0)",
+                xaxis_title="Contributo EUR",
+            )
+            st.plotly_chart(fig_fx, use_container_width=True)
+
+            fx_show = currency_df[["currency", "positions", "end_value", "contribution_eur",
+                                   "contribution_pp", "period_return_pct", "end_weight_pct"]].copy()
+            fx_show.columns = ["Valuta", "# Pos.", "Valore Finale", "Contributo EUR",
+                               "Contributo pp", "Return %", "Peso Finale %"]
+            fx_show["Contributo pp"] = fx_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+            fx_show["Return %"] = fx_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+            fx_show["Peso Finale %"] = fx_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
+            fx_show = format_table_numbers(fx_show, euro_cols=["Valore Finale", "Contributo EUR"])
+            st.dataframe(fx_show, use_container_width=True, hide_index=True)
+
+    with tab_table:
+        detail = contrib.copy()
+        detail["contribution_pp_fmt"] = detail["contribution_pp"].apply(lambda x: f"{x:+.2f} pp")
+        detail["period_return_fmt"] = detail["period_return_pct"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+        detail["end_weight_fmt"] = detail["end_weight_pct"].apply(lambda x: f"{x:.2f}%")
+        detail_show = detail[["name", "isin", "macro_class", "sector", "currency",
+                              "start_value", "end_value", "buys_eur", "sells_eur", "dividends_eur",
+                              "contribution_eur", "contribution_pp_fmt", "period_return_fmt", "end_weight_fmt"]].copy()
+        detail_show.columns = ["Nome", "ISIN", "Classe", "Settore", "Valuta", "Valore Iniziale",
+                               "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole",
+                               "Contributo EUR", "Contributo pp", "Return %", "Peso Finale"]
+        detail_show = format_table_numbers(
+            detail_show,
+            euro_cols=["Valore Iniziale", "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole", "Contributo EUR"],
+        )
+        st.dataframe(detail_show, use_container_width=True, hide_index=True,
+                     height=min(700, len(detail_show) * 35 + 60))
+
+
+def _render_contribution_page(
+    has_data: bool,
+    positions: pd.DataFrame,
+    transactions: pd.DataFrame,
+    isin_map: dict,
+    fund_info: dict,
+    nav_history: pd.DataFrame,
+    nav_total: float,
+    liquidita: float,
+):
+    st.markdown('<div class="section-header">Analisi Contribuzione Performance</div>', unsafe_allow_html=True)
+
+    if not has_data:
+        st.info("Nessun dato disponibile.")
+        return
+
+    tab_snapshot, tab_period, tab_benchmark, tab_lookthrough, tab_detail = st.tabs([
+        "Snapshot P&L", "Periodo", "Benchmark", "Lookthrough", "Dettaglio"
+    ])
+    benchmark_label = fund_info.get("benchmark", "VNGA60") or "VNGA60"
+
+    with tab_snapshot:
+        _render_contribution_snapshot(positions, nav_total, liquidita)
+
+    with tab_period:
+        st.markdown('<div class="section-header">Contributo Performance per Periodo</div>',
+                    unsafe_allow_html=True)
+        period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
+        pc1, pc2 = st.columns([1, 3])
+        with pc1:
+            selected_period = st.selectbox("Time frame", period_options, index=3)
+        period_context = _period_contribution_context(
+            transactions=transactions,
+            positions=positions,
+            isin_map=isin_map,
+            nav_history=nav_history,
+            selected_period=selected_period,
+        )
+        with pc2:
+            if period_context.get("ready"):
+                st.caption(
+                    f"Periodo analizzato: **{pd.to_datetime(period_context['start_date']).date()} → "
+                    f"{pd.to_datetime(period_context['end_date']).date()}** · "
+                    "contributi calcolati in EUR includendo acquisti, vendite e dividendi/cedole del periodo."
+                )
+        _render_contribution_period(period_context)
+
+    with tab_benchmark:
+        _render_contribution_benchmark(period_context, benchmark_label)
+
+    with tab_lookthrough:
+        _render_contribution_lookthrough(positions, nav_total, liquidita)
+
+    with tab_detail:
+        _render_contribution_detail(period_context)
+
+
 positions, overrides, isin_map, fund_info, nav_history, transactions, cash_data = load_all_data()
 
 # Handle deferred GitHub sync (after rerun from "Aggiorna Posizioni")
@@ -618,6 +1242,12 @@ if st.session_state.pop("_pending_github_sync", False):
         pass  # Non-blocking
 
 has_data = not positions.empty
+total_value = 0
+total_invested = 0
+total_pnl = 0
+total_pnl_pct = 0
+liquidita = 0
+nav_total = 0
 
 if has_data:
     positions = enrich_positions(positions, overrides)
@@ -672,8 +1302,7 @@ with st.sidebar:
     page = st.radio(
         "Navigazione",
         ["🏠 Dashboard", "📋 Posizioni", "📈 Performance",
-         "📊 Analytics Avanzate", "🏆 Contribuzione P&L",
-         "📊 Performance Contribution",
+         "📊 Analytics Avanzate", "🏆 Contribuzione Performance",
          "🏛️ Analisi Fixed Income",
          "🎯 Ottimizzazione PTF",
          "🔬 X-Ray Esposizioni", "💹 Multipli & Fondamentali",
@@ -1631,541 +2260,20 @@ elif page == "📊 Analytics Avanzate":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: CONTRIBUZIONE P&L
+# PAGE: CONTRIBUZIONE PERFORMANCE
 # ══════════════════════════════════════════════════════════════════════════════
 
-elif page == "🏆 Contribuzione P&L":
-    st.markdown('<div class="section-header">Analisi Contribuzione alla Performance</div>', unsafe_allow_html=True)
-
-    if not has_data:
-        st.info("Nessun dato disponibile.")
-        st.stop()
-
-    # ── Contribution by single stock ────────────────────────────────────
-    st.markdown('<div class="section-header">Contributo per Singolo Titolo</div>', unsafe_allow_html=True)
-
-    contrib_pos = positions[["name", "isin", "macro_class", "sector", "invested_capital",
-                              "current_value", "pnl", "pnl_pct"]].copy()
-    contrib_pos["weight_ptf"] = (contrib_pos["current_value"] / nav_total) if nav_total > 0 else 0
-    # Contribution to portfolio P&L = weight × individual return
-    total_invested = contrib_pos["invested_capital"].sum()
-    contrib_pos["contrib_pnl_pct"] = (contrib_pos["pnl"] / total_invested * 100) if total_invested > 0 else 0
-
-    # Top gainers & losers
-    top_gain = contrib_pos.nlargest(10, "pnl")
-    top_loss = contrib_pos.nsmallest(10, "pnl")
-
-    col_g, col_l = st.columns(2)
-    with col_g:
-        st.markdown("**🟢 Top 10 Contributori Positivi**")
-        fig_g = go.Figure(go.Bar(
-            x=top_gain["pnl"].values,
-            y=top_gain["name"].values,
-            orientation="h", marker_color="#22c55e",
-            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_gain["pnl"]],
-            textposition="outside"))
-        fig_g.update_layout(
-            height=max(350, len(top_gain) * 35),
-            margin=dict(t=10, b=30, l=180, r=80),
-            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_g, use_container_width=True)
-
-    with col_l:
-        st.markdown("**🔴 Top 10 Contributori Negativi**")
-        fig_l = go.Figure(go.Bar(
-            x=top_loss["pnl"].values,
-            y=top_loss["name"].values,
-            orientation="h", marker_color="#ef4444",
-            text=[f"€{x:+,.0f}".replace(",", "'") for x in top_loss["pnl"]],
-            textposition="outside"))
-        fig_l.update_layout(
-            height=max(350, len(top_loss) * 35),
-            margin=dict(t=10, b=30, l=180, r=80),
-            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            yaxis=dict(autorange="reversed"))
-        st.plotly_chart(fig_l, use_container_width=True)
-
-    # Full contribution table
-    contrib_table = contrib_pos.sort_values("pnl", ascending=False).copy()
-    contrib_table["pnl_pct_d"] = (contrib_table["pnl_pct"] * 100).round(2)
-    contrib_table["contrib_pnl_pct"] = contrib_table["contrib_pnl_pct"].round(3)
-    contrib_table["weight_ptf_d"] = (contrib_table["weight_ptf"] * 100).round(2)
-    show_contrib = contrib_table[["name", "macro_class", "sector", "invested_capital",
-                                    "current_value", "pnl", "pnl_pct_d", "contrib_pnl_pct", "weight_ptf_d"]].copy()
-    show_contrib.columns = ["Nome", "Classe", "Settore", "Investito", "Controvalore",
-                             "P&L €", "P&L %", "Contrib. PTF (pp)", "Peso PTF %"]
-    show_contrib = format_table_numbers(show_contrib,
-                                         euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(show_contrib, use_container_width=True, hide_index=True, height=min(600, len(show_contrib) * 38 + 50))
-
-    st.divider()
-
-    # ── Contribution by Sector ──────────────────────────────────────────
-    st.markdown('<div class="section-header">Contributo per Settore</div>', unsafe_allow_html=True)
-
-    by_sector = contrib_pos.groupby("sector").agg(
-        invested=("invested_capital", "sum"),
-        value=("current_value", "sum"),
-        pnl=("pnl", "sum"),
-        positions=("name", "count")
-    ).reset_index()
-    by_sector["pnl_pct"] = ((by_sector["value"] / by_sector["invested"] - 1) * 100).round(2)
-    by_sector["weight"] = (by_sector["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
-    by_sector = by_sector.sort_values("pnl", ascending=True)
-
-    colors_s = ["#ef4444" if x < 0 else "#22c55e" for x in by_sector["pnl"]]
-    fig_sec = go.Figure(go.Bar(
-        x=by_sector["pnl"].values,
-        y=by_sector["sector"].values,
-        orientation="h", marker_color=colors_s,
-        text=[f"€{x:+,.0f}".replace(",", "'") for x in by_sector["pnl"]],
-        textposition="outside"))
-    fig_sec.update_layout(
-        height=max(400, len(by_sector) * 30),
-        margin=dict(t=10, b=30, l=200, r=80),
-        template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-    st.plotly_chart(fig_sec, use_container_width=True)
-
-    sec_table = by_sector.sort_values("pnl", ascending=False)
-    sec_show = sec_table[["sector", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
-    sec_show.columns = ["Settore", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
-    sec_show = format_table_numbers(sec_show, euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(sec_show, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # ── Contribution by Macro Class ─────────────────────────────────────
-    st.markdown('<div class="section-header">Contributo per Macro Classe</div>', unsafe_allow_html=True)
-
-    by_macro = contrib_pos.groupby("macro_class").agg(
-        invested=("invested_capital", "sum"),
-        value=("current_value", "sum"),
-        pnl=("pnl", "sum"),
-        positions=("name", "count")
-    ).reset_index()
-    by_macro["pnl_pct"] = ((by_macro["value"] / by_macro["invested"] - 1) * 100).round(2)
-    by_macro["weight"] = (by_macro["value"] / nav_total * 100).round(2) if nav_total > 0 else 0
-    # Add liquidità row
-    liq_row = pd.DataFrame([{"macro_class": "Liquidità", "invested": 0, "value": liquidita,
-                              "pnl": 0, "positions": 0, "pnl_pct": 0,
-                              "weight": round(liquidita / nav_total * 100, 2) if nav_total > 0 else 0}])
-    by_macro = pd.concat([by_macro, liq_row], ignore_index=True)
-
-    col_pie, col_bar = st.columns(2)
-    with col_pie:
-        fig_mp = px.pie(by_macro, values="value", names="macro_class", hole=0.5,
-                         color="macro_class",
-                         color_discrete_map={"Equity": "#6366f1", "Fixed Income": "#22c55e",
-                                             "Alternative": "#f59e0b", "Liquidità": "#64748b"})
-        fig_mp.update_layout(height=350, margin=dict(t=20, b=20, l=20, r=20),
-                              template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-                              title="Allocazione per Valore")
-        fig_mp.update_traces(textposition="inside", textinfo="percent+label", textfont_size=11)
-        st.plotly_chart(fig_mp, use_container_width=True)
-
-    with col_bar:
-        by_macro_sorted = by_macro[by_macro["macro_class"] != "Liquidità"].sort_values("pnl")
-        colors_m = ["#ef4444" if x < 0 else "#22c55e" for x in by_macro_sorted["pnl"]]
-        fig_mb = go.Figure(go.Bar(
-            x=by_macro_sorted["pnl"].values,
-            y=by_macro_sorted["macro_class"].values,
-            orientation="h", marker_color=colors_m,
-            text=[f"€{x:+,.0f}".replace(",", "'") for x in by_macro_sorted["pnl"]],
-            textposition="outside"))
-        fig_mb.update_layout(
-            height=350, margin=dict(t=20, b=30, l=120, r=80),
-            template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
-            title="P&L per Macro Classe")
-        st.plotly_chart(fig_mb, use_container_width=True)
-
-    macro_show = by_macro[["macro_class", "positions", "invested", "value", "pnl", "pnl_pct", "weight"]].copy()
-    macro_show.columns = ["Macro Classe", "# Posizioni", "Investito", "Controvalore", "P&L €", "P&L %", "Peso PTF %"]
-    macro_show = format_table_numbers(macro_show, euro_cols=["Investito", "Controvalore", "P&L €"])
-    st.dataframe(macro_show, use_container_width=True, hide_index=True)
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: PERFORMANCE CONTRIBUTION
-# ══════════════════════════════════════════════════════════════════════════════
-
-elif page == "📊 Performance Contribution":
-    st.markdown('<div class="section-header">Performance Contribution per Periodo</div>', unsafe_allow_html=True)
-
-    if not has_data or nav_history.empty:
-        st.info("Dati NAV insufficienti. Aggiorna i prezzi dalla pagina Operazioni & Import.")
-        st.stop()
-
-    nav_clean = nav_history.drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
-    period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
-    pc1, pc2 = st.columns([1, 3])
-    with pc1:
-        selected_period = st.selectbox("Time frame", period_options, index=3)
-
-    bounds = period_bounds(nav_clean, selected_period)
-    if bounds is None:
-        st.warning("Servono almeno due punti NAV per calcolare la contribution.")
-        st.stop()
-
-    start_date = bounds["start_date"]
-    end_date = bounds["end_date"]
-    nav_start = bounds["nav_start"]
-    nav_end = bounds["nav_end"]
-
-    with pc2:
-        st.caption(
-            f"Periodo analizzato: **{pd.to_datetime(start_date).date()} → {pd.to_datetime(end_date).date()}** · "
-            "contributi calcolati in EUR includendo acquisti, vendite e dividendi/cedole del periodo."
-        )
-
-    start_values = _estimate_values_on_date(transactions, positions, isin_map, start_date)
-    end_values = {}
-    if not positions.empty and "isin" in positions.columns:
-        end_values = dict(zip(positions["isin"], pd.to_numeric(positions["current_value"], errors="coerce").fillna(0)))
-
-    contrib = compute_period_contributions(
-        transactions=transactions,
+elif page == "🏆 Contribuzione Performance":
+    _render_contribution_page(
+        has_data=has_data,
         positions=positions,
-        start_date=start_date,
-        end_date=end_date,
-        nav_start=nav_start,
-        nav_end=nav_end,
-        start_values=start_values,
-        end_values=end_values,
+        transactions=transactions,
+        isin_map=isin_map,
+        fund_info=fund_info,
+        nav_history=nav_history,
+        nav_total=nav_total,
+        liquidita=liquidita,
     )
-
-    tx_period = transactions.copy()
-    if not tx_period.empty:
-        tx_period["date"] = pd.to_datetime(tx_period["date"], errors="coerce").dt.normalize()
-        tx_period = tx_period[(tx_period["date"] > pd.to_datetime(start_date).normalize()) &
-                              (tx_period["date"] <= pd.to_datetime(end_date).normalize())]
-    deposits = tx_period.loc[tx_period["transaction_type"].eq("DEPOSIT"), "quantity"].sum() if not tx_period.empty else 0
-    withdrawals = tx_period.loc[tx_period["transaction_type"].eq("WITHDRAWAL"), "quantity"].sum() if not tx_period.empty else 0
-    fund_return_eur = nav_end - nav_start - deposits + withdrawals
-    fund_return_pp = (fund_return_eur / nav_start * 100) if nav_start > 0 else 0
-    contribution_sum = contrib["contribution_eur"].sum() if not contrib.empty else 0
-    residual = fund_return_eur - contribution_sum
-    residual_pp = (residual / nav_start * 100) if nav_start > 0 else 0
-
-    benchmark_label = fund_info.get("benchmark", "VNGA60") or "VNGA60"
-    benchmark_cmp = benchmark_period_comparison(
-        nav_clean,
-        start_date=start_date,
-        end_date=end_date,
-        fund_return_pct=fund_return_pp,
-        nav_start=nav_start,
-    )
-
-    k1, k2, k3, k4 = st.columns(4)
-    k1.metric("NAV Iniziale", fmt_eur_full(nav_start))
-    k2.metric("NAV Finale", fmt_eur_full(nav_end))
-    k3.metric("Performance Periodo", f"{fund_return_pp:+.2f}%", delta=fmt_eur_full(fund_return_eur))
-    k4.metric("Residuo Riconciliazione", f"{residual_pp:+.2f} pp", delta=fmt_eur_full(residual))
-
-    if contrib.empty:
-        st.info("Nessun contributo calcolabile per il periodo selezionato.")
-        st.stop()
-
-    st.caption(
-        "Il residuo include liquidità, approssimazioni su strumenti senza storico prezzi e piccoli scostamenti "
-        "tra NAV storico e valorizzazioni ricostruite per ISIN."
-    )
-
-    st.markdown(f'<div class="section-header">Confronto Benchmark {benchmark_label}</div>', unsafe_allow_html=True)
-    if benchmark_cmp:
-        b1, b2, b3, b4 = st.columns(4)
-        b1.metric("Fondo", f"{benchmark_cmp['fund_return_pct']:+.2f}%")
-        b2.metric(benchmark_label, f"{benchmark_cmp['benchmark_return_pct']:+.2f}%")
-        b3.metric("Active Return", f"{benchmark_cmp['active_return_pp']:+.2f} pp")
-        b4.metric("Extra Performance", fmt_eur_full(benchmark_cmp["active_return_eur"]))
-
-        bench_chart = nav_clean.copy()
-        bench_chart["date"] = pd.to_datetime(bench_chart["date"], errors="coerce")
-        bench_chart["nav"] = pd.to_numeric(bench_chart["nav"], errors="coerce")
-        bench_chart["benchmark"] = pd.to_numeric(bench_chart.get("benchmark"), errors="coerce")
-        bench_chart = bench_chart[(bench_chart["date"] >= pd.to_datetime(start_date)) &
-                                  (bench_chart["date"] <= pd.to_datetime(end_date))]
-        bench_chart = bench_chart.sort_values("date")
-        bench_chart["benchmark"] = bench_chart["benchmark"].ffill()
-        if len(bench_chart) >= 2 and bench_chart["benchmark"].dropna().size >= 2:
-            fund_base = bench_chart["nav"].dropna().iloc[0]
-            bench_base = bench_chart["benchmark"].dropna().iloc[0]
-            bench_chart["fondo_rebased"] = (bench_chart["nav"] / fund_base - 1) * 100 if fund_base > 0 else np.nan
-            bench_chart["bench_rebased"] = (bench_chart["benchmark"] / bench_base - 1) * 100 if bench_base > 0 else np.nan
-            fig_bench = go.Figure()
-            fig_bench.add_trace(go.Scatter(
-                x=bench_chart["date"], y=bench_chart["fondo_rebased"],
-                mode="lines", name="SFC Fund",
-                line=dict(color="#6366f1", width=3),
-            ))
-            fig_bench.add_trace(go.Scatter(
-                x=bench_chart["date"], y=bench_chart["bench_rebased"],
-                mode="lines", name=benchmark_label,
-                line=dict(color="#22c55e", width=2),
-            ))
-            fig_bench.add_hline(y=0, line_color="rgba(148,163,184,0.35)", line_width=1)
-            fig_bench.update_layout(
-                height=330,
-                margin=dict(t=20, b=30, l=40, r=20),
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                yaxis_title="Performance % rebased",
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                hovermode="x unified",
-            )
-            st.plotly_chart(fig_bench, use_container_width=True)
-    else:
-        st.info(f"Benchmark {benchmark_label} non disponibile per il periodo selezionato.")
-
-    st.markdown('<div class="section-header">Spaccato Sottostanti Fondo vs VNGA60</div>', unsafe_allow_html=True)
-    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
-    fund_lookthrough = fund_level1_holdings(positions, nav_total=nav_total, cash=liquidita)
-
-    source_text = {
-        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
-        "cache": "VNGA60 holdings letti dalla cache",
-        "fallback": "VNGA60 holdings da fallback locale",
-    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
-    st.caption(source_text)
-
-    macro_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "macro_class")
-    region_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "region")
-
-    tab_lt_macro, tab_lt_region, tab_lt_holdings = st.tabs(["Macro", "Aree", "Sottostanti"])
-
-    with tab_lt_macro:
-        macro_plot = macro_comp.sort_values("fund_weight_pct", ascending=False)
-        fig_macro_lt = go.Figure()
-        fig_macro_lt.add_trace(go.Bar(
-            x=macro_plot["macro_class"], y=macro_plot["fund_weight_pct"],
-            name="SFC Fund", marker_color="#6366f1",
-            text=[f"{x:.1f}%" for x in macro_plot["fund_weight_pct"]], textposition="outside",
-        ))
-        fig_macro_lt.add_trace(go.Bar(
-            x=macro_plot["macro_class"], y=macro_plot["benchmark_weight_pct"],
-            name="VNGA60", marker_color="#22c55e",
-            text=[f"{x:.1f}%" for x in macro_plot["benchmark_weight_pct"]], textposition="outside",
-        ))
-        fig_macro_lt.update_layout(
-            height=380,
-            barmode="group",
-            margin=dict(t=20, b=40, l=40, r=20),
-            template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            yaxis_title="Peso su NAV %",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-        )
-        st.plotly_chart(fig_macro_lt, use_container_width=True)
-
-        macro_show = macro_comp.copy()
-        macro_show.columns = ["Macro Classe", "Fondo %", "VNGA60 %", "Active Weight"]
-        for col in ["Fondo %", "VNGA60 %"]:
-            macro_show[col] = macro_show[col].apply(lambda x: f"{x:.2f}%")
-        macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
-        st.dataframe(macro_show, use_container_width=True, hide_index=True)
-
-    with tab_lt_region:
-        region_plot = region_comp.reindex(region_comp["active_weight_pct"].abs().sort_values(ascending=True).index)
-        colors = ["#ef4444" if x < 0 else "#22c55e" for x in region_plot["active_weight_pct"]]
-        fig_region_lt = go.Figure(go.Bar(
-            x=region_plot["active_weight_pct"],
-            y=region_plot["region"],
-            orientation="h",
-            marker_color=colors,
-            text=[f"{x:+.1f} pp" for x in region_plot["active_weight_pct"]],
-            textposition="outside",
-            customdata=region_plot[["fund_weight_pct", "benchmark_weight_pct"]],
-            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f} pp<extra></extra>",
-        ))
-        fig_region_lt.update_layout(
-            height=max(420, len(region_plot) * 36),
-            margin=dict(t=20, b=30, l=170, r=80),
-            template="plotly_dark",
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Active weight vs VNGA60",
-        )
-        st.plotly_chart(fig_region_lt, use_container_width=True)
-
-        region_show = region_comp.copy()
-        region_show.columns = ["Area", "Fondo %", "VNGA60 %", "Active Weight"]
-        for col in ["Fondo %", "VNGA60 %"]:
-            region_show[col] = region_show[col].apply(lambda x: f"{x:.2f}%")
-        region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f} pp")
-        st.dataframe(region_show, use_container_width=True, hide_index=True)
-
-    with tab_lt_holdings:
-        fh, bh = st.columns(2)
-        with fh:
-            st.markdown("**SFC Fund - sottostanti diretti**")
-            fund_show = fund_lookthrough[["name", "macro_class", "region", "currency", "weight_pct"]].copy()
-            fund_show.columns = ["Nome", "Classe", "Area", "Valuta", "Peso"]
-            fund_show["Peso"] = fund_show["Peso"].apply(lambda x: f"{x:.2f}%")
-            st.dataframe(fund_show.head(30), use_container_width=True, hide_index=True, height=520)
-        with bh:
-            st.markdown("**VNGA60 - fondi sottostanti**")
-            bench_show = benchmark_holdings[["ticker", "name", "macro_class", "region", "weight_pct"]].copy()
-            bench_show.columns = ["Ticker", "Nome", "Classe", "Area", "Peso"]
-            bench_show["Peso"] = bench_show["Peso"].apply(lambda x: f"{x:.2f}%")
-            st.dataframe(bench_show, use_container_width=True, hide_index=True, height=520)
-
-    st.markdown('<div class="section-header">Contributi al Periodo</div>', unsafe_allow_html=True)
-    waterfall_df = contribution_waterfall_items(contrib, residual=residual, limit=8)
-
-    fig_wf = go.Figure(go.Waterfall(
-        x=waterfall_df["label"],
-        y=waterfall_df["value"],
-        measure=waterfall_df["measure"],
-        connector={"line": {"color": "rgba(148,163,184,0.45)"}},
-        increasing={"marker": {"color": "#22c55e"}},
-        decreasing={"marker": {"color": "#ef4444"}},
-        text=[fmt_eur_short(v) for v in waterfall_df["value"]],
-        textposition="outside",
-    ))
-    fig_wf.update_layout(
-        height=420,
-        margin=dict(t=20, b=80, l=40, r=30),
-        template="plotly_dark",
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        yaxis_title="EUR",
-        xaxis_tickangle=-35,
-    )
-    if waterfall_df.empty:
-        st.info("Nessun contributo significativo da mostrare nel grafico.")
-    else:
-        st.plotly_chart(fig_wf, use_container_width=True)
-
-    tab_titles, tab_groups, tab_fx, tab_table = st.tabs(["Titoli", "Macro & Settori", "Valuta", "Dettaglio"])
-
-    with tab_titles:
-        st.markdown('<div class="section-header">Top / Bottom Contributor</div>', unsafe_allow_html=True)
-        nonzero = contrib[contrib["contribution_eur"].abs() > 1].copy()
-        top = nonzero.nlargest(10, "contribution_eur")
-        bottom = nonzero.nsmallest(10, "contribution_eur")
-        combined = pd.concat([top, bottom]).drop_duplicates(subset=["isin"]).sort_values("contribution_eur")
-        if combined.empty:
-            st.info("Nessun contributo significativo nel periodo.")
-        else:
-            colors = ["#ef4444" if x < 0 else "#22c55e" for x in combined["contribution_eur"]]
-            fig_titles = go.Figure(go.Bar(
-                x=combined["contribution_eur"],
-                y=combined["name"],
-                orientation="h",
-                marker_color=colors,
-                text=[fmt_eur_short(x) for x in combined["contribution_eur"]],
-                textposition="outside",
-                customdata=combined[["contribution_pp", "period_return_pct"]],
-                hovertemplate="%{y}<br>Contributo: %{x:,.0f} EUR<br>Contributo: %{customdata[0]:+.2f} pp<br>Return: %{customdata[1]:+.2f}%<extra></extra>",
-            ))
-            fig_titles.update_layout(
-                height=max(420, len(combined) * 34),
-                margin=dict(t=10, b=30, l=220, r=80),
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                xaxis_title="Contributo EUR",
-                yaxis=dict(autorange="reversed"),
-            )
-            st.plotly_chart(fig_titles, use_container_width=True)
-
-    with tab_groups:
-        macro_df = summarize_contributions(contrib, "macro_class", nav_end)
-        sector_df = summarize_contributions(contrib, "sector", nav_end)
-        gm1, gm2 = st.columns(2)
-        for container, df_group, label_col, title in [
-            (gm1, macro_df, "macro_class", "Contributo per Macro Classe"),
-            (gm2, sector_df, "sector", "Contributo per Settore"),
-        ]:
-            with container:
-                st.markdown(f"**{title}**")
-                if not df_group.empty:
-                    df_plot = df_group.sort_values("contribution_eur")
-                    colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
-                    fig_group = go.Figure(go.Bar(
-                        x=df_plot["contribution_eur"],
-                        y=df_plot[label_col],
-                        orientation="h",
-                        marker_color=colors,
-                        text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
-                        textposition="outside",
-                    ))
-                    fig_group.update_layout(
-                        height=max(360, len(df_plot) * 32),
-                        margin=dict(t=10, b=30, l=170, r=70),
-                        template="plotly_dark",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                    )
-                    st.plotly_chart(fig_group, use_container_width=True)
-
-        st.markdown("**Tabella Aggregata**")
-        agg_choice = st.radio("Aggregazione", ["Macro Classe", "Settore"], horizontal=True, label_visibility="collapsed")
-        agg_df = macro_df if agg_choice == "Macro Classe" else sector_df
-        agg_label = "macro_class" if agg_choice == "Macro Classe" else "sector"
-        agg_show = agg_df[[agg_label, "positions", "end_value", "contribution_eur", "contribution_pp",
-                           "period_return_pct", "end_weight_pct"]].copy()
-        agg_show.columns = [agg_choice, "# Pos.", "Valore Finale", "Contributo EUR",
-                            "Contributo pp", "Return %", "Peso Finale %"]
-        agg_show["Contributo pp"] = agg_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
-        agg_show["Return %"] = agg_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
-        agg_show["Peso Finale %"] = agg_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
-        agg_show = format_table_numbers(agg_show, euro_cols=["Valore Finale", "Contributo EUR"])
-        st.dataframe(agg_show, use_container_width=True, hide_index=True)
-
-    with tab_fx:
-        currency_df = summarize_contributions(contrib, "currency", nav_end)
-        if currency_df.empty:
-            st.info("Dati valuta non disponibili.")
-        else:
-            df_plot = currency_df.sort_values("contribution_eur")
-            colors = ["#ef4444" if x < 0 else "#22c55e" for x in df_plot["contribution_eur"]]
-            fig_fx = go.Figure(go.Bar(
-                x=df_plot["contribution_eur"],
-                y=df_plot["currency"],
-                orientation="h",
-                marker_color=colors,
-                text=[fmt_eur_short(x) for x in df_plot["contribution_eur"]],
-                textposition="outside",
-            ))
-            fig_fx.update_layout(
-                height=max(360, len(df_plot) * 42),
-                margin=dict(t=10, b=30, l=90, r=80),
-                template="plotly_dark",
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-                xaxis_title="Contributo EUR",
-            )
-            st.plotly_chart(fig_fx, use_container_width=True)
-
-            fx_show = currency_df[["currency", "positions", "end_value", "contribution_eur",
-                                   "contribution_pp", "period_return_pct", "end_weight_pct"]].copy()
-            fx_show.columns = ["Valuta", "# Pos.", "Valore Finale", "Contributo EUR",
-                               "Contributo pp", "Return %", "Peso Finale %"]
-            fx_show["Contributo pp"] = fx_show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
-            fx_show["Return %"] = fx_show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
-            fx_show["Peso Finale %"] = fx_show["Peso Finale %"].apply(lambda x: f"{x:.2f}%")
-            fx_show = format_table_numbers(fx_show, euro_cols=["Valore Finale", "Contributo EUR"])
-            st.dataframe(fx_show, use_container_width=True, hide_index=True)
-
-    with tab_table:
-        detail = contrib.copy()
-        detail["contribution_pp_fmt"] = detail["contribution_pp"].apply(lambda x: f"{x:+.2f} pp")
-        detail["period_return_fmt"] = detail["period_return_pct"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
-        detail["end_weight_fmt"] = detail["end_weight_pct"].apply(lambda x: f"{x:.2f}%")
-        detail_show = detail[["name", "isin", "macro_class", "sector", "currency",
-                              "start_value", "end_value", "buys_eur", "sells_eur", "dividends_eur",
-                              "contribution_eur", "contribution_pp_fmt", "period_return_fmt", "end_weight_fmt"]].copy()
-        detail_show.columns = ["Nome", "ISIN", "Classe", "Settore", "Valuta", "Valore Iniziale",
-                               "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole",
-                               "Contributo EUR", "Contributo pp", "Return %", "Peso Finale"]
-        detail_show = format_table_numbers(
-            detail_show,
-            euro_cols=["Valore Iniziale", "Valore Finale", "Acquisti", "Vendite", "Dividendi/Cedole", "Contributo EUR"],
-        )
-        st.dataframe(detail_show, use_container_width=True, hide_index=True, height=min(700, len(detail_show) * 35 + 60))
 
 
 # ══════════════════════════════════════════════════════════════════════════════
