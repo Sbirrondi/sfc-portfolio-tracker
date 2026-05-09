@@ -42,7 +42,7 @@ class AppNavigationTests(unittest.TestCase):
         self.assertIn('elif page == "🏆 Contribuzione Performance":', source)
         self.assertNotIn('elif page == "🏆 Contribuzione P&L":', source)
         self.assertNotIn('elif page == "📊 Performance Contribution":', source)
-        for tab_label in ["Snapshot P&L", "Periodo", "Benchmark", "Lookthrough", "Dettaglio"]:
+        for tab_label in ["Snapshot P&L", "Periodo", "Benchmark", "Driver VNGA60", "Lookthrough", "Dettaglio"]:
             self.assertIn(f'"{tab_label}"', source)
 
 

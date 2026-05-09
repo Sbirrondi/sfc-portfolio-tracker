@@ -18,6 +18,9 @@ from streamlit_lightweight_charts import renderLightweightCharts
 from benchmark_lookthrough import (
     compare_group_exposures, fund_level1_holdings, load_vnga60_holdings
 )
+from benchmark_contribution import (
+    benchmark_symbol_to_yahoo, compute_benchmark_underlying_contributions
+)
 import fund_manager as _fm
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
@@ -559,6 +562,26 @@ def _load_vnga60_lookthrough():
     return load_vnga60_holdings()
 
 
+@st.cache_data(ttl=3600, show_spinner=False)
+def _load_benchmark_underlying_prices(holdings: pd.DataFrame, start_date, end_date):
+    if holdings is None or holdings.empty:
+        return {}
+
+    tickers = []
+    for _, row in holdings.iterrows():
+        ticker = benchmark_symbol_to_yahoo(row.get("symbol", "")) or str(row.get("ticker", "") or "").strip().upper()
+        if ticker:
+            tickers.append(ticker)
+    tickers = sorted(set(tickers))
+    if not tickers:
+        return {}
+
+    from data_fetcher import get_historical_prices
+    start = (pd.to_datetime(start_date).normalize() - pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+    end = (pd.to_datetime(end_date).normalize() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    return get_historical_prices(tickers, start=start, end=end)
+
+
 # ── Load Data ────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=300)
@@ -938,6 +961,179 @@ def _render_contribution_benchmark(context: dict, benchmark_label: str):
     st.plotly_chart(fig_bench, use_container_width=True)
 
 
+def _fund_contributions_with_region(contrib: pd.DataFrame, positions: pd.DataFrame, nav_total: float, liquidita: float):
+    if contrib is None or contrib.empty:
+        return pd.DataFrame(columns=["macro_class", "region", "contribution_pp"])
+
+    fund_regions = fund_level1_holdings(positions, nav_total=nav_total, cash=liquidita)
+    if fund_regions.empty:
+        result = contrib.copy()
+        result["region"] = "N/A"
+        return result
+
+    region_map = fund_regions[["symbol", "region"]].rename(columns={"symbol": "isin"})
+    result = contrib.copy().merge(region_map, on="isin", how="left")
+    result["region"] = result["region"].fillna("N/A").replace("", "N/A")
+    return result
+
+
+def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str):
+    st.markdown(f"**{title}**")
+    if summary is None or summary.empty:
+        st.info("Dati non disponibili.")
+        return
+
+    plot_df = summary.reindex(summary["active_contribution_pp"].abs().sort_values(ascending=True).index)
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=plot_df["fund_contribution_pp"],
+        y=plot_df[group_col],
+        orientation="h",
+        name="SFC Fund",
+        marker_color="#6366f1",
+        text=[f"{x:+.2f} pp" for x in plot_df["fund_contribution_pp"]],
+        textposition="outside",
+    ))
+    fig.add_trace(go.Bar(
+        x=plot_df["benchmark_contribution_pp"],
+        y=plot_df[group_col],
+        orientation="h",
+        name="VNGA60",
+        marker_color="#22c55e",
+        text=[f"{x:+.2f} pp" for x in plot_df["benchmark_contribution_pp"]],
+        textposition="outside",
+    ))
+    fig.update_layout(
+        height=max(360, len(plot_df) * 42),
+        barmode="group",
+        margin=dict(t=10, b=30, l=180, r=80),
+        template="plotly_dark",
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis_title="Contributo al periodo",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    show = summary[[group_col, "fund_contribution_pp", "benchmark_contribution_pp",
+                    "active_contribution_pp", "benchmark_weight_pct"]].copy()
+    show.columns = [title, "Fondo pp", "VNGA60 pp", "Active pp", "Peso VNGA60 %"]
+    for col in ["Fondo pp", "VNGA60 pp", "Active pp"]:
+        show[col] = show[col].apply(lambda x: f"{x:+.2f} pp")
+    show["Peso VNGA60 %"] = show["Peso VNGA60 %"].apply(lambda x: f"{x:.2f}%")
+    st.dataframe(show, use_container_width=True, hide_index=True)
+
+
+def _render_benchmark_underlying_drivers(
+    context: dict,
+    positions: pd.DataFrame,
+    nav_total: float,
+    liquidita: float,
+    benchmark_label: str,
+):
+    if not context.get("ready"):
+        st.info(context.get("message", "Dati insufficienti per calcolare i driver del benchmark."))
+        return
+
+    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
+    if benchmark_holdings.empty:
+        st.info("Sottostanti VNGA60 non disponibili.")
+        return
+
+    benchmark_cmp = context.get("benchmark_cmp") or {}
+    benchmark_return_pct = benchmark_cmp.get("benchmark_return_pct", np.nan)
+    if pd.isna(benchmark_return_pct):
+        benchmark_return_pct = 0.0
+
+    with st.spinner("Calcolo performance sottostanti VNGA60..."):
+        price_data = _load_benchmark_underlying_prices(
+            benchmark_holdings,
+            context["start_date"],
+            context["end_date"],
+        )
+        fund_contrib = _fund_contributions_with_region(
+            context["contrib"],
+            positions=positions,
+            nav_total=nav_total,
+            liquidita=liquidita,
+        )
+        drivers = compute_benchmark_underlying_contributions(
+            holdings=benchmark_holdings,
+            price_data=price_data,
+            start_date=context["start_date"],
+            end_date=context["end_date"],
+            benchmark_return_pct=benchmark_return_pct,
+            fund_contributions=fund_contrib,
+        )
+
+    detail = drivers["detail"]
+    ok_count = int((detail["data_status"] == "OK").sum()) if not detail.empty else 0
+    total_count = len(detail)
+
+    source_text = {
+        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
+        "cache": "VNGA60 holdings letti dalla cache",
+        "fallback": "VNGA60 holdings da fallback locale",
+    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
+    st.caption(f"{source_text} · Prezzi disponibili per {ok_count}/{total_count} sottostanti")
+
+    active_return = benchmark_cmp.get("active_return_pp", context.get("fund_return_pp", 0) - benchmark_return_pct)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric(f"{benchmark_label} Reale", f"{benchmark_return_pct:+.2f}%")
+    k2.metric("Ricostruito Sottostanti", f"{drivers['reconstructed_return_pct']:+.2f}%")
+    k3.metric("Residuo", f"{drivers['residual_pp']:+.2f} pp")
+    k4.metric("Active Return Fondo", f"{active_return:+.2f} pp")
+
+    if ok_count < total_count:
+        st.warning("Alcuni sottostanti non hanno prezzi storici disponibili: restano in tabella ma non entrano nella ricostruzione.")
+
+    st.markdown('<div class="section-header">Top / Bottom Driver VNGA60</div>', unsafe_allow_html=True)
+    nonzero = detail[detail["contribution_pp"].abs() > 0.001].copy()
+    if nonzero.empty:
+        st.info("Nessun contributo significativo calcolabile sui sottostanti VNGA60.")
+    else:
+        top = nonzero.nlargest(8, "contribution_pp")
+        bottom = nonzero.nsmallest(8, "contribution_pp")
+        combined = pd.concat([top, bottom]).drop_duplicates(subset=["yahoo_ticker"]).sort_values("contribution_pp")
+        colors = ["#ef4444" if x < 0 else "#22c55e" for x in combined["contribution_pp"]]
+        fig = go.Figure(go.Bar(
+            x=combined["contribution_pp"],
+            y=combined["name"],
+            orientation="h",
+            marker_color=colors,
+            text=[f"{x:+.2f} pp" for x in combined["contribution_pp"]],
+            textposition="outside",
+            customdata=combined[["weight_pct", "period_return_pct", "yahoo_ticker"]],
+            hovertemplate="%{customdata[2]}<br>Peso: %{customdata[0]:.2f}%<br>Return: %{customdata[1]:+.2f}%<br>Contributo: %{x:+.2f} pp<extra></extra>",
+        ))
+        fig.update_layout(
+            height=max(420, len(combined) * 34),
+            margin=dict(t=10, b=30, l=260, r=80),
+            template="plotly_dark",
+            plot_bgcolor="rgba(0,0,0,0)",
+            paper_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Contributo VNGA60",
+            yaxis=dict(autorange="reversed"),
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown('<div class="section-header">Fondo vs VNGA60: Contributo per Gruppo</div>', unsafe_allow_html=True)
+    tab_macro, tab_region = st.tabs(["Macro Classe", "Area"])
+    with tab_macro:
+        _plot_driver_group_summary(drivers["macro_summary"], "macro_class", "Macro Classe")
+    with tab_region:
+        _plot_driver_group_summary(drivers["region_summary"], "region", "Area")
+
+    st.markdown('<div class="section-header">Dettaglio Sottostanti VNGA60</div>', unsafe_allow_html=True)
+    show = detail[["yahoo_ticker", "name", "weight_pct", "period_return_pct", "contribution_pp",
+                   "macro_class", "region", "data_status"]].copy()
+    show.columns = ["Ticker", "Nome", "Peso", "Return %", "Contributo pp", "Macro Classe", "Area", "Dato"]
+    show["Peso"] = show["Peso"].apply(lambda x: f"{x:.2f}%")
+    show["Return %"] = show["Return %"].apply(lambda x: f"{x:+.2f}%" if pd.notna(x) else "N/A")
+    show["Contributo pp"] = show["Contributo pp"].apply(lambda x: f"{x:+.2f} pp")
+    st.dataframe(show, use_container_width=True, hide_index=True, height=min(620, len(show) * 35 + 60))
+
+
 def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, liquidita: float):
     st.markdown('<div class="section-header">Spaccato Sottostanti Fondo vs VNGA60</div>', unsafe_allow_html=True)
     benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
@@ -1190,10 +1386,31 @@ def _render_contribution_page(
         st.info("Nessun dato disponibile.")
         return
 
-    tab_snapshot, tab_period, tab_benchmark, tab_lookthrough, tab_detail = st.tabs([
-        "Snapshot P&L", "Periodo", "Benchmark", "Lookthrough", "Dettaglio"
-    ])
     benchmark_label = fund_info.get("benchmark", "VNGA60") or "VNGA60"
+    period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
+    pc1, pc2 = st.columns([1, 3])
+    with pc1:
+        selected_period = st.selectbox("Time frame", period_options, index=3)
+    period_context = _period_contribution_context(
+        transactions=transactions,
+        positions=positions,
+        isin_map=isin_map,
+        nav_history=nav_history,
+        selected_period=selected_period,
+    )
+    with pc2:
+        if period_context.get("ready"):
+            st.caption(
+                f"Periodo analizzato: **{pd.to_datetime(period_context['start_date']).date()} → "
+                f"{pd.to_datetime(period_context['end_date']).date()}** · "
+                "contributi calcolati in EUR includendo acquisti, vendite e dividendi/cedole del periodo."
+            )
+        else:
+            st.caption(period_context.get("message", "Dati periodo non disponibili."))
+
+    tab_snapshot, tab_period, tab_benchmark, tab_driver, tab_lookthrough, tab_detail = st.tabs([
+        "Snapshot P&L", "Periodo", "Benchmark", "Driver VNGA60", "Lookthrough", "Dettaglio"
+    ])
 
     with tab_snapshot:
         _render_contribution_snapshot(positions, nav_total, liquidita)
@@ -1201,28 +1418,13 @@ def _render_contribution_page(
     with tab_period:
         st.markdown('<div class="section-header">Contributo Performance per Periodo</div>',
                     unsafe_allow_html=True)
-        period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
-        pc1, pc2 = st.columns([1, 3])
-        with pc1:
-            selected_period = st.selectbox("Time frame", period_options, index=3)
-        period_context = _period_contribution_context(
-            transactions=transactions,
-            positions=positions,
-            isin_map=isin_map,
-            nav_history=nav_history,
-            selected_period=selected_period,
-        )
-        with pc2:
-            if period_context.get("ready"):
-                st.caption(
-                    f"Periodo analizzato: **{pd.to_datetime(period_context['start_date']).date()} → "
-                    f"{pd.to_datetime(period_context['end_date']).date()}** · "
-                    "contributi calcolati in EUR includendo acquisti, vendite e dividendi/cedole del periodo."
-                )
         _render_contribution_period(period_context)
 
     with tab_benchmark:
         _render_contribution_benchmark(period_context, benchmark_label)
+
+    with tab_driver:
+        _render_benchmark_underlying_drivers(period_context, positions, nav_total, liquidita, benchmark_label)
 
     with tab_lookthrough:
         _render_contribution_lookthrough(positions, nav_total, liquidita)
