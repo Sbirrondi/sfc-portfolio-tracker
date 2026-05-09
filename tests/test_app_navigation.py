@@ -5,6 +5,7 @@ import unittest
 
 
 APP_PATH = Path(__file__).resolve().parents[1] / "app.py"
+UI_HELPERS_PATH = Path(__file__).resolve().parents[1] / "ui_helpers.py"
 
 
 def _sidebar_pages() -> list[str]:
@@ -30,6 +31,31 @@ def _sidebar_pages() -> list[str]:
 
 
 class AppNavigationTests(unittest.TestCase):
+    def test_app_chrome_is_internal_dashboard_friendly(self):
+        source = APP_PATH.read_text()
+
+        self.assertIn('initial_sidebar_state="auto"', source)
+        helper_source = UI_HELPERS_PATH.read_text()
+        self.assertIn('[data-testid="stToolbar"]', helper_source)
+        self.assertIn('[data-testid="stDecoration"]', helper_source)
+
+    def test_positions_page_uses_responsive_kpi_cards(self):
+        source = APP_PATH.read_text()
+        helper_source = UI_HELPERS_PATH.read_text()
+
+        self.assertIn("position-kpi-grid", helper_source)
+        self.assertIn("render_position_kpis", source)
+        self.assertNotIn("c1, c2, c3, c4, c5 = st.columns(5)", source)
+
+    def test_management_pages_use_shared_access_gate(self):
+        source = APP_PATH.read_text()
+        helper_source = UI_HELPERS_PATH.read_text()
+
+        self.assertIn("def render_management_gate(", helper_source)
+        self.assertIn("access-panel", helper_source)
+        self.assertIn("render_management_gate(\"operazioni\"", source)
+        self.assertIn("render_management_gate(\"gestione_info\"", source)
+
     def test_contribution_page_is_a_single_sidebar_entry(self):
         pages = _sidebar_pages()
 

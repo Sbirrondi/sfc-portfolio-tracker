@@ -9,5 +9,8 @@ textColor = "#FAFAFA"
 maxUploadSize = 10
 enableXsrfProtection = true
 
+[client]
+toolbarMode = "minimal"
+
 [browser]
 gatherUsageStats = false

@@ -47,207 +47,17 @@ from performance_contribution import (
     summarize_contributions,
 )
 from xray_utils import add_xray_sector, build_country_exposure, build_exposure_table
+from ui_helpers import CUSTOM_CSS, SIDEBAR_TOGGLE_HTML, render_management_gate, render_position_kpis
 
 DATA_DIR = Path(__file__).parent / "data"
 
-st.set_page_config(page_title="SFC Investment Fund", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="SFC Investment Fund", page_icon="📊", layout="wide", initial_sidebar_state="auto")
 
-# ── Custom CSS ───────────────────────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
-    /* ── Global ── */
-    .main .block-container {
-        padding-top: 0.5rem; max-width: 1600px;
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-    #MainMenu, footer { visibility: hidden; }
-    /* Hide header text but keep the bar for sidebar toggle */
-    header[data-testid="stHeader"] {
-        background: transparent !important;
-        border-bottom: none !important;
-    }
-    /* Custom floating sidebar button when sidebar is collapsed */
-    .sidebar-toggle-btn {
-        position: fixed;
-        top: 0.6rem;
-        left: 0.6rem;
-        z-index: 999999;
-        background: rgba(99,102,241,0.2);
-        border: 1px solid rgba(99,102,241,0.4);
-        border-radius: 10px;
-        padding: 0.5rem 0.6rem;
-        cursor: pointer;
-        backdrop-filter: blur(10px);
-        box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-        transition: all 0.2s;
-        display: none;  /* shown via JS when sidebar closed */
-    }
-    .sidebar-toggle-btn:hover {
-        background: rgba(99,102,241,0.4);
-        border-color: rgba(99,102,241,0.6);
-    }
-    .sidebar-toggle-btn svg { width:22px; height:22px; }
-
-    /* ── Sidebar ── */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #080810 0%, #0d0d1a 100%);
-        border-right: 1px solid rgba(99,102,241,0.12);
-    }
-
-    /* ── Fund Banner ── */
-    .fund-banner {
-        background: linear-gradient(135deg, #0a0a14 0%, #12122a 50%, #0f1a2e 100%);
-        padding: 1rem 1.5rem; border-radius: 12px; color: white;
-        display: flex; align-items: center; gap: 1.2rem;
-        border: 1px solid rgba(99,102,241,0.18);
-        margin-bottom: 0.6rem; box-shadow: 0 4px 24px rgba(0,0,0,0.3);
-    }
-    .fund-banner img { width: 52px; height: 52px; border-radius: 50%; background: white; padding: 3px; }
-    .fund-banner h1 { margin:0; font-size:1.3rem; font-weight:700; letter-spacing:-0.5px; color:#e2e8f0; }
-    .fund-banner p { margin:0.1rem 0 0; color:#64748b; font-size:0.75rem; letter-spacing:0.3px; }
-
-    /* ── KPI Cards ── */
-    .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:0.7rem; margin-bottom:0.8rem; }
-    @media(max-width:768px){
-        .kpi-grid{grid-template-columns:repeat(2,1fr); gap:0.4rem;}
-        .kpi-value { font-size:1.1rem; }
-        .kpi-label { font-size:0.58rem; }
-        .kpi-delta { font-size:0.65rem; }
-        .fund-banner { flex-direction:column; text-align:center; padding:0.8rem; gap:0.6rem; }
-        .fund-banner img { width:44px; height:44px; }
-        .fund-banner h1 { font-size:1.05rem; }
-        .section-header { font-size:0.72rem; }
-        .stat-grid { grid-template-columns:1fr; }
-        .perf-table { font-size:0.7rem; }
-        .perf-table thead th { font-size:0.58rem; padding:0.4rem; }
-        .perf-table tbody td { padding:0.35rem 0.4rem; }
-        .mover-name { max-width:55%; font-size:0.72rem; }
-        .main .block-container { padding-left:0.5rem; padding-right:0.5rem; }
-    }
-    @media(max-width:480px){
-        .kpi-grid { grid-template-columns:1fr; }
-        .kpi-value { font-size:1rem; }
-    }
-    .kpi-card {
-        background: linear-gradient(135deg, #0d0d1a 0%, #13132a 100%);
-        border: 1px solid rgba(99,102,241,0.10); border-radius:10px;
-        padding: 0.9rem 1.1rem; transition: border-color 0.2s;
-    }
-    .kpi-card:hover { border-color: rgba(99,102,241,0.3); }
-    .kpi-label { font-size:0.65rem; font-weight:600; color:#64748b; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:0.35rem; }
-    .kpi-value { font-size:1.45rem; font-weight:700; color:#e2e8f0; line-height:1.2; }
-    .kpi-delta { font-size:0.72rem; font-weight:500; margin-top:0.25rem; color:#64748b; }
-    .kpi-delta .pos { color:#22c55e; font-weight:600; }
-    .kpi-delta .neg { color:#ef4444; font-weight:600; }
-    .accent-purple { border-left:3px solid #6366f1; }
-    .accent-green { border-left:3px solid #22c55e; }
-    .accent-blue { border-left:3px solid #3b82f6; }
-    .accent-amber { border-left:3px solid #f59e0b; }
-
-    /* ── Section Headers ── */
-    .section-header {
-        font-size:0.8rem; font-weight:600; color:#94a3b8; text-transform:uppercase;
-        letter-spacing:0.8px; margin:1.2rem 0 0.5rem; padding-bottom:0.4rem;
-        border-bottom:1px solid rgba(99,102,241,0.10);
-    }
-
-    /* ── Performance Table ── */
-    .perf-table {
-        width:100%; border-collapse:separate; border-spacing:0; font-size:0.8rem;
-        border-radius:8px; overflow:hidden; border:1px solid rgba(99,102,241,0.10);
-    }
-    .perf-table thead th {
-        background:#0d0d1a; color:#94a3b8; font-weight:600; font-size:0.65rem;
-        text-transform:uppercase; letter-spacing:0.5px; padding:0.55rem 0.7rem;
-        text-align:right; border-bottom:1px solid rgba(99,102,241,0.12);
-    }
-    .perf-table thead th:first-child { text-align:left; }
-    .perf-table tbody td {
-        padding:0.5rem 0.7rem; text-align:right; color:#cbd5e1;
-        border-bottom:1px solid rgba(99,102,241,0.05);
-    }
-    .perf-table tbody td:first-child { text-align:left; font-weight:500; color:#e2e8f0; }
-    .perf-table tbody tr:hover { background:rgba(99,102,241,0.04); }
-    .perf-table .pos { color:#22c55e; font-weight:600; }
-    .perf-table .neg { color:#ef4444; font-weight:600; }
-
-    /* ── Risk / Stat Grid ── */
-    .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.45rem; }
-    .stat-item {
-        background:#0d0d1a; border:1px solid rgba(99,102,241,0.07);
-        border-radius:8px; padding:0.6rem 0.8rem;
-    }
-    .stat-label { font-size:0.6rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
-    .stat-value { font-size:1.05rem; font-weight:700; color:#e2e8f0; margin-top:0.15rem; }
-
-    /* ── Movers List ── */
-    .mover-item {
-        display:flex; justify-content:space-between; align-items:center;
-        padding:0.4rem 0; border-bottom:1px solid rgba(99,102,241,0.05); font-size:0.78rem;
-    }
-    .mover-item:last-child { border-bottom:none; }
-    .mover-name { color:#cbd5e1; font-weight:500; max-width:68%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .mover-pnl { font-weight:700; }
-    .mover-pnl.pos { color:#22c55e; }
-    .mover-pnl.neg { color:#ef4444; }
-    .mover-section { font-size:0.6rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; margin:0.5rem 0 0.3rem; }
-    .mover-section:first-child { margin-top:0; }
-
-    /* ── Streamlit Overrides ── */
-    .stTabs [data-baseweb="tab-list"] {
-        gap:0.2rem; background:rgba(13,13,26,0.6); padding:0.25rem;
-        border-radius:10px; border:1px solid rgba(99,102,241,0.08);
-    }
-    .stTabs [data-baseweb="tab"] { border-radius:8px; padding:0.4rem 1rem; font-weight:500; font-size:0.8rem; }
-    [data-testid="stMetric"] {
-        background: linear-gradient(135deg, #0d0d1a 0%, #13132a 100%);
-        border:1px solid rgba(99,102,241,0.08); border-radius:10px; padding:0.7rem 0.9rem;
-    }
-    [data-testid="stMetricLabel"] { font-size:0.68rem !important; text-transform:uppercase; letter-spacing:0.4px; }
-    [data-testid="stExpander"] {
-        border:1px solid rgba(99,102,241,0.08); border-radius:10px; background:rgba(13,13,26,0.3);
-    }
-
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width:5px; }
-    ::-webkit-scrollbar-track { background:#0a0a14; }
-    ::-webkit-scrollbar-thumb { background:#2a2a4a; border-radius:3px; }
-</style>
-""", unsafe_allow_html=True)
+# ── Custom CSS / Streamlit chrome ───────────────────────────────────────────
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # Floating sidebar toggle button (visible when sidebar is collapsed)
-st.markdown("""
-<div class="sidebar-toggle-btn" id="sidebarToggle" onclick="
-    var btn = window.parent.document.querySelector('[data-testid=\\'stSidebarCollapsedControl\\'] button')
-        || window.parent.document.querySelector('[data-testid=\\'collapsedControl\\'] button')
-        || window.parent.document.querySelector('button[aria-label*=\\'sidebar\\']')
-        || window.parent.document.querySelector('header button');
-    if(btn) btn.click();
-    else { window.parent.document.querySelector('[data-testid=\\'stSidebar\\']').style.display='block'; }
-">
-    <svg viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="2.5" stroke-linecap="round">
-        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-    </svg>
-</div>
-<script>
-(function() {
-    function checkSidebar() {
-        var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-        var toggle = document.getElementById('sidebarToggle');
-        if (!sidebar || !toggle) return;
-        var collapsed = sidebar.getAttribute('aria-expanded') === 'false'
-                     || sidebar.offsetWidth < 50
-                     || sidebar.style.display === 'none'
-                     || sidebar.classList.contains('st-emotion-cache-1cypcdb');
-        toggle.style.display = collapsed ? 'block' : 'none';
-    }
-    setInterval(checkSidebar, 500);
-    checkSidebar();
-})();
-</script>
-""", unsafe_allow_html=True)
+st.markdown(SIDEBAR_TOGGLE_HTML, unsafe_allow_html=True)
 
 
 # ── Helper Functions ─────────────────────────────────────────────────────────
@@ -2028,12 +1838,38 @@ elif page == "📋 Posizioni":
         st.info("Nessun dato disponibile.")
         st.stop()
 
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("NAV Totale", fmt_eur_full(nav_total))
-    c2.metric("Posizioni", len(positions))
-    c3.metric("P&L Totale", fmt_eur_full(total_pnl))
-    c4.metric("P&L %", f"{total_pnl_pct:.2%}")
-    c5.metric("Liquidità", fmt_eur_full(liquidita))
+    render_position_kpis([
+        {
+            "label": "NAV Totale",
+            "value": fmt_eur_short(nav_total),
+            "detail": fmt_eur_full(nav_total),
+            "accent": "#6366f1",
+        },
+        {
+            "label": "Posizioni",
+            "value": str(len(positions)),
+            "detail": "posizioni attive",
+            "accent": "#3b82f6",
+        },
+        {
+            "label": "P&L Totale",
+            "value": fmt_eur_short(total_pnl),
+            "detail": fmt_eur_full(total_pnl),
+            "accent": "#22c55e" if total_pnl >= 0 else "#ef4444",
+        },
+        {
+            "label": "P&L %",
+            "value": f"{total_pnl_pct:.2%}",
+            "detail": "su capitale investito",
+            "accent": "#22c55e" if total_pnl_pct >= 0 else "#ef4444",
+        },
+        {
+            "label": "Liquidità",
+            "value": fmt_eur_short(liquidita),
+            "detail": fmt_eur_full(liquidita),
+            "accent": "#f59e0b",
+        },
+    ])
 
     st.divider()
 
@@ -3476,16 +3312,10 @@ elif page == "💹 Multipli & Fondamentali":
 elif page == "📝 Operazioni & Import":
     st.markdown('<div class="section-header">Gestione Operazioni</div>', unsafe_allow_html=True)
 
-    # Password gate for management pages
-    _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_operazioni")
-    _correct_pw = st.secrets.get("management", {}).get("password") if hasattr(st, "secrets") else None
-    if not _correct_pw:
-        st.error("Password di gestione non configurata. Imposta [management] password in Streamlit Secrets.")
-        st.stop()
-    if _mgmt_pw != _correct_pw:
-        if _mgmt_pw:
-            st.warning("Password errata")
-        st.stop()
+    render_management_gate("operazioni",
+        "Area operativa protetta",
+        "Registra, modifica e aggiorna operazioni, prezzi e NAV. Le modifiche qui impattano i file dati del fondo.",
+    )
 
     # KPIs
     if has_data:
@@ -3958,16 +3788,10 @@ elif page == "📝 Operazioni & Import":
 elif page == "⚙️ Gestione Info Strumenti":
     st.markdown('<div class="section-header">Gestione Info Strumenti</div>', unsafe_allow_html=True)
 
-    # Password gate for management pages
-    _mgmt_pw = st.text_input("🔒 Password richiesta", type="password", key="pw_gestione_info")
-    _correct_pw = st.secrets.get("management", {}).get("password") if hasattr(st, "secrets") else None
-    if not _correct_pw:
-        st.error("Password di gestione non configurata. Imposta [management] password in Streamlit Secrets.")
-        st.stop()
-    if _mgmt_pw != _correct_pw:
-        if _mgmt_pw:
-            st.warning("Password errata")
-        st.stop()
+    render_management_gate("gestione_info",
+        "Anagrafica strumenti protetta",
+        "Aggiorna mapping ISIN, settore, paese e classificazioni usate dalle viste di analisi e X-Ray.",
+    )
 
     st.markdown("Modifica manualmente settore, paese e altre info per strumenti non coperti da Yahoo Finance.")
 
