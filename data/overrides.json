@@ -412,6 +412,15 @@
     "asset_type": "Stock",
     "macro_class": "Equity"
   },
+  "US4642875151": {
+    "name": "iShares Expanded Tech-Software Sector ETF",
+    "sector": "Technology",
+    "industry": "Software & IT",
+    "country": "United States",
+    "asset_type": "ETF",
+    "macro_class": "Equity",
+    "classification": "Software US"
+  },
   "US5949181045": {
     "name": "Microsoft",
     "sector": "Technology",
@@ -432,6 +441,14 @@
     "name": "Nvidia",
     "sector": "Technology",
     "industry": "Semiconduttori",
+    "country": "United States",
+    "asset_type": "Stock",
+    "macro_class": "Equity"
+  },
+  "US81762P1021": {
+    "name": "ServiceNow",
+    "sector": "Technology",
+    "industry": "Software & IT",
     "country": "United States",
     "asset_type": "Stock",
     "macro_class": "Equity"
