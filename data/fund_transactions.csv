@@ -152,9 +152,21 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-03-20,BUY,US912810PV44,US TIPS 1.75% Jan 2028,Fixed Income,1850.0,101.485,USD,1.1555,0.0,,Gov. Internazionali,Bond
 2026-03-20,BUY,LU1681041114,Amundi EUR FRN Corporate Bond ESG ETF,Fixed Income,900.0,111.71,EUR,1.0,0.0,,Corporate Bond,ETF
 2026-03-24,BUY,IT0000072170,Fineco,Equity,4500.0,18.88,EUR,1.0,0.0,,Financials,Stock
+2026-04-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.6875,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Europa,Bond
 2026-04-08,BUY,IT0005282865,Reply,Equity,280.0,84.25,EUR,1.0,0.0,,Technology,Stock
+2026-04-08,SELL,DE0001141836,Bobl Tf0% Ap26,Fixed Income,4757.0,100.0,EUR,1.0,0.0,Maturity imported from Excel 2026-05-27,Gov. Europa,Bond
+2026-04-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.6666666667,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Corporate Bond,Bond
 2026-04-23,BUY,US4642875151,IGV,Equity,1700.0,83.45,USD,1.16836,0.0,,Technology,ETF
+2026-04-23,SELL,US91324P1021,UNH,Equity,153.0,352.98,USD,1.16866,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Healthcare,Stock
+2026-05-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.6875,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Europa,Bond
 2026-05-11,SELL,US67066G1040,Nvidia,Equity,540.0,221.79,USD,1.17808,0.0,,Technology,Stock
 2026-05-11,SELL,US1273871087,Cadence,Equity,350.0,362.09,USD,1.17769,0.0,,Technology,Stock
 2026-05-12,SELL,IT0004176001,Prysmian,Equity,400.0,153.7,EUR,1.0,0.0,,Industrials,Stock
 2026-05-12,BUY,US81762P1021,ServiceNow,Equity,1000.0,89.2,USD,1.17311,0.0,,Technology,Stock
+2026-05-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.6666666667,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Corporate Bond,Bond
+2026-05-19,SELL,IT0003549422,SanLorenzo,Equity,3200.0,37.14,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Consumer Discretionary,Stock
+2026-05-19,SELL,IE00BLNMYC90,SP Equal Weight,Equity,2600.0,96.51,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-19,SELL,IE00B4YBJ215,SPY4,Equity,970.0,96.02,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-19,SELL,IE00BJ38QD84,Russell2000,Equity,1400.0,69.41,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-21,DIVIDEND,AU000XCLWAX7,Cedola mensile Australia,Fixed Income,597.1504364371,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Internazionali,Bond
+2026-05-27,DEPOSIT,,Riconciliazione cash da Excel,,3975.24,1.0,EUR,1.0,0.0,Cash reconciliation to match FONDO DEFINITIVO (2).xlsx,,
