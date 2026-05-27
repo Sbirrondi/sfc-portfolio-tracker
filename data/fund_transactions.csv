@@ -3,15 +3,15 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2023-10-16,BUY,IT0004176001,Azioni Prysmian,Equity,6299.0,35.72,EUR,1.0,0.0,,Industrials,Stock
 2023-10-17,BUY,IE00B579F325,Oro,Alternative,849.0,176.78,EUR,1.0,0.0,,Precious Metals,Commodity
 2023-10-24,BUY,GB00BJYDH287,Bitcoin,Alternative,39002.0,7.692,EUR,1.0,0.0,,Crypto,Crypto
-2023-11-03,BUY,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,96.07,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
-2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
-2023-11-03,BUY,IT0005419848,"Btp Tf 0,50% Fb26 Eur",Fixed Income,9620.0,93.37,EUR,1.0,0.0,,"Btp Tf 0,50% Fb26 Eur",Bond
+2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
+2023-11-03,BUY,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.156,EUR,1.0,0.0,,HY EU,ETF
+2023-11-03,BUY,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,95.84,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
+2023-11-03,BUY,IT0005433690,"Btp Tf 0,25% Mz28 Eur",Fixed Income,5200.0,86.14,EUR,1.0,0.0,,Gov. Italia,Bond
 2023-11-03,BUY,NO0010732555,"Norway Tf 1,75% Mz25 Nok",Fixed Income,55000.0,97.13,NOK,11.876485,0.0,,"Norway Tf 1,75% Mz25 Nok",Bond
 2023-11-03,BUY,AT0000A2HLC4,"Austria Tf 0,85% Gn2120 Eur",Fixed Income,11300.0,39.8,EUR,1.0,0.0,,Gov. Europa,Bond
-2023-11-03,BUY,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,95.84,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
-2023-11-03,BUY,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.156,EUR,1.0,0.0,,HY EU,ETF
-2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
-2023-11-03,BUY,IT0005433690,"Btp Tf 0,25% Mz28 Eur",Fixed Income,5200.0,86.14,EUR,1.0,0.0,,Gov. Italia,Bond
+2023-11-03,BUY,IT0005419848,"Btp Tf 0,50% Fb26 Eur",Fixed Income,9620.0,93.37,EUR,1.0,0.0,,"Btp Tf 0,50% Fb26 Eur",Bond
+2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
+2023-11-03,BUY,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,96.07,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
 2023-11-09,BUY,IT0004176001,Azioni Prysmian,Equity,6484.0,34.7,EUR,1.0,0.0,,Industrials,Stock
 2023-11-30,BUY,GB00BJYDH287,Bitcoin,Alternative,17999.0,8.334,EUR,1.0,0.0,,Crypto,Crypto
 2023-12-01,BUY,IE00BNGJJT35,S&P Equal Weight,Equity,11122.0,44.955,EUR,1.0,0.0,,US Equity,Stock
@@ -75,12 +75,12 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-05-27,SELL,NL0000687663,Aercap,Equity,1291.0,113.67,USD,1.136,0.0,,Aercap,Stock
 2025-06-06,SELL,IE00B53SZB19,Nasdaq,Equity,150.0,1086.05,EUR,1.0,0.0,,US Equity,Stock
 2025-06-06,SELL,IE00BLNMYC90,SP Equal Weight,Equity,2000.0,85.23,EUR,1.0,0.0,,US Equity,Stock
-2025-07-07,SELL,GB00BM8Q5M07,JD Sports,Equity,102833.0,0.898,GBP,0.8635,0.0,,JD Sports,Stock
 2025-07-07,BUY,FR0000121014,LVMH,Equity,166.0,472.55,EUR,1.0,0.0,,Consumer Discretionary,Stock
-2025-07-11,SELL,IE00BLNMYC90,SP Equal Weight,Equity,1840.0,86.57,EUR,1.0,0.0,,US Equity,Stock
+2025-07-07,SELL,GB00BM8Q5M07,JD Sports,Equity,102833.0,0.898,GBP,0.8635,0.0,,JD Sports,Stock
 2025-07-11,SELL,IE00B53SZB19,Nasdaq,Equity,90.0,1116.82,EUR,1.0,0.0,,US Equity,Stock
-2025-07-11,BUY,IE00BQQP9F84,GDX,Alternative,1047.0,49.95,EUR,1.0,0.0,,Precious Metals,Commodity
+2025-07-11,SELL,IE00BLNMYC90,SP Equal Weight,Equity,1840.0,86.57,EUR,1.0,0.0,,US Equity,Stock
 2025-07-11,BUY,US8716071076,Synopsys,Equity,135.0,563.59,USD,1.16956,0.0,,Synopsys,Stock
+2025-07-11,BUY,IE00BQQP9F84,GDX,Alternative,1047.0,49.95,EUR,1.0,0.0,,Precious Metals,Commodity
 2025-07-23,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-07-23,BUY,IT0005282865,Reply,Equity,420.0,138.9,EUR,1.0,0.0,,Technology,Stock
 2025-07-23,SELL,US8716071076,Synopsys,Equity,135.0,617.61,USD,1.17,0.0,,Synopsys,Stock
@@ -89,15 +89,15 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-07-25,SELL,IE00B1TXK627,Water,Equity,1577.0,62.53,EUR,1.0,0.0,,Water,Stock
 2025-07-25,BUY,NL0010273215,ASML,Equity,132.0,604.0,EUR,1.0,0.0,,Technology,Stock
 2025-07-28,SELL,IT0004176001,Prysmian,Equity,400.0,66.68,EUR,1.0,0.0,,Industrials,Stock
-2025-08-13,BUY,DE0001141836,Bobl Tf0% Ap26,Fixed Income,4757.0,98.785,EUR,1.0,0.0,,Gov. Europa,Bond
 2025-08-13,BUY,IT0005640666,BOT Mz26,Fixed Income,5491.0,98.86,EUR,1.0,0.0,,Gov. Italia,Bond
+2025-08-13,BUY,DE0001141836,Bobl Tf0% Ap26,Fixed Income,4757.0,98.785,EUR,1.0,0.0,,Gov. Europa,Bond
 2025-09-16,SELL,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,97.25,NOK,11.591515,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
 2025-09-16,BUY,IE00BJ38QD84,Russell 2000,Equity,2520.0,59.11,EUR,1.0,0.0,,US Equity,Stock
 2025-09-16,BUY,IE00B4YBJ215,SPY400,Equity,1000.0,85.82,EUR,1.0,0.0,,US Equity,Stock
-2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
+2025-10-08,BUY,FR0000121014,LVMH,Equity,39.0,563.0,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
 2025-10-08,BUY,LU1437017350,Emerging Markets,Equity,1250.0,79.35,EUR,1.0,0.0,,Emerging Markets,Stock
-2025-10-08,BUY,FR0000121014,LVMH,Equity,39.0,563.0,EUR,1.0,0.0,,Consumer Discretionary,Stock
+2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
 2025-10-08,SELL,GB00B082RF11,Rentokil,Equity,9524.0,4.1204,GBP,0.8661,0.0,,Business Services,Stock
 2025-10-13,BUY,IE00BQQP9F84,GDX,Alternative,453.0,75.25,EUR,1.0,0.0,,Precious Metals,Commodity
 2025-10-14,BUY,NL0011585146,Ferrari,Equity,270.0,327.4,EUR,1.0,0.0,,Consumer Discretionary,Stock
@@ -107,9 +107,9 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-11-17,BUY,IE00BFMXXD54,Vanguard S&P500,Equity,3500.0,111.7,EUR,1.0,0.0,,US Equity,Stock
 2025-11-17,SELL,IE00BNGJJT35,S&P Equal Weight,Equity,5622.0,54.74,EUR,1.0,0.0,,US Equity,Stock
 2025-11-17,SELL,NL0015435975,Campari,Equity,10211.0,5.654,EUR,1.0,0.0,,Consumer Staples,Stock
+2025-11-28,SELL,LU0489337690,Real Estate EU,Equity,14344.0,24.1,EUR,1.0,0.0,,European Equity,Stock
 2025-11-28,SELL,IE00BM67HK77,Healthcare,Equity,2133.0,51.24,EUR,1.0,0.0,,Healthcare,Stock
 2025-11-28,BUY,IE00BYXG2H39,Biotech US,Equity,8186.0,7.33,EUR,1.0,0.0,,Healthcare,Stock
-2025-11-28,SELL,LU0489337690,Real Estate EU,Equity,14344.0,24.1,EUR,1.0,0.0,,European Equity,Stock
 2025-12-01,BUY,AU000000EMR4,EMR,Equity,14250.0,5.23,AUD,1.77,0.0,,Materials,Stock
 2025-12-02,DIVIDEND,XS2262211076,Cedola annuale Romania,Fixed Income,6875.0,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
 2025-12-03,BUY,HK0000516697,Biotech Cina,Equity,5100.0,71.37,HKD,9.048,0.0,,China Equity,Stock
@@ -118,18 +118,18 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-01-15,SELL,GB00BM8Q5M07,Jd Sport,Equity,55000.0,0.82,GBP,0.866,0.0,,Jd Sport,Stock
 2026-01-15,SELL,NL0015435975,Campari,Equity,9800.0,5.602,EUR,1.0,0.0,,Consumer Staples,Stock
 2026-01-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Corporate Bond,Bond
-2026-01-28,SELL,IT0004176001,Prysmian,Equity,1200.0,97.16,EUR,1.0,0.0,,Industrials,Stock
 2026-01-28,SELL,IE00B579F325,Oro,Alternative,249.0,425.36,EUR,1.0,0.0,,Precious Metals,Commodity
-2026-01-28,SELL,NL0010273215,ASML,Equity,32.0,1195.2,EUR,1.0,0.0,,Technology,Stock
 2026-01-28,SELL,DE000A1E0HS6,Silver,Alternative,193.0,884.86,EUR,1.0,0.0,,Precious Metals,Commodity
+2026-01-28,SELL,NL0010273215,ASML,Equity,32.0,1195.2,EUR,1.0,0.0,,Technology,Stock
+2026-01-28,SELL,IT0004176001,Prysmian,Equity,1200.0,97.16,EUR,1.0,0.0,,Industrials,Stock
 2026-02-02,SELL,IT0005419848,"Btp Tf 0,50% Fb26 Eur",Fixed Income,9620.0,100.0,EUR,1.0,0.0,,"Btp Tf 0,50% Fb26 Eur",Bond
 2026-02-04,SELL,IT0003549422,Sanlorenzo,Equity,1581.0,31.65,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2026-02-04,BUY,IE00BQQP9F84,GDX,Alternative,300.0,93.74,EUR,1.0,0.0,,Precious Metals,Commodity
 2026-02-04,BUY,US91324P1021,UNH,Equity,153.0,278.77,USD,1.1802,0.0,,Healthcare,Stock
 2026-02-04,SELL,FR0000121014,LVMH,Equity,40.0,528.9,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2026-02-09,BUY,DE000A2QP4D2,Brasile Bond,Fixed Income,2000.0,107.58,USD,1.1865,0.0,,Gov. Internazionali,Bond
-2026-02-09,SELL,IE00B53SZB19,Nasdaq,Equity,130.0,1214.93,EUR,1.0,0.0,,US Equity,Stock
 2026-02-09,BUY,IE00B4KBBD01,Utilities US,Equity,22500.0,9.007,EUR,1.0,0.0,,US Equity,Stock
+2026-02-09,SELL,IE00B53SZB19,Nasdaq,Equity,130.0,1214.93,EUR,1.0,0.0,,US Equity,Stock
 2026-02-09,BUY,LU1437017350,EM,Equity,600.0,87.994,EUR,1.0,0.0,,Emerging Markets,Stock
 2026-02-09,SELL,IE00BFMXXD54,Vanguard S&P500,Equity,950.0,112.53,EUR,1.0,0.0,,US Equity,Stock
 2026-02-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Corporate Bond,Bond
@@ -141,9 +141,9 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-03-01,SELL,IT0005640666,BOT Mz26,Fixed Income,5491.0,100.0,EUR,1.0,0.0,,Gov. Italia,Bond
 2026-03-03,DIVIDEND,XS2262211076,Cedola annuale Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
 2026-03-03,DIVIDEND,XS2262211076,Cedola annuale Romania Q1,Fixed Income,2114.06,1.0,EUR,1.0,0.0,,Gov. Europa,Bond
-2026-03-13,SELL,IT0003856405,Leonardo,Equity,700.0,63.82,EUR,1.0,0.0,,Leonardo,Stock
 2026-03-13,BUY,US58733R1023,MercadoLibre,Equity,60.0,1663.91,USD,1.14774,0.0,,Technology,Stock
 2026-03-13,BUY,US67066G1040,Nvidia,Equity,540.0,184.52,USD,1.14774,0.0,,Technology,Stock
+2026-03-13,SELL,IT0003856405,Leonardo,Equity,700.0,63.82,EUR,1.0,0.0,,Leonardo,Stock
 2026-03-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Corporate Bond,Bond
 2026-03-19,BUY,US91282CMN82,US Treasury 4.25% Feb 2028,Fixed Income,3000.0,100.66,USD,1.1485,0.0,,Gov. Internazionali,Bond
 2026-03-19,BUY,GB00BSQNRC93,UK Bond 4.375% 24/28,Fixed Income,1550.0,99.85,GBP,0.863,0.0,,Gov. Internazionali,Bond
@@ -152,14 +152,21 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-03-20,BUY,US912810PV44,US TIPS 1.75% Jan 2028,Fixed Income,1850.0,101.485,USD,1.1555,0.0,,Gov. Internazionali,Bond
 2026-03-20,BUY,LU1681041114,Amundi EUR FRN Corporate Bond ESG ETF,Fixed Income,900.0,111.71,EUR,1.0,0.0,,Corporate Bond,ETF
 2026-03-24,BUY,IT0000072170,Fineco,Equity,4500.0,18.88,EUR,1.0,0.0,,Financials,Stock
+2026-04-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.6875,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Europa,Bond
 2026-04-08,BUY,IT0005282865,Reply,Equity,280.0,84.25,EUR,1.0,0.0,,Technology,Stock
+2026-04-08,SELL,DE0001141836,Bobl Tf0% Ap26,Fixed Income,4757.0,100.0,EUR,1.0,0.0,Maturity imported from Excel 2026-05-27,Gov. Europa,Bond
+2026-04-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.6666666667,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Corporate Bond,Bond
 2026-04-23,BUY,US4642875151,IGV,Equity,1700.0,83.45,USD,1.16836,0.0,,Technology,ETF
+2026-04-23,SELL,US91324P1021,UNH,Equity,153.0,352.98,USD,1.16866,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Healthcare,Stock
+2026-05-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.6875,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Europa,Bond
 2026-05-11,SELL,US67066G1040,Nvidia,Equity,540.0,221.79,USD,1.17808,0.0,,Technology,Stock
 2026-05-11,SELL,US1273871087,Cadence,Equity,350.0,362.09,USD,1.17769,0.0,,Technology,Stock
 2026-05-12,SELL,IT0004176001,Prysmian,Equity,400.0,153.7,EUR,1.0,0.0,,Industrials,Stock
 2026-05-12,BUY,US81762P1021,ServiceNow,Equity,1000.0,89.2,USD,1.17311,0.0,,Technology,Stock
-2026-05-18,SELL,US91324P1021,UnitedHealth Group,Equity,153.0,352.98,USD,0.8598,0.0,,Healthcare,Stock
-2026-05-19,SELL,IE00BLNMYC90,SP Equal Weight,Equity,2600.0,96.51,EUR,1.0,0.0,,US Equity,Stock
-2026-05-19,SELL,IE00B4YBJ215,SPY400,Equity,970.0,96.02,EUR,1.0,0.0,,US Equity,Stock
-2026-05-19,SELL,IT0003549422,Sanlorenzo,Equity,3200.0,37.14,EUR,1.0,0.0,,Consumer Discretionary,Stock
-2026-05-19,SELL,IE00BJ38QD84,Russell 2000,Equity,1400.0,69.41,EUR,1.0,0.0,,US Equity,Stock
+2026-05-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.6666666667,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Corporate Bond,Bond
+2026-05-19,SELL,IT0003549422,SanLorenzo,Equity,3200.0,37.14,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Consumer Discretionary,Stock
+2026-05-19,SELL,IE00BLNMYC90,SP Equal Weight,Equity,2600.0,96.51,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-19,SELL,IE00B4YBJ215,SPY4,Equity,970.0,96.02,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-19,SELL,IE00BJ38QD84,Russell2000,Equity,1400.0,69.41,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,US Equity,Stock
+2026-05-21,DIVIDEND,AU000XCLWAX7,Cedola mensile Australia,Fixed Income,597.1504364371,1.0,EUR,1.0,0.0,Imported from Excel FONDO DEFINITIVO (2) 2026-05-27,Gov. Internazionali,Bond
+2026-05-27,DEPOSIT,,Riconciliazione cash da Excel,,3975.24,1.0,EUR,1.0,0.0,Cash reconciliation to match FONDO DEFINITIVO (2).xlsx,,
