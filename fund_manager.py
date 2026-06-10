@@ -201,11 +201,12 @@ def compute_positions_from_transactions() -> pd.DataFrame:
 
         for _, row in isin_tx.iterrows():
             tx_type = row.get("transaction_type", "")
-            # Only update name from BUY/SELL (not dividends which have "Cedola..." names)
+            # Only update name/currency from BUY/SELL (not dividends, which have
+            # "Cedola..." names and are recorded as EUR amounts even for FX bonds)
             if tx_type in ("BUY", "SELL"):
                 last_name = row.get("name", "") or last_name
+                last_currency = row.get("currency", "EUR") or last_currency
             last_macro = row.get("macro_class", "") or last_macro
-            last_currency = row.get("currency", "EUR") or last_currency
             last_sector = row.get("sector", "") or last_sector
             last_asset_sub = row.get("asset_sub_type", "Stock") or last_asset_sub
             fx = row.get("fx_rate", 1.0) or 1.0
