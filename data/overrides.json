@@ -525,5 +525,14 @@
     "country": "Italy",
     "asset_type": "Stock",
     "macro_class": "Equity"
+  },
+  "IE00BM67HN09": {
+    "name": "Xtrackers MSCI World Consumer Staples",
+    "sector": "Consumer Staples",
+    "industry": "Beni di consumo primario",
+    "country": "Global",
+    "asset_type": "ETF",
+    "macro_class": "Equity",
+    "classification": "Consumer Staples"
   }
 }

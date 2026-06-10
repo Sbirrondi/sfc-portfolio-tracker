@@ -303,9 +303,9 @@ _BOND_BORSA_IT_MAP = {
 }
 
 # Map ISIN -> Euronext market code for bonds available via Euronext ajax API
-_BOND_EURONEXT_MAP = {
-    "AU000XCLWAX7": "ETLX",  # Australia 2.75% Nov 2029
-}
+# NB: da giugno 2026 l'endpoint Euronext risponde con payload cifrato ("ct": ...),
+# quindi non è più utilizzabile: preferire _BOND_TV_MAP.
+_BOND_EURONEXT_MAP = {}
 
 # Map ISIN -> TradingView exchange:ticker for bonds via TradingView scanner API
 _BOND_TV_MAP = {
@@ -313,6 +313,7 @@ _BOND_TV_MAP = {
     "US91282CMN82": "OTCB:91282CMN8",       # US Treasury 4.25% Feb 2028
     "GB00BSQNRC93": "DUS:GBBSQNRC9",       # UK Bond 4.375% 24/28
     "US912810PV44": "FWB:US912810PV4",      # US TIPS 1.75% Jan 2028
+    "AU000XCLWAX7": "EUROTLX:AU000XCLWAX7",  # Australia 2.75% Nov 2029 (EuroTLX)
 }
 
 _bond_price_cache = {}

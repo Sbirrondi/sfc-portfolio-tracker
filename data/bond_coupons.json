@@ -1,0 +1,83 @@
+{
+  "_comment": "Cedole registrate automaticamente all'aggiornamento prezzi (vedi coupon_manager.py). amount: per cedola, nella valuta indicata (convertita in EUR al cambio della data di stacco). first_payment: prima cedola da registrare automaticamente (le precedenti sono gia' a registro). Per disabilitare una voce: enabled=false.",
+  "coupons": [
+    {
+      "isin": "XS2943818059",
+      "name": "Cedola mensile ILIAD",
+      "description": "Iliad holding 5.375% 2030 - rateo mensile 5,375%/12 su 400.000 nominali",
+      "frequency": "monthly",
+      "payment_day": 15,
+      "amount": 1791.666667,
+      "currency": "EUR",
+      "first_payment": "2026-06-15",
+      "last_payment": "2030-04-15",
+      "sector": "Corporate Bond",
+      "enabled": true
+    },
+    {
+      "isin": "XS2262211076",
+      "name": "Cedola mensile Romania",
+      "description": "Romania 1.375% Dec 2029 - rateo mensile 1,375%/12 su 615.000 nominali",
+      "frequency": "monthly",
+      "payment_day": 2,
+      "amount": 704.6875,
+      "currency": "EUR",
+      "first_payment": "2026-07-02",
+      "last_payment": "2029-12-02",
+      "sector": "Gov. Europa",
+      "enabled": true
+    },
+    {
+      "isin": "AU000XCLWAX7",
+      "name": "Cedola semestrale Australia",
+      "description": "Australia 2.75% Nov 2029 - 2,75%/2 su 850.000 AUD nominali",
+      "frequency": "semiannual",
+      "payment_dates": ["05-21", "11-21"],
+      "amount": 11687.5,
+      "currency": "AUD",
+      "first_payment": "2026-11-21",
+      "last_payment": "2029-11-21",
+      "sector": "Gov. Internazionali",
+      "enabled": true
+    },
+    {
+      "isin": "US91282CMN82",
+      "name": "Cedola semestrale US Treasury",
+      "description": "US Treasury 4.25% Feb 2028 - 4,25%/2 su 300.000 USD nominali",
+      "frequency": "semiannual",
+      "payment_dates": ["02-15", "08-15"],
+      "amount": 6375.0,
+      "currency": "USD",
+      "first_payment": "2026-08-15",
+      "last_payment": "2028-02-15",
+      "sector": "Gov. Internazionali",
+      "enabled": true
+    },
+    {
+      "isin": "US912810PV44",
+      "name": "Cedola semestrale US TIPS",
+      "description": "US TIPS 1.75% Jan 2028 - 1,75%/2 su 185.000 USD nominali (approssimata: le cedole TIPS variano col capitale indicizzato all'inflazione)",
+      "frequency": "semiannual",
+      "payment_dates": ["01-15", "07-15"],
+      "amount": 1618.75,
+      "currency": "USD",
+      "first_payment": "2026-07-15",
+      "last_payment": "2028-01-15",
+      "sector": "Gov. Internazionali",
+      "enabled": true
+    },
+    {
+      "isin": "GB00BSQNRC93",
+      "name": "Cedola semestrale Gilt UK",
+      "description": "UK Treasury Gilt 4.375% 7-mar-2028 - 4,375%/2 su 155.000 GBP nominali",
+      "frequency": "semiannual",
+      "payment_dates": ["03-07", "09-07"],
+      "amount": 3390.625,
+      "currency": "GBP",
+      "first_payment": "2026-09-07",
+      "last_payment": "2028-03-07",
+      "sector": "Gov. Internazionali",
+      "enabled": true
+    }
+  ]
+}

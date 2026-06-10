@@ -175,3 +175,4 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-06-09,BUY,IE00BM67HK77,Healthcare,Equity,2585.0,49.41,EUR,1.0,0.0,Acquisto del 09/06/2026 (in Excel datato 09/05 per refuso),Healthcare,Stock
 2026-06-09,BUY,IE00BYXG2H39,Biotech US,Equity,6314.0,7.34,EUR,1.0,0.0,Acquisto del 09/06/2026 (in Excel datato 09/05 per refuso),Healthcare,Stock
 2026-06-09,BUY,IE000M7V94E1,Nucl,Alternative,1600.0,48.65,EUR,1.0,0.0,Acquisto del 09/06/2026 (in Excel datato 09/05 per refuso),Energy,Commodity
+2026-06-10,BUY,IE00BM67HN09,Consumer Staples,Equity,4000.0,47.265,EUR,1.0,0.0,,Consumer Staples,Stock

@@ -1555,6 +1555,17 @@ with st.sidebar:
                 # Pause GitHub sync to avoid triggering redeployments mid-update
                 _fm._sync_paused = True
 
+                # Step 0: registra le cedole obbligazionarie scadute (idempotente)
+                try:
+                    from coupon_manager import process_due_coupons
+                    _cedole = process_due_coupons()
+                    if _cedole:
+                        _status.info("Step 0/4 — Registrate {} cedole: {}".format(
+                            len(_cedole),
+                            ", ".join(f"{c['name']} {c['amount_eur']:,.2f}€ ({c['date']})" for c in _cedole)))
+                except Exception:
+                    pass  # le cedole non devono mai bloccare l'aggiornamento prezzi
+
                 # Step 1: Recompute positions from transactions
                 _status.info("Step 1/4 — Ricalcolo posizioni da transazioni...")
                 fresh_pos = compute_positions_from_transactions()
@@ -3775,6 +3786,13 @@ elif page == "📝 Operazioni & Import":
 
         if st.button("🔄 Aggiorna Prezzi Live", use_container_width=True):
             with st.spinner("Recuperando prezzi da Yahoo Finance..."):
+                try:
+                    from coupon_manager import process_due_coupons
+                    _cedole = process_due_coupons()
+                    for _c in _cedole:
+                        st.success(f"💶 Cedola registrata: {_c['name']} {_c['amount_eur']:,.2f}€ ({_c['date']})")
+                except Exception:
+                    pass  # le cedole non devono mai bloccare l'aggiornamento prezzi
                 fresh_positions = compute_positions_from_transactions()
                 if not fresh_positions.empty:
                     # Preserve old prices for unmapped bonds
