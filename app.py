@@ -2210,19 +2210,38 @@ elif page == "📈 Performance":
                     "topColor": "rgba(0,0,0,0)", "bottomColor": "rgba(239,68,68,0.25)"}],
                   height=230, key="perf_dd")
 
-    # Monthly heatmap
-    st.markdown('<div class="section-header">Performance Mensile</div>', unsafe_allow_html=True)
-    monthly = monthly_returns_table(nav_series)
-    if not monthly.empty:
+    # Monthly heatmaps — Fondo, Benchmark e Extra-performance (Fondo − Benchmark)
+    def _monthly_heatmap(table: pd.DataFrame, key: str):
+        if table.empty:
+            return
         fig_heat = go.Figure(data=go.Heatmap(
-            z=monthly.values * 100, x=monthly.columns.tolist(),
-            y=[str(y) for y in monthly.index.tolist()],
+            z=table.values * 100, x=table.columns.tolist(),
+            y=[str(y) for y in table.index.tolist()],
             colorscale=[[0, "#ef4444"], [0.5, "#1a1a2e"], [1, "#22c55e"]], zmid=0,
-            text=np.where(np.isnan(monthly.values), "", np.vectorize(lambda x: f"{x*100:.1f}%")(monthly.values)),
+            text=np.where(np.isnan(table.values), "", np.vectorize(lambda x: f"{x*100:.1f}%")(table.values)),
             texttemplate="%{text}", textfont={"size": 11}))
-        fig_heat.update_layout(height=max(180, len(monthly) * 50 + 50), margin=dict(t=10, b=10, l=60, r=20),
+        fig_heat.update_layout(height=max(180, len(table) * 50 + 50), margin=dict(t=10, b=10, l=60, r=20),
                                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.plotly_chart(fig_heat, use_container_width=True, key=key)
+
+    st.markdown('<div class="section-header">Performance Mensile — Fondo</div>', unsafe_allow_html=True)
+    monthly = monthly_returns_table(nav_series)
+    _monthly_heatmap(monthly, key="perf_monthly_fund")
+
+    if bench_series is not None and len(bench_series) > 1:
+        monthly_bench = monthly_returns_table(bench_series)
+        st.markdown('<div class="section-header">Performance Mensile — Benchmark (VNGA60)</div>', unsafe_allow_html=True)
+        _monthly_heatmap(monthly_bench, key="perf_monthly_bench")
+
+        # Extra-performance mensile = Fondo − Benchmark (differenza aritmetica dei rendimenti)
+        if not monthly.empty and not monthly_bench.empty:
+            monthly_active = monthly.subtract(monthly_bench).reindex(
+                index=monthly.index, columns=monthly.columns)
+            st.markdown('<div class="section-header">Extra-performance Mensile (Fondo − Benchmark)</div>', unsafe_allow_html=True)
+            st.caption("Verde = il fondo ha battuto il benchmark nel mese · Rosso = ha fatto peggio")
+            _monthly_heatmap(monthly_active, key="perf_monthly_active")
+    else:
+        st.caption("Benchmark non disponibile per il confronto mensile.")
 
     # ── P&L per Posizione (Top and Bottom) ────────────────────────────────
     if has_data:
