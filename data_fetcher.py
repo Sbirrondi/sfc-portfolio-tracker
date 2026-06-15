@@ -207,6 +207,60 @@ def get_current_prices(tickers: list) -> dict:
     return prices
 
 
+def get_current_prices_bulk(tickers: list) -> dict:
+    """
+    Ultimo prezzo di chiusura per molti ticker con UNA chiamata bulk a
+    yf.download (in batch da 10), invece di una chiamata .info per ticker.
+
+    Perché: l'endpoint quoteSummary usato da .info viene bloccato/throttato
+    dagli IP datacenter (es. Streamlit Cloud) e torna vuoto — questo congelava
+    silenziosamente i prezzi. L'endpoint chart/download usato qui è molto più
+    tollerante (è lo stesso che tiene aggiornato lo storico NAV).
+
+    Restituisce {ticker: prezzo} solo per i ticker con un prezzo valido.
+    """
+    tickers = [t for t in dict.fromkeys(tickers) if t]  # dedup, drop empty
+    if not tickers:
+        return {}
+
+    end = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    start = (datetime.now() - timedelta(days=10)).strftime("%Y-%m-%d")
+    out = {}
+    batch_size = 10
+
+    for i in range(0, len(tickers), batch_size):
+        batch = tickers[i:i + batch_size]
+        try:
+            data = yf.download(
+                batch, start=start, end=end,
+                auto_adjust=True, progress=False, threads=True
+            )
+            if data is None or data.empty:
+                continue
+
+            if isinstance(data.columns, pd.MultiIndex):
+                lvl0 = data.columns.get_level_values(0)
+                col = "Close" if "Close" in lvl0 else ("Price" if "Price" in lvl0 else None)
+                if not col:
+                    continue
+                close = data[col]
+                for tk in batch:
+                    if tk in close.columns:
+                        s = close[tk].dropna()
+                        if not s.empty and float(s.iloc[-1]) > 0:
+                            out[tk] = float(s.iloc[-1])
+            else:
+                # Single ticker: simple columns
+                if "Close" in data.columns:
+                    s = data["Close"].dropna()
+                    if not s.empty and float(s.iloc[-1]) > 0:
+                        out[batch[0]] = float(s.iloc[-1])
+        except Exception as e:
+            logger.warning(f"bulk price batch failed for {batch}: {e}")
+
+    return out
+
+
 # ── Benchmark Data ───────────────────────────────────────────────────────────
 
 BENCHMARKS = {
