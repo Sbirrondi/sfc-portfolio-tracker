@@ -313,7 +313,7 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
 
     from data_fetcher import (
         get_ticker_info, get_fx_rate, get_bond_price_from_borsa_italiana,
-        clear_cache,
+        clear_cache, get_current_prices_bulk,
     )
 
     # Svuota la cache in memoria di data_fetcher prima di ogni aggiornamento:
@@ -351,37 +351,49 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
         except Exception:
             fx_rates[ccy] = 1.0
 
+    # Tickers la cui valuta di trading reale differisce dal valore salvato sulla
+    # posizione (o da quello riportato da yfinance). Forzata qui così la
+    # conversione FX è corretta senza dover chiamare .info per ticker (che viene
+    # throttato sugli IP cloud).
+    _TICKER_CURRENCY_OVERRIDE = {
+        "RTO1.F": "EUR",   # Frankfurt, già EUR
+        "CTEC.AS": "EUR",  # Euronext Amsterdam, EUR
+        "BTEC.L": "USD",   # quotato a Londra ma tratta in USD
+    }
+
+    # Scarica TUTTI i prezzi live in un'unica chiamata bulk (endpoint chart)
+    # invece di una .info per ticker: .info (quoteSummary) viene bloccato dagli
+    # IP datacenter (Streamlit Cloud) e torna vuoto, congelando i prezzi; il
+    # download bulk resta affidabile (stesso endpoint che alimenta lo storico NAV).
+    mapped_tickers = sorted({isin_map.get(i) for i in df["isin"] if isin_map.get(i)})
+    bulk_prices = get_current_prices_bulk(mapped_tickers)
+
     for idx, row in df.iterrows():
         isin = row.get("isin", "")
         ticker = isin_map.get(isin)
         currency = row.get("currency", "EUR")
         qty = float(row["quantity"])
 
-        # Tickers whose actual trading currency differs from yfinance report
-        _TICKER_CURRENCY_OVERRIDE = {
-            "RTO1.F": "EUR",   # Frankfurt, already EUR
-            "CTEC.AS": "EUR",  # Euronext Amsterdam, EUR
-        }
-
         live_price = None
-        yf_currency = currency  # Will be updated from yfinance if available
+        # Valuta per la conversione FX: override esplicito, altrimenti quella
+        # salvata sulla posizione (corretta per il book attuale, verificata).
+        yf_currency = _TICKER_CURRENCY_OVERRIDE.get(ticker, currency)
         if ticker:
-            try:
-                info = get_ticker_info(ticker)
-                lp = info.get("current_price", 0)
-                if lp and lp > 0:
-                    live_price = lp
-                    df.at[idx, "current_price"] = round(live_price, 4)
-                # Use the actual trading currency from yfinance for FX conversion
-                # But respect overrides for tickers with known currency
-                if ticker in _TICKER_CURRENCY_OVERRIDE:
-                    yf_currency = _TICKER_CURRENCY_OVERRIDE[ticker]
-                else:
-                    reported_ccy = info.get("currency", "")
-                    if reported_ccy and reported_ccy != "":
-                        yf_currency = reported_ccy
-            except Exception:
-                pass
+            bp = bulk_prices.get(ticker)
+            if bp and bp > 0:
+                live_price = bp
+                df.at[idx, "current_price"] = round(bp, 4)
+            else:
+                # Il bulk non ha restituito questo ticker: ripiego su una singola
+                # .info (raro; può fallire su IP cloud throttato, gestito sotto).
+                try:
+                    info = get_ticker_info(ticker)
+                    lp = info.get("current_price", 0)
+                    if lp and lp > 0:
+                        live_price = lp
+                        df.at[idx, "current_price"] = round(lp, 4)
+                except Exception:
+                    pass
 
         # Get current FX rate based on actual trading currency
         if yf_currency != "EUR":
