@@ -359,6 +359,7 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
         "RTO1.F": "EUR",   # Frankfurt, già EUR
         "CTEC.AS": "EUR",  # Euronext Amsterdam, EUR
         "BTEC.L": "USD",   # quotato a Londra ma tratta in USD
+        "BTCW.L": "USD",   # WisdomTree Bitcoin, listing londinese in USD
     }
 
     # Scarica TUTTI i prezzi live in un'unica chiamata bulk (endpoint chart)
