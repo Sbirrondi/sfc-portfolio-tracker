@@ -311,7 +311,16 @@ def update_position_prices(positions: pd.DataFrame, isin_map: dict) -> pd.DataFr
     if positions.empty:
         return positions
 
-    from data_fetcher import get_ticker_info, get_fx_rate, get_bond_price_from_borsa_italiana
+    from data_fetcher import (
+        get_ticker_info, get_fx_rate, get_bond_price_from_borsa_italiana,
+        clear_cache,
+    )
+
+    # Svuota la cache in memoria di data_fetcher prima di ogni aggiornamento:
+    # _info_cache/_price_cache/_bond_price_cache persistono per tutta la vita del
+    # processo Streamlit, quindi senza questo i click ripetuti nella stessa
+    # sessione restituirebbero i prezzi già scaricati invece di riscaricarli.
+    clear_cache()
 
     df = positions.copy()
 
