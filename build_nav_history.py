@@ -25,8 +25,11 @@ DATA_DIR = Path(__file__).parent / "data"
 
 # Module-level constants for ticker/currency overrides
 CRYPTO_PROXY = {
-    "GB00BJYDH287.SG": {"proxy": "BTC-EUR", "scale": 0.00023982},
-    "GB00BLD4ZM24.SG": {"proxy": "ETH-EUR", "scale": 0.03031801},
+    # Chiavi = ticker in isin_map. Per lo storico questi ETN non hanno dati
+    # scaricabili affidabili, quindi si stima il prezzo dallo spot crypto in EUR
+    # × scale (lo scale converte lo spot nel prezzo per unità dell'ETN).
+    "BTCW.L": {"proxy": "BTC-EUR", "scale": 0.00023982},   # WisdomTree Bitcoin
+    "ETHE.MI": {"proxy": "ETH-EUR", "scale": 0.03031801},  # CoinShares Ethereum
 }
 # Tickers whose yfinance currency differs from transaction currency
 TICKER_CURRENCY = {
