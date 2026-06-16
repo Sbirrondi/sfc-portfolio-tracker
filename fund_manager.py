@@ -581,6 +581,10 @@ def snapshot_nav(nav: float, benchmark_value: float = None):
         history = pd.concat([history, new_row], ignore_index=True)
 
     history = history.sort_values("date").reset_index(drop=True)
+    # Self-heal: un fetch benchmark fallito non deve lasciare NaN persistenti
+    # (nessun'altra funzione li ripristina), quindi riporta avanti l'ultimo valido.
+    if "benchmark" in history.columns:
+        history["benchmark"] = pd.to_numeric(history["benchmark"], errors="coerce").ffill()
     history.to_csv(NAV_HISTORY_FILE, index=False)
     _sync_to_github("fund_nav_history.csv", "Update NAV history")
     return history

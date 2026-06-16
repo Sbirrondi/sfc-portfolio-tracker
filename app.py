@@ -1605,18 +1605,17 @@ with st.sidebar:
                     # Fetch current benchmark value for fund_info update
                     bench_val = None
                     try:
-                        from data_fetcher import get_historical_prices, get_ticker_info
+                        from data_fetcher import get_current_prices_bulk, get_historical_prices
                         bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
-                        # Try historical prices first (most reliable for recent close)
-                        bench_data = get_historical_prices([bench_ticker], period="5d")
-                        if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
-                            bench_val = float(bench_data[bench_ticker].iloc[-1])
-                        # Fallback: use get_ticker_info for current price
-                        if bench_val is None or bench_val <= 0:
-                            bench_info = get_ticker_info(bench_ticker)
-                            bp = bench_info.get("current_price", 0)
-                            if bp and bp > 0:
-                                bench_val = float(bp)
+                        # Endpoint bulk/chart: affidabile sul cloud (a differenza di .info,
+                        # che viene throttato e faceva finire il benchmark a NaN).
+                        bench_bulk = get_current_prices_bulk([bench_ticker])
+                        if bench_bulk.get(bench_ticker, 0) and bench_bulk[bench_ticker] > 0:
+                            bench_val = float(bench_bulk[bench_ticker])
+                        else:
+                            bench_data = get_historical_prices([bench_ticker], period="5d")
+                            if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
+                                bench_val = float(bench_data[bench_ticker].iloc[-1])
                     except Exception:
                         pass
                     update_fund_info(nav, len(updated), benchmark_value=bench_val)
@@ -3838,16 +3837,17 @@ elif page == "📝 Operazioni & Import":
                     # Fetch benchmark value
                     bench_val = None
                     try:
-                        from data_fetcher import get_historical_prices, get_ticker_info
+                        from data_fetcher import get_current_prices_bulk, get_historical_prices
                         bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
-                        bench_data = get_historical_prices([bench_ticker], period="5d")
-                        if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
-                            bench_val = float(bench_data[bench_ticker].iloc[-1])
-                        if bench_val is None or bench_val <= 0:
-                            bench_info_d = get_ticker_info(bench_ticker)
-                            bp = bench_info_d.get("current_price", 0)
-                            if bp and bp > 0:
-                                bench_val = float(bp)
+                        # Endpoint bulk/chart: affidabile sul cloud (a differenza di .info,
+                        # che viene throttato e faceva finire il benchmark a NaN).
+                        bench_bulk = get_current_prices_bulk([bench_ticker])
+                        if bench_bulk.get(bench_ticker, 0) and bench_bulk[bench_ticker] > 0:
+                            bench_val = float(bench_bulk[bench_ticker])
+                        else:
+                            bench_data = get_historical_prices([bench_ticker], period="5d")
+                            if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
+                                bench_val = float(bench_data[bench_ticker].iloc[-1])
                     except Exception:
                         pass
 
