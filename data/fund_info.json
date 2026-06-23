@@ -5,9 +5,9 @@
   "currency": "EUR",
   "benchmark": "VNGA60",
   "benchmark_ticker": "V60A.DE",
-  "current_nav": 12832729.05,
-  "performance_since_inception": 0.2832729050000001,
-  "benchmark_performance": 0.386299,
+  "current_nav": 12852666.48,
+  "performance_since_inception": 0.28526664800000007,
+  "benchmark_performance": 0.386488,
   "positions_count": 50,
-  "last_updated": "2026-06-23 13:51:58"
+  "last_updated": "2026-06-23 19:55:44"
 }
