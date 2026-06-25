@@ -413,6 +413,70 @@ def format_qty_column(df, col="Quantità"):
     return result
 
 
+# ── Shared visual language: comparison cards + highlight cards ────────────────
+CMP_CARD_CSS = """<style>
+.rkc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
+.rkc-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:0.7rem 0.8rem;}
+.rkc-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;}
+.rkc-row{display:flex;align-items:stretch;justify-content:space-between;gap:0.35rem;}
+.rkc-side{flex:1;text-align:center;border-radius:8px;padding:0.3rem 0.15rem;border:1px solid transparent;}
+.rkc-lab{font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;}
+.rkc-val{font-size:1.02rem;font-weight:800;color:#cbd5e1;line-height:1.4;}
+.rkc-vs{display:flex;align-items:center;font-size:0.58rem;color:#475569;}
+.rkc-win{background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);}
+.rkc-win .rkc-val{color:#22c55e;}
+.rkc-win .rkc-lab{color:#22c55e;font-weight:700;}
+.rkc-desc{font-size:0.65rem;color:#64748b;margin-top:0.5rem;line-height:1.35;}
+.hl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
+.hl-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-left-width:3px;border-left-style:solid;border-radius:12px;padding:0.7rem 0.85rem;}
+.hl-lab{font-size:0.62rem;text-transform:uppercase;letter-spacing:0.5px;color:#94a3b8;font-weight:700;}
+.hl-val{font-size:1.28rem;font-weight:800;color:#e2e8f0;margin:0.2rem 0 0.12rem;line-height:1.25;}
+.hl-sub{font-size:0.65rem;color:#64748b;line-height:1.35;}
+</style>"""
+
+
+def cmp_winner(direction, fv, bv):
+    """'fund' / 'bench' / 'tie' / None. direction='up' = higher is better."""
+    try:
+        fv, bv = float(fv), float(bv)
+    except (TypeError, ValueError):
+        return None
+    if pd.isna(fv) or pd.isna(bv):
+        return None
+    if abs(fv - bv) < 1e-9:
+        return "tie"
+    if direction == "up":
+        return "fund" if fv > bv else "bench"
+    return "fund" if fv < bv else "bench"
+
+
+def cmp_card_html(title, fund_str, bench_str, winner=None, desc="",
+                  fund_label="Fondo", bench_label="Bench"):
+    """Two-sided comparison card with the winning side highlighted green."""
+    fcls = " rkc-win" if winner == "fund" else ""
+    bcls = " rkc-win" if winner == "bench" else ""
+    fa = " ▲" if winner == "fund" else ""
+    ba = " ▲" if winner == "bench" else ""
+    return (f'<div class="rkc-card"><div class="rkc-title">{title}</div><div class="rkc-row">'
+            f'<div class="rkc-side{fcls}"><div class="rkc-lab">{fund_label}</div><div class="rkc-val">{fund_str}{fa}</div></div>'
+            f'<div class="rkc-vs">vs</div>'
+            f'<div class="rkc-side{bcls}"><div class="rkc-lab">{bench_label}</div><div class="rkc-val">{bench_str}{ba}</div></div>'
+            f'</div><div class="rkc-desc">{desc}</div></div>')
+
+
+def highlight_card_html(label, value, sub, accent="#6366f1"):
+    """Single-value 'strength' card with a coloured left accent + explanation."""
+    return (f'<div class="hl-card" style="border-left-color:{accent};">'
+            f'<div class="hl-lab">{label}</div><div class="hl-val">{value}</div>'
+            f'<div class="hl-sub">{sub}</div></div>')
+
+
+def render_cards(html_list, grid="rkc-grid"):
+    """Inject the shared CSS and render a grid of card HTML strings."""
+    st.markdown(CMP_CARD_CSS + f'<div class="{grid}">' + "".join(html_list) + "</div>",
+                unsafe_allow_html=True)
+
+
 def _series_value_on_or_before(series: pd.Series, target_date):
     if series is None or len(series) == 0:
         return None
@@ -1760,6 +1824,36 @@ if page == "🏠 Dashboard":
         </div>
     </div>""", unsafe_allow_html=True)
 
+    # ── Punti di forza (highlight strip) ──────────────────────────────────
+    _pv = positions.copy()
+    _pv["_cv"] = pd.to_numeric(_pv.get("current_value"), errors="coerce").fillna(0)
+    _pv = _pv[_pv["_cv"] > 0]
+    _strength = []
+    if not _pv.empty and "pnl_pct" in _pv.columns:
+        _pv["_pp"] = pd.to_numeric(_pv["pnl_pct"], errors="coerce").fillna(-99)
+        _bp = _pv.loc[_pv["_pp"].idxmax()]
+        _strength.append(highlight_card_html(
+            "Miglior Posizione", str(_bp.get("name", "—")),
+            f"+{_bp['_pp'] * 100:.1f}% di rendimento: il titolo che sta performando meglio in portafoglio.",
+            accent="#22c55e"))
+    _real = realized_total + dividends_total
+    _strength.append(highlight_card_html(
+        "Utili Già Incassati", fmt_eur_short(_real),
+        "Plusvalenze realizzate + cedole e dividendi: guadagni già monetizzati, non solo sulla carta.",
+        accent="#22c55e"))
+    _ncl = positions["macro_class"].nunique() if "macro_class" in positions.columns else 0
+    _nsec = positions["sector"].nunique() if "sector" in positions.columns else 0
+    _strength.append(highlight_card_html(
+        "Diversificazione", f"{len(positions)} posizioni",
+        f"Distribuite su {_ncl} classi di attivo e {_nsec} settori: rischio ben ripartito.",
+        accent="#38bdf8"))
+    _strength.append(highlight_card_html(
+        "Buffer di Liquidità", f"{cash_pct:.1%}",
+        f"{fmt_eur_short(liquidita)} di cash pronto a cogliere nuove opportunità di mercato.",
+        accent="#f59e0b"))
+    st.markdown('<div class="section-header">Punti di Forza</div>', unsafe_allow_html=True)
+    render_cards(_strength, grid="hl-grid")
+
     # ── NAV vs Benchmark Chart ────────────────────────────────────────
     # Load daily NAV data (already daily from build_nav_history.py)
     nav_df = _interpolate_nav_to_daily(nav_history)
@@ -2359,21 +2453,8 @@ elif page == "📊 Fondo vs Benchmark":
 
     ret_table = bcmp.compute_return_table(daily_nav, bench_aligned, inception, initial_nav, selected)
 
-    # Shared style for the "Fondo vs Benchmark" comparison cards (used by more tabs).
-    cmp_card_css = """<style>
-    .rkc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
-    .rkc-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:0.7rem 0.8rem;}
-    .rkc-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;}
-    .rkc-row{display:flex;align-items:stretch;justify-content:space-between;gap:0.35rem;}
-    .rkc-side{flex:1;text-align:center;border-radius:8px;padding:0.3rem 0.15rem;border:1px solid transparent;}
-    .rkc-lab{font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;}
-    .rkc-val{font-size:1.02rem;font-weight:800;color:#cbd5e1;line-height:1.4;}
-    .rkc-vs{display:flex;align-items:center;font-size:0.58rem;color:#475569;}
-    .rkc-win{background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);}
-    .rkc-win .rkc-val{color:#22c55e;}
-    .rkc-win .rkc-lab{color:#22c55e;font-weight:700;}
-    .rkc-desc{font-size:0.65rem;color:#64748b;margin-top:0.5rem;line-height:1.35;}
-    </style>"""
+    # Shared style for the comparison cards (defined once at module level).
+    cmp_card_css = CMP_CARD_CSS
 
     tab_perf, tab_risk, tab_dd, tab_comp, tab_report = st.tabs(
         ["📈 Andamento", "📉 Rischio", "💧 Drawdown", "🥧 Composizione", "📄 Report"])
