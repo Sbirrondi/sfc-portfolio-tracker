@@ -2696,10 +2696,34 @@ elif page == "📊 Fondo vs Benchmark":
                 yaxis_title="Drawdown %", hovermode="x unified")
             st.plotly_chart(fig_dd, use_container_width=True)
 
-            d1, d2 = st.columns(2)
-            d1.metric(f"Max Drawdown · {bcmp.FUND_LABEL}", f"{fdd.min():.2f}%")
-            if len(ref_s) >= 2:
-                d2.metric(f"Max Drawdown · {labels[ref]}", f"{_dd(ref_s).min():.2f}%")
+            # ── Drawdown comparison cards ────────────────────────────────────
+            ref_dd_ok = len(ref_s) >= 2
+            rdd = _dd(ref_s) if ref_dd_ok else None
+            dd_pairs = [
+                ("Max Drawdown", float(fdd.min()), float(rdd.min()) if ref_dd_ok else None,
+                 "Perdita massima dal picco nel periodo; più vicino a 0 è meglio."),
+                ("Drawdown Attuale", float(fdd.iloc[-1]), float(rdd.iloc[-1]) if ref_dd_ok else None,
+                 "Quanto si è oggi sotto il massimo precedente; più vicino a 0 è meglio."),
+            ]
+            dd_cards = []
+            for title, fv, bv, desc in dd_pairs:
+                win = None
+                if bv is not None:
+                    win = "fund" if fv > bv else ("bench" if bv > fv else "tie")
+                fcls = " rkc-win" if win == "fund" else ""
+                bcls = " rkc-win" if win == "bench" else ""
+                fa = " ▲" if win == "fund" else ""
+                ba = " ▲" if win == "bench" else ""
+                bstr = f"{bv:.2f}%{ba}" if bv is not None else "N/A"
+                dd_cards.append(
+                    f'<div class="rkc-card"><div class="rkc-title">{title}</div><div class="rkc-row">'
+                    f'<div class="rkc-side{fcls}"><div class="rkc-lab">Fondo</div><div class="rkc-val">{fv:.2f}%{fa}</div></div>'
+                    f'<div class="rkc-vs">vs</div>'
+                    f'<div class="rkc-side{bcls}"><div class="rkc-lab">{ref}</div><div class="rkc-val">{bstr}</div></div>'
+                    f'</div><div class="rkc-desc">{desc}</div></div>')
+            st.markdown(cmp_card_css + '<div class="rkc-grid">' + "".join(dd_cards) + '</div>', unsafe_allow_html=True)
+            st.caption("Il **drawdown** misura la perdita dal massimo precedente: una curva più vicina allo zero e "
+                       "risalite più rapide indicano maggiore resilienza nelle fasi negative.")
 
     # ── TAB: Composizione ───────────────────────────────────────────────────
     with tab_comp:
