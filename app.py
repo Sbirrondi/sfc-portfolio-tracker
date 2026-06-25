@@ -2359,6 +2359,22 @@ elif page == "📊 Fondo vs Benchmark":
 
     ret_table = bcmp.compute_return_table(daily_nav, bench_aligned, inception, initial_nav, selected)
 
+    # Shared style for the "Fondo vs Benchmark" comparison cards (used by more tabs).
+    cmp_card_css = """<style>
+    .rkc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
+    .rkc-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:0.7rem 0.8rem;}
+    .rkc-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;}
+    .rkc-row{display:flex;align-items:stretch;justify-content:space-between;gap:0.35rem;}
+    .rkc-side{flex:1;text-align:center;border-radius:8px;padding:0.3rem 0.15rem;border:1px solid transparent;}
+    .rkc-lab{font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;}
+    .rkc-val{font-size:1.02rem;font-weight:800;color:#cbd5e1;line-height:1.4;}
+    .rkc-vs{display:flex;align-items:center;font-size:0.58rem;color:#475569;}
+    .rkc-win{background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);}
+    .rkc-win .rkc-val{color:#22c55e;}
+    .rkc-win .rkc-lab{color:#22c55e;font-weight:700;}
+    .rkc-desc{font-size:0.65rem;color:#64748b;margin-top:0.5rem;line-height:1.35;}
+    </style>"""
+
     tab_perf, tab_risk, tab_dd, tab_comp, tab_report = st.tabs(
         ["📈 Andamento", "📉 Rischio", "💧 Drawdown", "🥧 Composizione", "📄 Report"])
 
@@ -2388,25 +2404,77 @@ elif page == "📊 Fondo vs Benchmark":
                 yaxis_title="Base 100", hovermode="x unified")
             st.plotly_chart(fig, use_container_width=True)
 
-            # Period KPIs vs reference benchmark
-            fund_p = ret_table.loc[bcmp.FUND_LABEL, period]
+            # ── Period comparison cards: Fondo vs reference benchmark ────────
             ref_label = labels[ref]
-            ref_p = ret_table.loc[ref_label, period] if ref_label in ret_table.index else float("nan")
-            active = fund_p - ref_p if pd.notna(fund_p) and pd.notna(ref_p) else float("nan")
-            k1, k2, k3 = st.columns(3)
-            k1.metric(f"Fondo ({period})", f"{fund_p:+.2f}%" if pd.notna(fund_p) else "N/A")
-            k2.metric(f"{ref_label} ({period})", f"{ref_p:+.2f}%" if pd.notna(ref_p) else "N/A")
-            k3.metric("Active Return", f"{active:+.2f}%" if pd.notna(active) else "N/A")
+            fund_row = ret_table.loc[bcmp.FUND_LABEL] if bcmp.FUND_LABEL in ret_table.index else None
+            ref_row = ret_table.loc[ref_label] if ref_label in ret_table.index else None
 
-            st.markdown('<div class="section-header">Rendimenti per Periodo</div>', unsafe_allow_html=True)
-            disp = ret_table.copy()
-            disp.index.name = "Strumento"
-            styled = disp.reset_index()
-            for col in bcmp.PERIODS:
-                styled[col] = styled[col].apply(lambda v: f"{v:+.2f}%" if pd.notna(v) else "N/A")
-            st.dataframe(styled, use_container_width=True, hide_index=True)
-            st.caption("Fondo = total return NAV (include la liquidità). I benchmark sono ETF ad accumulazione "
-                       "(total return, pienamente investiti): la differenza riflette anche il cash drag e l'asset allocation.")
+            p_cards, p_wins, p_valid = [], 0, 0
+            best_p = worst_p = None
+            for p in bcmp.PERIODS:
+                fv = fund_row[p] if fund_row is not None else float("nan")
+                bv = ref_row[p] if ref_row is not None else float("nan")
+                fv_s = f"{fv:+.2f}%" if pd.notna(fv) else "N/A"
+                bv_s = f"{bv:+.2f}%" if pd.notna(bv) else "N/A"
+                win = None
+                if pd.notna(fv) and pd.notna(bv):
+                    p_valid += 1
+                    win = "fund" if fv > bv else ("bench" if bv > fv else "tie")
+                    if win == "fund":
+                        p_wins += 1
+                    act = fv - bv
+                    if best_p is None or act > best_p[1]:
+                        best_p = (p, act)
+                    if worst_p is None or act < worst_p[1]:
+                        worst_p = (p, act)
+                    act_col = "#22c55e" if act >= 0 else "#ef4444"
+                    sub = f'Active: <span style="color:{act_col};font-weight:700;">{act:+.2f} pt</span>'
+                else:
+                    sub = 'Active: <span style="color:#64748b;">n/d</span>'
+                fcls = " rkc-win" if win == "fund" else ""
+                bcls = " rkc-win" if win == "bench" else ""
+                fa = " ▲" if win == "fund" else ""
+                ba = " ▲" if win == "bench" else ""
+                p_cards.append(
+                    f'<div class="rkc-card"><div class="rkc-title">{p}</div><div class="rkc-row">'
+                    f'<div class="rkc-side{fcls}"><div class="rkc-lab">Fondo</div><div class="rkc-val">{fv_s}{fa}</div></div>'
+                    f'<div class="rkc-vs">vs</div>'
+                    f'<div class="rkc-side{bcls}"><div class="rkc-lab">{ref}</div><div class="rkc-val">{bv_s}{ba}</div></div>'
+                    f'</div><div class="rkc-desc">{sub}</div></div>')
+
+            vc = "#22c55e" if p_valid and p_wins > p_valid / 2 else ("#f59e0b" if p_wins == p_valid - p_wins else "#ef4444")
+            st.markdown(
+                f'<div class="section-header">Rendimenti per Periodo · Fondo vs {ref_label} '
+                f'<span style="font-size:0.8rem;color:{vc};font-weight:700;">(Fondo davanti in {p_wins}/{p_valid})</span></div>',
+                unsafe_allow_html=True)
+            st.markdown(cmp_card_css + '<div class="rkc-grid">' + "".join(p_cards) + '</div>', unsafe_allow_html=True)
+
+            if best_p and worst_p:
+                st.markdown(
+                    f'<div style="font-size:0.8rem;color:#94a3b8;margin:0.1rem 0 0.4rem;">'
+                    f'🟢 Miglior orizzonte relativo: <b style="color:#e2e8f0;">{best_p[0]}</b> ({best_p[1]:+.2f} pt) · '
+                    f'🔴 Più indietro: <b style="color:#e2e8f0;">{worst_p[0]}</b> ({worst_p[1]:+.2f} pt)</div>',
+                    unsafe_allow_html=True)
+
+            with st.expander("📋 Tutti i benchmark selezionati (tabella completa)"):
+                disp = ret_table.copy()
+                disp.index.name = "Strumento"
+                styled = disp.reset_index()
+                for col in bcmp.PERIODS:
+                    styled[col] = styled[col].apply(lambda v: f"{v:+.2f}%" if pd.notna(v) else "N/A")
+                st.dataframe(styled, use_container_width=True, hide_index=True)
+
+            with st.expander("ℹ️ Come leggere questa pagina"):
+                st.markdown(
+                    "- **NAV ribasato a 100**: tutte le linee partono da 100 all'inizio del periodo, così "
+                    "il confronto è sulla performance pura, non sui valori assoluti.\n"
+                    "- **Active (pt)**: differenza in punti percentuali tra il Fondo e il benchmark di riferimento "
+                    "nel periodo; verde se il Fondo è avanti.\n"
+                    "- **Fondo = total return del NAV** (include la liquidità). I benchmark sono ETF ad "
+                    "accumulazione, **total return e pienamente investiti**: la differenza riflette anche il "
+                    "cash drag e l'asset allocation più difensiva del fondo.\n"
+                    "- Cambia il **benchmark di riferimento** in alto per confrontare il fondo con un profilo "
+                    "più simile (es. VNGA40 = 40/60).")
 
     # ── TAB: Rischio ────────────────────────────────────────────────────────
     with tab_risk:
@@ -2457,20 +2525,7 @@ elif page == "📊 Fondo vs Benchmark":
                 ("Win Rate", "Win Rate", "up", "pct", "Quota di giorni positivi; più alto è meglio."),
             ]
 
-            css = """<style>
-            .rkc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
-            .rkc-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:0.7rem 0.8rem;}
-            .rkc-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;}
-            .rkc-row{display:flex;align-items:stretch;justify-content:space-between;gap:0.35rem;}
-            .rkc-side{flex:1;text-align:center;border-radius:8px;padding:0.3rem 0.15rem;border:1px solid transparent;}
-            .rkc-lab{font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;}
-            .rkc-val{font-size:1.02rem;font-weight:800;color:#cbd5e1;line-height:1.4;}
-            .rkc-vs{display:flex;align-items:center;font-size:0.58rem;color:#475569;}
-            .rkc-win{background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);}
-            .rkc-win .rkc-val{color:#22c55e;}
-            .rkc-win .rkc-lab{color:#22c55e;font-weight:700;}
-            .rkc-desc{font-size:0.65rem;color:#64748b;margin-top:0.5rem;line-height:1.35;}
-            </style>"""
+            css = cmp_card_css
 
             cards = []
             fund_wins = 0
