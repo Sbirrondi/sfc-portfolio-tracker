@@ -397,6 +397,22 @@ def format_table_numbers(df, euro_cols=None, pct_cols=None, price_cols=None):
     return result
 
 
+def format_qty_column(df, col="Quantità"):
+    """Format a quantity column: integers without decimals, fractional with up to 4."""
+    result = df.copy()
+    if col in result.columns:
+        def _q(x):
+            if pd.isna(x):
+                return "N/A"
+            try:
+                xf = float(x)
+            except (TypeError, ValueError):
+                return x
+            return fmt_num(xf, 0) if abs(xf - round(xf)) < 1e-6 else fmt_num(xf, 4)
+        result[col] = result[col].apply(_q)
+    return result
+
+
 def _series_value_on_or_before(series: pd.Series, target_date):
     if series is None or len(series) == 0:
         return None
@@ -1504,7 +1520,7 @@ with st.sidebar:
     page = st.radio(
         "Navigazione",
         ["🏠 Dashboard", "📋 Posizioni", "📈 Performance",
-         "📊 Analytics Avanzate", "🏆 Contribuzione Performance",
+         "📊 Fondo vs Benchmark", "🏆 Contribuzione Performance",
          "🏛️ Analisi Fixed Income",
          "🎯 Ottimizzazione PTF",
          "🔬 X-Ray Esposizioni", "💹 Multipli & Fondamentali",
@@ -2065,7 +2081,7 @@ elif page == "📋 Posizioni":
         cc.metric("P&L Classe", fmt_eur_full(class_pnl))
         cd.metric("P&L %", f"{class_pnl_pct:+.2f}%")
 
-        base_cols = ["isin", "name", "sector", "currency", "avg_cost", "current_price",
+        base_cols = ["isin", "name", "sector", "currency", "quantity", "avg_cost", "current_price",
                      "invested_capital", "current_value", "pnl", "pnl_pct"]
         # Add FX columns if present
         has_fx_cols = "fx_effect" in df.columns and "price_effect" in df.columns
@@ -2077,9 +2093,9 @@ elif page == "📋 Posizioni":
         display["pnl_pct_d"] = (display["pnl_pct"] * 100).round(2)
         display = display.sort_values("current_value", ascending=False)
 
-        show_cols = ["isin", "name", "sector", "currency", "avg_cost", "current_price",
+        show_cols = ["isin", "name", "sector", "currency", "quantity", "avg_cost", "current_price",
                      "invested_capital", "current_value", "pnl", "pnl_pct_d"]
-        col_names = ["ISIN", "Nome", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
+        col_names = ["ISIN", "Nome", "Settore", "Valuta", "Quantità", "Prezzo Carico", "Prezzo Attuale",
                       "Investito €", "Controvalore €", "P&L €", "P&L %"]
         if has_fx_cols:
             show_cols += ["price_effect", "fx_effect"]
@@ -2094,6 +2110,7 @@ elif page == "📋 Posizioni":
             fx_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
         show = format_table_numbers(show, euro_cols=fx_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
+        show = format_qty_column(show)
         st.dataframe(show, use_container_width=True, hide_index=True,
                      height=min(500, len(show) * 38 + 50))
 
@@ -2116,7 +2133,7 @@ elif page == "📋 Posizioni":
     st.divider()
     st.markdown('<div class="section-header">Tutte le Posizioni (Peso su Portafoglio)</div>', unsafe_allow_html=True)
 
-    all_base_cols = ["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
+    all_base_cols = ["isin", "name", "macro_class", "sector", "currency", "quantity", "avg_cost", "current_price",
                       "invested_capital", "current_value", "pnl", "pnl_pct"]
     has_fx = "fx_effect" in positions.columns and "price_effect" in positions.columns
     if has_fx:
@@ -2126,9 +2143,9 @@ elif page == "📋 Posizioni":
     all_disp["pnl_pct_d"] = (all_disp["pnl_pct"] * 100).round(2)
     all_disp = all_disp.sort_values("current_value", ascending=False)
 
-    all_show_cols = ["isin", "name", "macro_class", "sector", "currency", "avg_cost", "current_price",
+    all_show_cols = ["isin", "name", "macro_class", "sector", "currency", "quantity", "avg_cost", "current_price",
                       "invested_capital", "current_value", "pnl", "pnl_pct_d"]
-    all_col_names = ["ISIN", "Nome", "Classe", "Settore", "Valuta", "Prezzo Carico", "Prezzo Attuale",
+    all_col_names = ["ISIN", "Nome", "Classe", "Settore", "Valuta", "Quantità", "Prezzo Carico", "Prezzo Attuale",
                       "Investito €", "Controvalore €", "P&L €", "P&L %"]
     if has_fx:
         all_show_cols += ["price_effect", "fx_effect"]
@@ -2143,6 +2160,7 @@ elif page == "📋 Posizioni":
         all_euro_cols += ["Eff. Prezzo €", "Eff. Cambio €"]
     show_all = format_table_numbers(show_all, euro_cols=all_euro_cols,
                                      price_cols=["Prezzo Carico", "Prezzo Attuale"])
+    show_all = format_qty_column(show_all)
     st.dataframe(show_all, use_container_width=True, hide_index=True,
                  height=min(800, len(show_all) * 38 + 50))
 
@@ -2283,209 +2301,308 @@ elif page == "📈 Performance":
 # PAGE: ANALYTICS AVANZATE
 # ══════════════════════════════════════════════════════════════════════════════
 
-elif page == "📊 Analytics Avanzate":
-    st.markdown('<div class="section-header">Analytics Avanzate</div>', unsafe_allow_html=True)
-    st.caption("Powered by **QuantStats** · Metriche di rischio, rolling stats, drawdown analysis, Monte Carlo")
+elif page == "📊 Fondo vs Benchmark":
+    import benchmark_compare as bcmp
+    import sector_lookthrough as sl
+    from analytics_plus import advanced_risk_metrics, generate_html_report
+
+    st.markdown('<div class="section-header">Confronto Fondo vs Benchmark</div>', unsafe_allow_html=True)
+    st.caption("NAV ribasato, rendimenti per periodo, rischio e composizione del fondo a confronto con la scala "
+               "Vanguard LifeStrategy (20/40/60/80). **VNGA60** è il benchmark ufficiale; **VNGA40** è il rovescio "
+               "del nostro 60/40. Clicca le voci in legenda per accendere/spegnere le linee.")
 
     if not has_data:
         st.info("Nessun dato disponibile.")
         st.stop()
 
-    from analytics_plus import (
-        build_daily_nav_series, advanced_risk_metrics, rolling_statistics,
-        drawdown_details, generate_html_report, correlation_matrix,
-        fetch_position_prices,
-    )
-
-    # ── Build or load daily NAV ──────────────────────────────────────────
-    @st.cache_data(ttl=3600, show_spinner="Caricando NAV giornaliero...")
-    def get_daily_nav():
-        # Prefer the pre-built NAV history (computed correctly with daily cash)
-        hist = load_nav_history()
-        if not hist.empty and len(hist) >= 5:
-            return hist
-        # Fallback: reconstruct from current positions (approximate)
-        return build_daily_nav_series(
-            positions, isin_map,
-            inception_date=fund_info.get("inception_date", "2023-10-01"),
-            initial_nav=fund_info.get("initial_nav", 10_000_000),
-            cash=liquidita,
-        )
-
-    daily_nav = get_daily_nav()
-
+    # ── Daily NAV from the stored history (computed correctly with daily cash) ──
+    daily_nav = load_nav_history()
     if daily_nav.empty or len(daily_nav) < 5:
-        st.warning("Dati giornalieri insufficienti. Verifica il mapping ISIN → Ticker.")
+        st.warning("Storico NAV insufficiente. Generalo dalla pagina 'Operazioni & Import'.")
         st.stop()
+    daily_nav = daily_nav.copy()
+    daily_nav["date"] = pd.to_datetime(daily_nav["date"])
 
-    # Build return series
-    nav_series = pd.Series(daily_nav["nav"].values, index=pd.DatetimeIndex(daily_nav["date"]))
-    nav_returns = nav_series.pct_change().dropna()
+    inception = fund_info.get("inception_date", "2023-10-01")
+    initial_nav = fund_info.get("initial_nav", 10_000_000)
 
-    bench_returns = None
-    if "benchmark" in daily_nav.columns:
-        bench_vals = daily_nav["benchmark"].dropna()
-        if len(bench_vals) > 5:
-            bench_series_daily = pd.Series(bench_vals.values, index=pd.DatetimeIndex(daily_nav.loc[bench_vals.index, "date"]))
-            bench_returns = bench_series_daily.pct_change().dropna()
+    @st.cache_data(ttl=6 * 3600, show_spinner="Scarico i benchmark da Yahoo...")
+    def _load_benchmark_prices(start_str: str, end_str: str):
+        return bcmp.download_benchmark_prices(start=start_str)
 
-    # ── Tab layout ────────────────────────────────────────────────────────
-    tab_perf, tab_risk, tab_rolling, tab_dd, tab_report = st.tabs(
-        ["📈 Performance Giornaliera", "📉 Metriche di Rischio", "🔄 Rolling Stats",
-         "📊 Drawdown Analysis", "📄 Report HTML"])
+    bench_prices = _load_benchmark_prices(str(daily_nav["date"].min().date()),
+                                          str(daily_nav["date"].max().date()))
+    if bench_prices is None or bench_prices.empty:
+        st.error("Impossibile scaricare i benchmark da Yahoo in questo momento. Riprova più tardi.")
+        st.stop()
+    bench_aligned = bcmp.align_to_dates(bench_prices, daily_nav["date"])
 
+    # ── Controls ────────────────────────────────────────────────────────────
+    labels = {k: bcmp.BENCHMARKS[k]["label"] for k in bcmp.benchmark_keys()}
+    ctrl1, ctrl2, ctrl3 = st.columns([2.2, 1, 1])
+    with ctrl1:
+        selected = st.multiselect(
+            "Benchmark sul grafico",
+            options=bcmp.benchmark_keys(),
+            default=["VNGA60", "VNGA40"],
+            format_func=lambda k: labels[k],
+        )
+    if not selected:
+        selected = [bcmp.PRIMARY_BENCHMARK]
+    with ctrl2:
+        period = st.selectbox("Periodo", bcmp.PERIODS, index=bcmp.PERIODS.index("Dall'Inizio"))
+    with ctrl3:
+        ref_default = bcmp.PRIMARY_BENCHMARK if bcmp.PRIMARY_BENCHMARK in selected else selected[0]
+        ref = st.selectbox("Benchmark di riferimento", selected,
+                           index=selected.index(ref_default), format_func=lambda k: labels[k],
+                           help="Usato per i confronti 1-a-1 (rischio, drawdown, composizione).")
+
+    ret_table = bcmp.compute_return_table(daily_nav, bench_aligned, inception, initial_nav, selected)
+
+    tab_perf, tab_risk, tab_dd, tab_comp, tab_report = st.tabs(
+        ["📈 Andamento", "📉 Rischio", "💧 Drawdown", "🥧 Composizione", "📄 Report"])
+
+    # ── TAB: Andamento ──────────────────────────────────────────────────────
     with tab_perf:
-        st.markdown('<div class="section-header">NAV Giornaliero vs Benchmark (VNGA60)</div>', unsafe_allow_html=True)
-
-        # Period selector
-        period = st.selectbox("Periodo", ["YTD", "1M", "3M", "6M", "1Y", "Dall'Inizio"], index=0)
-        today = pd.Timestamp.today()
-        if period == "YTD":
-            start_date = pd.Timestamp(today.year, 1, 1)
-        elif period == "1M":
-            start_date = today - pd.DateOffset(months=1)
-        elif period == "3M":
-            start_date = today - pd.DateOffset(months=3)
-        elif period == "6M":
-            start_date = today - pd.DateOffset(months=6)
-        elif period == "1Y":
-            start_date = today - pd.DateOffset(years=1)
-        else:
-            start_date = pd.Timestamp(fund_info.get("inception_date", "2023-10-01"))
-
-        mask = daily_nav["date"] >= start_date
-        filtered = daily_nav[mask].copy()
-
-        if len(filtered) < 2:
+        reb = bcmp.build_rebased_frame(daily_nav, bench_aligned, period, inception, initial_nav, selected)
+        if reb.empty or len(reb) < 2:
             st.warning("Dati insufficienti per il periodo selezionato.")
         else:
-            # Rebase to 100
-            _an_base = fund_info.get("initial_nav", 10_000_000) if period == "Dall'Inizio" else filtered["nav"].iloc[0]
-            filtered["nav_base100"] = filtered["nav"] / _an_base * 100
-            if "benchmark" in filtered.columns:
-                bench_f = filtered["benchmark"].dropna()
-                if not bench_f.empty:
-                    first_bench = bench_f.iloc[0]
-                    filtered["bench_base100"] = filtered["benchmark"] / first_bench * 100
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=reb.index, y=reb[bcmp.FUND_LABEL], name=bcmp.FUND_LABEL, mode="lines",
+                line=dict(color=bcmp.FUND_COLOR, width=3),
+                hovertemplate="%{x|%d/%m/%Y}<br>" + bcmp.FUND_LABEL + ": %{y:.2f}<extra></extra>"))
+            for key in selected:
+                if key in reb.columns:
+                    cfg = bcmp.BENCHMARKS[key]
+                    fig.add_trace(go.Scatter(
+                        x=reb.index, y=reb[key], name=cfg["label"], mode="lines",
+                        line=dict(color=cfg["color"], width=2),
+                        hovertemplate="%{x|%d/%m/%Y}<br>" + cfg["label"] + ": %{y:.2f}<extra></extra>"))
+            fig.add_hline(y=100, line_dash="dot", line_color="rgba(148,163,184,0.35)")
+            fig.update_layout(
+                height=440, margin=dict(t=30, b=20, l=10, r=10),
+                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                yaxis_title="Base 100", hovermode="x unified")
+            st.plotly_chart(fig, use_container_width=True)
 
-            _an_series = [{"dates": filtered["date"], "values": filtered["nav_base100"],
-                          "color": "#6366f1", "type": "Area", "lineWidth": 2}]
-            if "bench_base100" in filtered.columns:
-                _an_series.append({"dates": filtered["date"], "values": filtered["bench_base100"],
-                                   "color": "#22c55e", "type": "Line", "lineWidth": 2})
-            tv_line_chart(_an_series, height=420, key=f"analytics_nav_{period}")
+            # Period KPIs vs reference benchmark
+            fund_p = ret_table.loc[bcmp.FUND_LABEL, period]
+            ref_label = labels[ref]
+            ref_p = ret_table.loc[ref_label, period] if ref_label in ret_table.index else float("nan")
+            active = fund_p - ref_p if pd.notna(fund_p) and pd.notna(ref_p) else float("nan")
+            k1, k2, k3 = st.columns(3)
+            k1.metric(f"Fondo ({period})", f"{fund_p:+.2f}%" if pd.notna(fund_p) else "N/A")
+            k2.metric(f"{ref_label} ({period})", f"{ref_p:+.2f}%" if pd.notna(ref_p) else "N/A")
+            k3.metric("Active Return", f"{active:+.2f}%" if pd.notna(active) else "N/A")
 
-            # Period performance
-            _perf_base = fund_info.get("initial_nav", 10_000_000) if period == "Dall'Inizio" else filtered["nav"].iloc[0]
-            fund_perf = (filtered["nav"].iloc[-1] / _perf_base - 1)
-            cols_perf = st.columns(3)
-            cols_perf[0].metric(f"SFC Fund ({period})", f"{fund_perf:+.2%}")
-            if "benchmark" in filtered.columns and not filtered["benchmark"].dropna().empty:
-                b_clean = filtered["benchmark"].dropna()
-                bench_perf_val = (b_clean.iloc[-1] / b_clean.iloc[0] - 1)
-                cols_perf[1].metric(f"Benchmark ({period})", f"{bench_perf_val:+.2%}")
-                cols_perf[2].metric("Scostamento", f"{fund_perf - bench_perf_val:+.2%}")
+            st.markdown('<div class="section-header">Rendimenti per Periodo</div>', unsafe_allow_html=True)
+            disp = ret_table.copy()
+            disp.index.name = "Strumento"
+            styled = disp.reset_index()
+            for col in bcmp.PERIODS:
+                styled[col] = styled[col].apply(lambda v: f"{v:+.2f}%" if pd.notna(v) else "N/A")
+            st.dataframe(styled, use_container_width=True, hide_index=True)
+            st.caption("Fondo = total return NAV (include la liquidità). I benchmark sono ETF ad accumulazione "
+                       "(total return, pienamente investiti): la differenza riflette anche il cash drag e l'asset allocation.")
 
+    # ── TAB: Rischio ────────────────────────────────────────────────────────
     with tab_risk:
-        st.markdown('<div class="section-header">Metriche di Rischio Avanzate</div>', unsafe_allow_html=True)
+        start = bcmp.period_start_date(daily_nav["date"], period, inception)
+        nav_s = pd.Series(pd.to_numeric(daily_nav["nav"], errors="coerce").values,
+                          index=pd.DatetimeIndex(daily_nav["date"])).dropna()
+        fund_ret = nav_s.pct_change().dropna()
+        fund_ret = fund_ret[fund_ret.index >= start]
+        ref_ret = bcmp.benchmark_returns_series(bench_aligned, ref)
+        ref_ret = ref_ret[ref_ret.index >= start]
 
-        metrics = advanced_risk_metrics(nav_returns, bench_returns)
-        if not metrics:
-            st.warning("Dati insufficienti.")
+        if len(fund_ret) < 5 or len(ref_ret) < 5:
+            st.warning("Servono almeno 5 giorni nel periodo per le metriche di rischio.")
         else:
-            # Group metrics
-            perf_keys = ["CAGR", "Sharpe", "Sortino", "Calmar", "Omega"]
-            risk_keys = ["Volatilità Ann.", "Max Drawdown", "VaR 95%", "CVaR 95%", "Recovery Factor", "Ulcer Index"]
-            dist_keys = ["Skew", "Kurtosis", "Tail Ratio"]
-            trade_keys = ["Win Rate", "Best Day", "Worst Day", "Profit Factor", "Payoff Ratio", "Kelly Criterion"]
-            bench_keys = ["Information Ratio", "Treynor Ratio", "Alpha", "Beta"]
+            m_fund = advanced_risk_metrics(fund_ret)
+            m_ref = advanced_risk_metrics(ref_ret)
+            m_rel = advanced_risk_metrics(fund_ret, ref_ret)
 
-            def show_metrics_group(title, keys):
-                st.markdown(f'<div class="section-header">{title}</div>', unsafe_allow_html=True)
-                cols = st.columns(min(len(keys), 5))
-                for i, key in enumerate(keys):
-                    val = metrics.get(key)
-                    if val is not None:
-                        if isinstance(val, float):
-                            if "Rate" in key or "CAGR" in key or "Drawdown" in key or "VaR" in key or "CVaR" in key:
-                                display = f"{val:.2%}"
-                            elif abs(val) > 100:
-                                display = f"{val:.0f}"
-                            else:
-                                display = f"{val:.3f}"
-                        else:
-                            display = str(val)
-                        cols[i % len(cols)].metric(key, display)
+            pct_keys = {"CAGR", "Volatilità Ann.", "Max Drawdown", "VaR 95%", "CVaR 95%",
+                        "Win Rate", "Best Day", "Worst Day"}
+            order = ["CAGR", "Volatilità Ann.", "Sharpe", "Sortino", "Calmar",
+                     "Max Drawdown", "VaR 95%", "CVaR 95%", "Win Rate", "Best Day", "Worst Day"]
 
-            show_metrics_group("Performance", perf_keys)
-            show_metrics_group("Rischio", risk_keys)
-            show_metrics_group("Distribuzione", dist_keys)
-            show_metrics_group("Win/Loss", trade_keys)
-            if bench_returns is not None:
-                show_metrics_group("vs Benchmark", bench_keys)
+            def _fmt(key, val):
+                if val is None or (isinstance(val, float) and (pd.isna(val))):
+                    return "N/A"
+                if key in pct_keys:
+                    return f"{val:.2%}"
+                return f"{val:.3f}"
 
-    with tab_rolling:
-        st.markdown('<div class="section-header">Statistiche Rolling</div>', unsafe_allow_html=True)
-        window = st.select_slider("Finestra (giorni)", options=[21, 42, 63, 126, 252], value=63)
+            rows = []
+            for key in order:
+                rows.append({
+                    "Metrica": key,
+                    bcmp.FUND_LABEL: _fmt(key, m_fund.get(key)),
+                    labels[ref]: _fmt(key, m_ref.get(key)),
+                })
+            st.markdown('<div class="section-header">Metriche di Rischio · Fondo vs Benchmark</div>', unsafe_allow_html=True)
+            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
 
-        rolling = rolling_statistics(nav_returns, window=window)
-        if rolling.empty:
-            st.warning(f"Servono almeno {window} giorni di dati.")
-        else:
-            for col_name, color in [("Rolling Sharpe", "#6366f1"), ("Rolling Sortino", "#22c55e"), ("Rolling Volatility", "#f59e0b")]:
-                if col_name in rolling.columns:
-                    st.caption(col_name)
-                    _bv = 0 if "Sharpe" in col_name or "Sortino" in col_name else None
-                    if _bv is not None:
-                        tv_line_chart([{"dates": rolling.index, "values": rolling[col_name],
-                                        "color": color, "type": "Baseline", "baseValue": _bv,
-                                        "topColor": "#22c55e", "bottomColor": "#ef4444"}],
-                                      height=220, key=f"roll_{col_name}")
-                    else:
-                        tv_line_chart([{"dates": rolling.index, "values": rolling[col_name],
-                                        "color": color, "type": "Area", "lineWidth": 2}],
-                                      height=220, key=f"roll_{col_name}")
+            st.markdown('<div class="section-header">Relative (Fondo vs ' + labels[ref] + ')</div>', unsafe_allow_html=True)
+            r1, r2, r3, r4 = st.columns(4)
+            def _rel(v, pct=False):
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    return "N/A"
+                return f"{v:.2%}" if pct else f"{v:.3f}"
+            r1.metric("Alpha (ann.)", _rel(m_rel.get("Alpha"), pct=True))
+            r2.metric("Beta", _rel(m_rel.get("Beta")))
+            r3.metric("Information Ratio", _rel(m_rel.get("Information Ratio")))
+            r4.metric("Treynor Ratio", _rel(m_rel.get("Treynor Ratio")))
 
+    # ── TAB: Drawdown ───────────────────────────────────────────────────────
     with tab_dd:
-        st.markdown('<div class="section-header">Dettaglio Drawdown</div>', unsafe_allow_html=True)
+        start = bcmp.period_start_date(daily_nav["date"], period, inception)
+        nav_s = pd.Series(pd.to_numeric(daily_nav["nav"], errors="coerce").values,
+                          index=pd.DatetimeIndex(daily_nav["date"])).dropna()
+        nav_s = nav_s[nav_s.index >= start]
+        ref_s = bench_aligned[ref].dropna() if ref in bench_aligned.columns else pd.Series(dtype=float)
+        ref_s = ref_s[ref_s.index >= start]
 
-        # Drawdown series chart (TradingView)
-        dd_series = nav_returns.copy()
-        cum = (1 + dd_series).cumprod()
-        running_max = cum.cummax()
-        dd_pct = (cum / running_max - 1) * 100
+        def _dd(series):
+            cum = series / series.iloc[0]
+            return (cum / cum.cummax() - 1) * 100
 
-        tv_line_chart([{"dates": dd_pct.index, "values": dd_pct.values, "color": "#ef4444",
-                        "type": "Area", "lineWidth": 2,
-                        "topColor": "rgba(0,0,0,0)", "bottomColor": "rgba(239,68,68,0.25)"}],
-                      height=280, key="analytics_dd")
-
-        # Drawdown details table
-        dd_detail = drawdown_details(nav_returns)
-        if not dd_detail.empty:
-            st.markdown("**Top 10 Drawdown Periods**")
-            st.dataframe(dd_detail, use_container_width=True, hide_index=True)
+        if len(nav_s) < 2:
+            st.warning("Dati insufficienti per il periodo.")
         else:
-            st.info("Dettagli drawdown non disponibili.")
+            fig_dd = go.Figure()
+            fdd = _dd(nav_s)
+            fig_dd.add_trace(go.Scatter(x=fdd.index, y=fdd.values, name=bcmp.FUND_LABEL,
+                                        mode="lines", line=dict(color=bcmp.FUND_COLOR, width=2),
+                                        fill="tozeroy", fillcolor="rgba(99,102,241,0.15)"))
+            if len(ref_s) >= 2:
+                rdd = _dd(ref_s)
+                fig_dd.add_trace(go.Scatter(x=rdd.index, y=rdd.values, name=labels[ref],
+                                            mode="lines", line=dict(color=bcmp.BENCHMARKS[ref]["color"], width=2)))
+            fig_dd.update_layout(
+                height=380, margin=dict(t=30, b=20, l=10, r=10),
+                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+                yaxis_title="Drawdown %", hovermode="x unified")
+            st.plotly_chart(fig_dd, use_container_width=True)
 
+            d1, d2 = st.columns(2)
+            d1.metric(f"Max Drawdown · {bcmp.FUND_LABEL}", f"{fdd.min():.2f}%")
+            if len(ref_s) >= 2:
+                d2.metric(f"Max Drawdown · {labels[ref]}", f"{_dd(ref_s).min():.2f}%")
+
+    # ── TAB: Composizione ───────────────────────────────────────────────────
+    with tab_comp:
+        st.markdown('<div class="section-header">Composizione Fondo vs Benchmark</div>', unsafe_allow_html=True)
+        grouping = st.radio("Raggruppamento", ["Classe di Attivo", "Area Geografica", "Settore (stima)"],
+                            horizontal=True, label_visibility="collapsed")
+        sector_mode = grouping == "Settore (stima)"
+
+        fund_lt = fund_level1_holdings(positions, nav_total, cash=liquidita)
+
+        if sector_mode:
+            cfg = bcmp.BENCHMARKS[ref]
+            bench_holdings, _src = _load_vnga60_lookthrough()
+            fund_grp = sl.fund_sector_breakdown(positions, nav_total, cash=liquidita)
+            bench_grp = sl.benchmark_sector_breakdown(bench_holdings, cfg["equity"], cfg["bond"])
+            bench_title = f"{labels[ref]} (stima)"
+        elif grouping == "Classe di Attivo":
+            fund_grp = (fund_lt.groupby("macro_class")["weight_pct"].sum()
+                        .sort_values(ascending=False)) if not fund_lt.empty else pd.Series(dtype=float)
+            cfg = bcmp.BENCHMARKS[ref]
+            bench_grp = bcmp.macro_composition(cfg["equity"], cfg["bond"]).set_index("macro_class")["weight_pct"]
+            bench_title = labels[ref]
+        else:  # Area Geografica
+            fund_grp = (fund_lt.groupby("region")["weight_pct"].sum()
+                        .sort_values(ascending=False)) if not fund_lt.empty else pd.Series(dtype=float)
+            bench_holdings, _src = _load_vnga60_lookthrough()
+            if bench_holdings is not None and not bench_holdings.empty:
+                bench_grp = bench_holdings.groupby("region")["weight_pct"].sum().sort_values(ascending=False)
+            else:
+                bench_grp = pd.Series(dtype=float)
+            bench_title = "VNGA60 (look-through)"
+
+        if not fund_grp.empty:
+            fund_grp = fund_grp[fund_grp > 0]
+            fund_grp.index.name = "Gruppo"
+        if not bench_grp.empty:
+            bench_grp = bench_grp[bench_grp > 0]
+            bench_grp.index.name = "Gruppo"
+
+        def _pie_colors(lbls):
+            if sector_mode:
+                return sl.colors_for(lbls)
+            base = ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#38bdf8", "#a855f7",
+                    "#14b8a6", "#eab308", "#fb7185", "#64748b", "#10b981", "#f97316"]
+            return [base[i % len(base)] for i in range(len(lbls))]
+
+        pc1, pc2 = st.columns(2)
+        with pc1:
+            if not fund_grp.empty:
+                lbls = fund_grp.index.tolist()
+                figf = go.Figure(go.Pie(labels=lbls, values=fund_grp.values.tolist(), hole=0.45,
+                                        marker=dict(colors=_pie_colors(lbls)),
+                                        textinfo="label+percent", sort=False))
+                figf.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10),
+                                   template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                                   paper_bgcolor="rgba(0,0,0,0)", title="Fondo SFC", showlegend=False)
+                st.plotly_chart(figf, use_container_width=True)
+            else:
+                st.info("Composizione fondo non disponibile.")
+        with pc2:
+            if not bench_grp.empty:
+                lbls = bench_grp.index.tolist()
+                figb = go.Figure(go.Pie(labels=lbls, values=bench_grp.values.tolist(), hole=0.45,
+                                        marker=dict(colors=_pie_colors(lbls)),
+                                        textinfo="label+percent", sort=False))
+                figb.update_layout(height=380, margin=dict(t=40, b=10, l=10, r=10),
+                                   template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                                   paper_bgcolor="rgba(0,0,0,0)", title=bench_title, showlegend=False)
+                st.plotly_chart(figb, use_container_width=True)
+            else:
+                st.info("Composizione benchmark non disponibile per questo raggruppamento.")
+
+        # Active weight table
+        comp = pd.merge(
+            fund_grp.rename("Fondo %").reset_index(),
+            bench_grp.rename("Benchmark %").reset_index(),
+            on="Gruppo", how="outer").fillna(0.0)
+        comp["Attivo %"] = comp["Fondo %"] - comp["Benchmark %"]
+        comp = comp.sort_values("Attivo %", ascending=False)
+        for c in ["Fondo %", "Benchmark %", "Attivo %"]:
+            comp[c] = comp[c].map(lambda v: f"{v:+.1f}" if c == "Attivo %" else f"{v:.1f}")
+        st.dataframe(comp, use_container_width=True, hide_index=True)
+
+        if sector_mode:
+            st.caption("⚠️ Stima indicativa: i pesi settoriali degli ETF ampi sono approssimati con profili di "
+                       "indice standard (S&P 500, STOXX 600, MSCI EM, ecc.); i singoli titoli usano il settore "
+                       "reale. Obbligazioni, materie prime, crypto e liquidità sono in bucket dedicati.")
+        elif grouping == "Area Geografica":
+            st.caption("Il look-through per area è disponibile solo per VNGA60 (composizione degli ETF sottostanti).")
+
+    # ── TAB: Report ─────────────────────────────────────────────────────────
     with tab_report:
-        st.markdown('<div class="section-header">Report HTML QuantStats</div>', unsafe_allow_html=True)
-        st.markdown("Genera un report completo in formato HTML scaricabile, con tutte le metriche e grafici.")
-
+        st.markdown('<div class="section-header">Report HTML QuantStats · Fondo vs ' + labels[ref] + '</div>', unsafe_allow_html=True)
+        st.caption("Report completo con metriche e grafici, fondo confrontato col benchmark di riferimento.")
         if st.button("📄 Genera Report HTML", use_container_width=True):
+            nav_s = pd.Series(pd.to_numeric(daily_nav["nav"], errors="coerce").values,
+                              index=pd.DatetimeIndex(daily_nav["date"])).dropna()
+            fund_ret = nav_s.pct_change().dropna()
+            ref_ret = bcmp.benchmark_returns_series(bench_aligned, ref)
             with st.spinner("Generando report..."):
                 report_path = generate_html_report(
-                    nav_returns, bench_returns,
-                    title="SFC Cattolica Investment Fund - Performance Report")
+                    fund_ret, ref_ret,
+                    title=f"SFC Cattolica Investment Fund vs {labels[ref]}")
             if "Errore" not in str(report_path):
                 st.success("Report generato!")
                 with open(report_path, "r") as f:
                     html_content = f.read()
-                st.download_button(
-                    "📥 Scarica Report HTML",
-                    html_content,
-                    "sfc_performance_report.html",
-                    "text/html")
+                st.download_button("📥 Scarica Report HTML", html_content,
+                                   "sfc_vs_benchmark_report.html", "text/html")
             else:
                 st.error(report_path)
 
