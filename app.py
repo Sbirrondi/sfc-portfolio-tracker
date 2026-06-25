@@ -2305,6 +2305,34 @@ elif page == "📈 Performance":
                              "color": "#22c55e", "type": "Line", "lineWidth": 2})
     tv_line_chart(_perf_series, height=420, key="perf_cum")
 
+    # ── Sintesi Fondo vs Benchmark (card di confronto con vincitore) ──────
+    if bench_series is not None and len(bench_series) > 1:
+        _bench_lbl = fund_info.get("benchmark", "VNGA60")
+        _br = calculate_returns(bench_series)
+        f_tot = nav_series.iloc[-1] / _initial_nav_perf - 1
+        b_tot = total_return(bench_series)
+        f_cagr = annualized_return(nav_returns, periods_per_year)
+        b_cagr = annualized_return(_br, periods_per_year)
+        f_vol = annualized_volatility(nav_returns, periods_per_year)
+        b_vol = annualized_volatility(_br, periods_per_year)
+        f_dd, b_dd = max_drawdown(nav_series), max_drawdown(bench_series)
+        _sec = [
+            cmp_card_html("Rendimento Totale", f"{f_tot:+.2%}", f"{b_tot:+.2%}",
+                          cmp_winner("up", f_tot, b_tot),
+                          "Performance cumulata dall'inizio; più alta è meglio.", bench_label=_bench_lbl),
+            cmp_card_html("Rendimento Ann.", f"{f_cagr:+.2%}", f"{b_cagr:+.2%}",
+                          cmp_winner("up", f_cagr, b_cagr),
+                          "Crescita media annua composta; più alta è meglio.", bench_label=_bench_lbl),
+            cmp_card_html("Volatilità Ann.", f"{f_vol:.2%}", f"{b_vol:.2%}",
+                          cmp_winner("down", f_vol, b_vol),
+                          "Oscillazione dei rendimenti; più bassa = più stabile.", bench_label=_bench_lbl),
+            cmp_card_html("Max Drawdown", f"{f_dd:.2%}", f"{b_dd:.2%}",
+                          cmp_winner("up", f_dd, b_dd),
+                          "Perdita massima dal picco; più vicino a 0 è meglio.", bench_label=_bench_lbl),
+        ]
+        st.markdown(f'<div class="section-header">Sintesi · Fondo vs {_bench_lbl}</div>', unsafe_allow_html=True)
+        render_cards(_sec)
+
     # Key Metrics
     st.markdown('<div class="section-header">Metriche Chiave</div>', unsafe_allow_html=True)
     report = performance_report(nav_series, bench_series)
