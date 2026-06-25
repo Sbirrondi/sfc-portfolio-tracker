@@ -2424,39 +2424,190 @@ elif page == "📊 Fondo vs Benchmark":
             m_fund = advanced_risk_metrics(fund_ret)
             m_ref = advanced_risk_metrics(ref_ret)
             m_rel = advanced_risk_metrics(fund_ret, ref_ret)
+            ref_short = ref
 
-            pct_keys = {"CAGR", "Volatilità Ann.", "Max Drawdown", "VaR 95%", "CVaR 95%",
-                        "Win Rate", "Best Day", "Worst Day"}
-            order = ["CAGR", "Volatilità Ann.", "Sharpe", "Sortino", "Calmar",
-                     "Max Drawdown", "VaR 95%", "CVaR 95%", "Win Rate", "Best Day", "Worst Day"]
+            def _val(v):
+                return None if v is None or (isinstance(v, float) and pd.isna(v)) else float(v)
 
-            def _fmt(key, val):
-                if val is None or (isinstance(val, float) and (pd.isna(val))):
+            def _fmtv(kind, v):
+                v = _val(v)
+                if v is None:
                     return "N/A"
-                if key in pct_keys:
-                    return f"{val:.2%}"
-                return f"{val:.3f}"
+                return f"{v:.2%}" if kind == "pct" else f"{v:.2f}"
 
-            rows = []
-            for key in order:
-                rows.append({
-                    "Metrica": key,
-                    bcmp.FUND_LABEL: _fmt(key, m_fund.get(key)),
-                    labels[ref]: _fmt(key, m_ref.get(key)),
-                })
-            st.markdown('<div class="section-header">Metriche di Rischio · Fondo vs Benchmark</div>', unsafe_allow_html=True)
-            st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+            def _winner(direction, fv, bv):
+                fv, bv = _val(fv), _val(bv)
+                if fv is None or bv is None:
+                    return None
+                if abs(fv - bv) < 1e-9:
+                    return "tie"
+                if direction == "up":
+                    return "fund" if fv > bv else "bench"
+                return "fund" if fv < bv else "bench"
 
-            st.markdown('<div class="section-header">Relative (Fondo vs ' + labels[ref] + ')</div>', unsafe_allow_html=True)
-            r1, r2, r3, r4 = st.columns(4)
-            def _rel(v, pct=False):
-                if v is None or (isinstance(v, float) and pd.isna(v)):
-                    return "N/A"
-                return f"{v:.2%}" if pct else f"{v:.3f}"
-            r1.metric("Alpha (ann.)", _rel(m_rel.get("Alpha"), pct=True))
-            r2.metric("Beta", _rel(m_rel.get("Beta")))
-            r3.metric("Information Ratio", _rel(m_rel.get("Information Ratio")))
-            r4.metric("Treynor Ratio", _rel(m_rel.get("Treynor Ratio")))
+            # key, label, direction(up=higher better), kind, one-line description
+            card_metrics = [
+                ("CAGR", "Rendimento Ann.", "up", "pct", "Crescita media annua composta; più alto è meglio."),
+                ("Volatilità Ann.", "Volatilità", "down", "pct", "Ampiezza delle oscillazioni; più bassa = più stabile."),
+                ("Sharpe", "Sharpe", "up", "num", "Rendimento per unità di rischio totale; più alto è meglio."),
+                ("Sortino", "Sortino", "up", "num", "Come Sharpe ma conta solo le perdite; più alto è meglio."),
+                ("Max Drawdown", "Max Drawdown", "up", "pct", "Perdita massima dal picco; più vicino a 0 è meglio."),
+                ("Calmar", "Calmar", "up", "num", "Rendimento annuo ÷ drawdown massimo; più alto è meglio."),
+                ("VaR 95%", "VaR 95%", "up", "pct", "Perdita giornaliera attesa nel 5% peggiore; meno negativa è meglio."),
+                ("Win Rate", "Win Rate", "up", "pct", "Quota di giorni positivi; più alto è meglio."),
+            ]
+
+            css = """<style>
+            .rkc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:0.7rem;margin:0.2rem 0 0.6rem;}
+            .rkc-card{background:rgba(13,13,26,0.55);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:0.7rem 0.8rem;}
+            .rkc-title{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;color:#94a3b8;font-weight:700;margin-bottom:0.45rem;}
+            .rkc-row{display:flex;align-items:stretch;justify-content:space-between;gap:0.35rem;}
+            .rkc-side{flex:1;text-align:center;border-radius:8px;padding:0.3rem 0.15rem;border:1px solid transparent;}
+            .rkc-lab{font-size:0.6rem;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;}
+            .rkc-val{font-size:1.02rem;font-weight:800;color:#cbd5e1;line-height:1.4;}
+            .rkc-vs{display:flex;align-items:center;font-size:0.58rem;color:#475569;}
+            .rkc-win{background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.4);}
+            .rkc-win .rkc-val{color:#22c55e;}
+            .rkc-win .rkc-lab{color:#22c55e;font-weight:700;}
+            .rkc-desc{font-size:0.65rem;color:#64748b;margin-top:0.5rem;line-height:1.35;}
+            </style>"""
+
+            cards = []
+            fund_wins = 0
+            for key, lbl, dirn, kind, desc in card_metrics:
+                fv, bv = m_fund.get(key), m_ref.get(key)
+                win = _winner(dirn, fv, bv)
+                if win == "fund":
+                    fund_wins += 1
+                fcls, bcls = (" rkc-win" if win == "fund" else ""), (" rkc-win" if win == "bench" else "")
+                fa, ba = (" ▲" if win == "fund" else ""), (" ▲" if win == "bench" else "")
+                cards.append(
+                    f'<div class="rkc-card"><div class="rkc-title">{lbl}</div><div class="rkc-row">'
+                    f'<div class="rkc-side{fcls}"><div class="rkc-lab">Fondo</div><div class="rkc-val">{_fmtv(kind, fv)}{fa}</div></div>'
+                    f'<div class="rkc-vs">vs</div>'
+                    f'<div class="rkc-side{bcls}"><div class="rkc-lab">{ref_short}</div><div class="rkc-val">{_fmtv(kind, bv)}{ba}</div></div>'
+                    f'</div><div class="rkc-desc">{desc}</div></div>')
+            n = len(card_metrics)
+            verdict_color = "#22c55e" if fund_wins > n / 2 else ("#f59e0b" if fund_wins == n / 2 else "#ef4444")
+            st.markdown(
+                f'<div class="section-header">Metriche di Rischio · Fondo vs {labels[ref]} '
+                f'<span style="font-size:0.8rem;color:{verdict_color};font-weight:700;">'
+                f'(Fondo davanti in {fund_wins}/{n})</span></div>', unsafe_allow_html=True)
+            st.markdown(css + '<div class="rkc-grid">' + "".join(cards) + '</div>', unsafe_allow_html=True)
+
+            # ── Relative metrics (fund vs benchmark only) ────────────────────
+            st.markdown(f'<div class="section-header">Indicatori Relativi (Fondo vs {labels[ref]})</div>', unsafe_allow_html=True)
+            rel_defs = [
+                ("Alpha", "Alpha (ann.)", "pct", True, "Extra-rendimento non spiegato dal benchmark; >0 = valore aggiunto."),
+                ("Information Ratio", "Information Ratio", "num", True, "Active return per unità di rischio attivo; più alto è meglio."),
+                ("Treynor Ratio", "Treynor", "num", True, "Rendimento per unità di rischio di mercato (beta); più alto è meglio."),
+                ("Beta", "Beta", "num", False, "Sensibilità al benchmark: 1 = si muove uguale, <1 = più difensivo."),
+            ]
+            rcols = st.columns(4)
+            for col, (key, lbl, kind, pos_good, desc) in zip(rcols, rel_defs):
+                v = _val(m_rel.get(key))
+                disp = _fmtv(kind, v)
+                delta = None
+                if pos_good and v is not None:
+                    delta = "migliore del benchmark" if v > 0 else "peggiore del benchmark"
+                col.metric(lbl, disp, delta=delta, help=desc,
+                           delta_color="normal" if pos_good else "off")
+
+            # ── Interactive charts ───────────────────────────────────────────
+            ch1, ch2 = st.columns(2)
+            with ch1:
+                st.caption("Indici aggiustati per il rischio")
+                ratio_keys = [("Sharpe", "Sharpe"), ("Sortino", "Sortino"),
+                              ("Calmar", "Calmar"), ("Omega", "Omega")]
+                xs = [lab for _, lab in ratio_keys]
+                fy = [_val(m_fund.get(k)) for k, _ in ratio_keys]
+                by = [_val(m_ref.get(k)) for k, _ in ratio_keys]
+                fig_r = go.Figure()
+                fig_r.add_bar(name="Fondo", x=xs, y=fy, marker_color="#6366f1",
+                              text=[f"{v:.2f}" if v is not None else "" for v in fy], textposition="outside")
+                fig_r.add_bar(name=ref_short, x=xs, y=by, marker_color="#22c55e",
+                              text=[f"{v:.2f}" if v is not None else "" for v in by], textposition="outside")
+                fig_r.update_layout(barmode="group", height=320, margin=dict(t=30, b=10, l=10, r=10),
+                                    template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                                    paper_bgcolor="rgba(0,0,0,0)",
+                                    legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+                st.plotly_chart(fig_r, use_container_width=True)
+            with ch2:
+                st.caption("Rischio vs Rendimento (più in alto a sinistra = meglio)")
+                fig_s = go.Figure()
+                fig_s.add_trace(go.Scatter(
+                    x=[(_val(m_fund.get("Volatilità Ann.")) or 0) * 100], y=[(_val(m_fund.get("CAGR")) or 0) * 100],
+                    mode="markers+text", text=["Fondo"], textposition="top center",
+                    marker=dict(size=20, color="#6366f1", line=dict(width=1, color="#a5b4fc")), name="Fondo"))
+                fig_s.add_trace(go.Scatter(
+                    x=[(_val(m_ref.get("Volatilità Ann.")) or 0) * 100], y=[(_val(m_ref.get("CAGR")) or 0) * 100],
+                    mode="markers+text", text=[ref_short], textposition="top center",
+                    marker=dict(size=20, color="#22c55e", line=dict(width=1, color="#86efac")), name=ref_short))
+                fig_s.update_layout(height=320, margin=dict(t=30, b=10, l=10, r=10),
+                                    template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                                    paper_bgcolor="rgba(0,0,0,0)", showlegend=False,
+                                    xaxis_title="Volatilità Ann. %", yaxis_title="Rendimento Ann. %")
+                st.plotly_chart(fig_s, use_container_width=True)
+
+            st.caption("Distribuzione dei rendimenti giornalieri")
+            fig_h = go.Figure()
+            fig_h.add_trace(go.Histogram(x=(fund_ret * 100).values, name="Fondo",
+                                         marker_color="#6366f1", opacity=0.55, nbinsx=60))
+            fig_h.add_trace(go.Histogram(x=(ref_ret * 100).values, name=ref_short,
+                                         marker_color="#22c55e", opacity=0.55, nbinsx=60))
+            fig_h.update_layout(barmode="overlay", height=300, margin=dict(t=20, b=10, l=10, r=10),
+                                template="plotly_dark", plot_bgcolor="rgba(0,0,0,0)",
+                                paper_bgcolor="rgba(0,0,0,0)",
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
+                                xaxis_title="Rendimento giornaliero %", yaxis_title="Frequenza")
+            st.plotly_chart(fig_h, use_container_width=True)
+
+            # ── Full table with winner highlight ─────────────────────────────
+            with st.expander("📋 Tutte le metriche (tabella completa)"):
+                table_metrics = [
+                    ("CAGR", "Rendimento Ann.", "up", "pct"), ("Volatilità Ann.", "Volatilità", "down", "pct"),
+                    ("Sharpe", "Sharpe", "up", "num"), ("Sortino", "Sortino", "up", "num"),
+                    ("Calmar", "Calmar", "up", "num"), ("Omega", "Omega", "up", "num"),
+                    ("Max Drawdown", "Max Drawdown", "up", "pct"), ("VaR 95%", "VaR 95%", "up", "pct"),
+                    ("CVaR 95%", "CVaR 95%", "up", "pct"), ("Ulcer Index", "Ulcer Index", "down", "num"),
+                    ("Win Rate", "Win Rate", "up", "pct"), ("Best Day", "Miglior Giorno", "up", "pct"),
+                    ("Worst Day", "Peggior Giorno", "up", "pct"),
+                ]
+                recs, winners = [], []
+                for key, lbl, dirn, kind in table_metrics:
+                    fv, bv = m_fund.get(key), m_ref.get(key)
+                    w = _winner(dirn, fv, bv)
+                    winners.append(w)
+                    recs.append({"Metrica": lbl, "Fondo": _fmtv(kind, fv), labels[ref]: _fmtv(kind, bv),
+                                 "Migliore": {"fund": "🟢 Fondo", "bench": f"🟢 {ref_short}", "tie": "="}.get(w, "—")})
+                dfm = pd.DataFrame(recs)
+
+                def _hl(row):
+                    w = winners[row.name]
+                    out = ["", "", "", ""]
+                    style = "background-color: rgba(34,197,94,0.18); color:#22c55e; font-weight:700;"
+                    if w == "fund":
+                        out[1] = style
+                    elif w == "bench":
+                        out[2] = style
+                    return out
+                st.dataframe(dfm.style.apply(_hl, axis=1), use_container_width=True, hide_index=True)
+
+            with st.expander("ℹ️ Cosa significano le metriche"):
+                st.markdown(
+                    "- **Rendimento Ann. (CAGR)** — crescita media annua composta. *Più alto è meglio.*\n"
+                    "- **Volatilità Ann.** — quanto oscillano i rendimenti. *Più bassa = più stabile.*\n"
+                    "- **Sharpe** — rendimento per unità di rischio totale. *Più alto è meglio.*\n"
+                    "- **Sortino** — come Sharpe ma penalizza solo le perdite. *Più alto è meglio.*\n"
+                    "- **Calmar** — rendimento annuo diviso il drawdown massimo. *Più alto è meglio.*\n"
+                    "- **Omega** — rapporto tra guadagni e perdite oltre una soglia. *Più alto è meglio.*\n"
+                    "- **Max Drawdown** — perdita massima dal picco al minimo. *Più vicino a 0 è meglio.*\n"
+                    "- **VaR / CVaR 95%** — perdita giornaliera attesa nel 5% dei casi peggiori. *Meno negativa è meglio.*\n"
+                    "- **Ulcer Index** — profondità e durata dei drawdown. *Più basso è meglio.*\n"
+                    "- **Win Rate** — quota di giorni positivi. *Più alto è meglio.*\n"
+                    "- **Alpha** — extra-rendimento non spiegato dal benchmark. *>0 = valore aggiunto.*\n"
+                    "- **Beta** — sensibilità al benchmark: 1 = si muove uguale, <1 = più difensivo.\n"
+                    "- **Information Ratio / Treynor** — rendimento attivo per unità di rischio. *Più alto è meglio.*")
 
     # ── TAB: Drawdown ───────────────────────────────────────────────────────
     with tab_dd:
