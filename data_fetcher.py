@@ -207,6 +207,81 @@ def get_current_prices(tickers: list) -> dict:
     return prices
 
 
+# ── TradingView equity/ETF fallback (indipendente da Yahoo) ──────────────────
+# Quando yf.download torna vuoto (Yahoo blocca gli IP datacenter, es. Streamlit
+# Cloud) i prezzi si congelano silenziosamente. Questo fallback interroga lo
+# scanner TradingView (stesso endpoint gia' usato per i bond) e copre azioni ed
+# ETF. Restituisce il prezzo nella valuta di trading dello strumento, coerente
+# con quanto si aspetta update_position_prices.
+
+_TV_EXCHANGE_BY_SUFFIX = {
+    ".MI": "MIL", ".DE": "XETR", ".AS": "EURONEXT", ".PA": "EURONEXT",
+    ".BR": "EURONEXT", ".L": "LSE", ".F": "FWB", ".HK": "HKEX",
+    ".AX": "ASX", ".ST": "OMXSTO", ".SW": "SIX", ".MC": "BME", ".VI": "VIE",
+}
+_TV_US_EXCHANGES = ["NASDAQ", "NYSE", "AMEX", "CBOE"]
+
+# ETF di Borsa Italiana (.MI) che TradingView non espone sotto MIL:: si usa la
+# quotazione Xetra (EUR) equivalente, cosi' la valuta resta coerente. IGV via
+# CBOE (USD); CTEC.AS forzato alla linea Xetra EUR (l'app lo tratta come EUR).
+_TV_ALT_SYMBOL = {
+    "SPEQ.MI": "XETR:SP2Q", "XDEW.MI": "XETR:XDEW", "VUSA.MI": "XETR:VUAA",
+    "SE15.MI": "XETR:EUNT", "AFRN.MI": "XETR:FRNE", "XDER.MI": "XETR:D5BK",
+    "XDWH.MI": "XETR:XDWH", "SPY4.MI": "XETR:SPY4", "R2US.MI": "XETR:ZPRR",
+    "GDX.MI": "XETR:G2X", "SGLD.MI": "XETR:8PSG", "COPA.MI": "XETR:OD7C",
+    "ETHE.MI": "XETR:CETH", "NUCL.MI": "XETR:NUKL", "XAD6.MI": "XETR:XAD6",
+    "XDWS.MI": "XETR:XDWS", "CTEC.AS": "XETR:CBUK", "IGV": "CBOE:IGV",
+}
+
+
+def _tv_candidate_symbols(yf_ticker: str) -> list:
+    """Restituisce i possibili simboli TradingView per un ticker yfinance."""
+    if yf_ticker in _TV_ALT_SYMBOL:
+        return [_TV_ALT_SYMBOL[yf_ticker]]
+    for suf, ex in _TV_EXCHANGE_BY_SUFFIX.items():
+        if yf_ticker.endswith(suf):
+            return [f"{ex}:{yf_ticker[:-len(suf)]}"]
+    if "." not in yf_ticker:  # US: exchange ignoto, prova le principali
+        return [f"{ex}:{yf_ticker}" for ex in _TV_US_EXCHANGES]
+    return []
+
+
+def get_tradingview_prices(yf_tickers: list) -> dict:
+    """
+    Fallback prezzi via TradingView scanner (indipendente da Yahoo).
+    Una sola chiamata per tutti i ticker. Restituisce {yf_ticker: prezzo}.
+    """
+    cand_to_tk = {}
+    all_syms = []
+    for tk in dict.fromkeys(t for t in yf_tickers if t):
+        for c in _tv_candidate_symbols(tk):
+            cand_to_tk[c] = tk
+            all_syms.append(c)
+    if not all_syms:
+        return {}
+
+    out = {}
+    try:
+        import requests as req_lib
+        resp = req_lib.post(
+            "https://scanner.tradingview.com/global/scan",
+            json={"symbols": {"tickers": all_syms, "query": {"types": []}},
+                  "columns": ["close", "currency"]},
+            headers={"Content-Type": "application/json", "User-Agent": "Mozilla/5.0"},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            return {}
+        for item in resp.json().get("data", []):
+            tk = cand_to_tk.get(item.get("s", ""))
+            vals = item.get("d", [])
+            if tk and tk not in out and vals and isinstance(vals[0], (int, float)) and vals[0] > 0:
+                out[tk] = float(vals[0])
+    except Exception as e:
+        logger.warning(f"TradingView fallback failed: {e}")
+    return out
+
+
 def get_current_prices_bulk(tickers: list) -> dict:
     """
     Ultimo prezzo di chiusura per molti ticker con UNA chiamata bulk a
@@ -257,6 +332,17 @@ def get_current_prices_bulk(tickers: list) -> dict:
                         out[batch[0]] = float(s.iloc[-1])
         except Exception as e:
             logger.warning(f"bulk price batch failed for {batch}: {e}")
+
+    # Fallback indipendente da Yahoo per i ticker che il download non ha
+    # restituito (tipicamente perche' Yahoo blocca l'IP del deploy, es. Streamlit
+    # Cloud): TradingView. Senza questo i prezzi restavano congelati.
+    missing = [t for t in tickers if t not in out]
+    if missing:
+        try:
+            for tk, px in get_tradingview_prices(missing).items():
+                out[tk] = px
+        except Exception as e:
+            logger.warning(f"TradingView fallback error: {e}")
 
     return out
 
