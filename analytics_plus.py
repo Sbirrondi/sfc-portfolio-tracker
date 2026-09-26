@@ -71,7 +71,6 @@ def build_daily_nav_series(
         return pd.DataFrame(columns=["date", "nav", "benchmark"])
 
     tickers = list(set(h["ticker"] for h in holdings))
-    tickers.append("VNGA60.MI")  # Benchmark: Vanguard LifeStrategy 60% Equity UCITS ETF
 
     # Download all historical prices in one batch
     start = inception_date
@@ -170,18 +169,16 @@ def build_daily_nav_series(
         "nav": nav_values,
     })
 
-    # Add benchmark
-    if "VNGA60.MI" in close.columns:
-        bench = close["VNGA60.MI"].dropna()
-        if not bench.empty:
-            # Rebase benchmark to initial_nav
-            bench_rebased = bench / bench.iloc[0] * initial_nav
-            result = result.merge(
-                pd.DataFrame({"date": bench.index, "benchmark": bench_rebased.values}),
-                on="date", how="left"
-            )
-    if "benchmark" not in result.columns:
-        result["benchmark"] = np.nan
+    # Add benchmark (VNGA50/50) rebased to initial_nav
+    result["benchmark"] = np.nan
+    try:
+        from fund_benchmark import align_to_dates, benchmark_series
+        bench = align_to_dates(benchmark_series(), result["date"])
+        valid = bench.dropna()
+        if not valid.empty:
+            result["benchmark"] = (bench / valid.iloc[0] * initial_nav).values
+    except Exception:
+        pass
 
     result = result.dropna(subset=["nav"])
     result = result[result["nav"] > 0]

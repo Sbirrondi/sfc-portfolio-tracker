@@ -1,16 +1,18 @@
 """
 Multi-benchmark comparison utilities for the SFC fund.
 
-Defines a small universe of multi-asset benchmarks (the Vanguard LifeStrategy
-ladder: 20/40/60/80 equity), downloads their price histories via the Yahoo
-*bulk* endpoint (the same one used for live position prices — `.info` is
-throttled on Streamlit Cloud datacenter IPs), aligns them to the fund's daily
-NAV dates, and computes rebased series + period returns for a fund-vs-benchmark
-comparison.
+Defines a small universe of multi-asset benchmarks: the fund's official
+benchmark VNGA50/50 (50% VNGA60 + 50% VNGA40) plus the Vanguard LifeStrategy
+ladder (20/40/60/80 equity). The ETF price histories come from the Yahoo *bulk*
+endpoint (the same one used for live position prices — `.info` is throttled on
+Streamlit Cloud datacenter IPs); VNGA50/50 is read from the fund's NAV history
+(`benchmark` column, see fund_benchmark.py). Everything is aligned to the
+fund's daily NAV dates to compute rebased series + period returns for a
+fund-vs-benchmark comparison.
 
-VNGA60 (V60A.DE) is the fund's official benchmark; VNGA40 is its mirror image
-(40/60 vs 60/40). VNGA20/VNGA80 bracket the ladder so the fund can be compared
-against more defensive and more aggressive multi-asset allocations.
+VNGA60 and VNGA40 are the two building blocks of the official benchmark;
+VNGA20/VNGA80 bracket the ladder so the fund can be compared against more
+defensive and more aggressive multi-asset allocations.
 """
 
 from __future__ import annotations
@@ -21,15 +23,20 @@ import pandas as pd
 
 # Benchmark KEY -> config. Order matters (used for legend / table ordering).
 BENCHMARKS: dict[str, dict] = {
+    "VNGA50/50": {
+        "ticker": None, "label": "VNGA50/50", "equity": 50, "bond": 50,
+        "color": "#22c55e", "primary": True,
+        "desc": "Blend 50% VNGA60 + 50% VNGA40 — benchmark ufficiale del fondo",
+    },
     "VNGA60": {
         "ticker": "V60A.DE", "label": "VNGA60 · 60/40", "equity": 60, "bond": 40,
-        "color": "#22c55e", "primary": True,
-        "desc": "Vanguard LifeStrategy 60% Equity — benchmark ufficiale del fondo",
+        "color": "#ec4899", "primary": False,
+        "desc": "Vanguard LifeStrategy 60% Equity — componente del benchmark VNGA50/50",
     },
     "VNGA40": {
         "ticker": "V40A.DE", "label": "VNGA40 · 40/60", "equity": 40, "bond": 60,
         "color": "#f59e0b", "primary": False,
-        "desc": "Vanguard LifeStrategy 40% Equity — il rovescio del nostro 60/40",
+        "desc": "Vanguard LifeStrategy 40% Equity — componente del benchmark VNGA50/50",
     },
     "VNGA20": {
         "ticker": "V20A.DE", "label": "VNGA20 · 20/80", "equity": 20, "bond": 80,
@@ -43,7 +50,7 @@ BENCHMARKS: dict[str, dict] = {
     },
 }
 
-PRIMARY_BENCHMARK = "VNGA60"
+PRIMARY_BENCHMARK = "VNGA50/50"
 FUND_COLOR = "#6366f1"
 FUND_LABEL = "Fondo SFC"
 
@@ -55,19 +62,21 @@ def benchmark_keys() -> list[str]:
 
 
 def benchmark_tickers() -> list[str]:
-    return [cfg["ticker"] for cfg in BENCHMARKS.values()]
+    """Yahoo tickers of the ETF benchmarks (VNGA50/50 has none: it comes from
+    the NAV history)."""
+    return [cfg["ticker"] for cfg in BENCHMARKS.values() if cfg.get("ticker")]
 
 
 def _ticker_to_key() -> dict[str, str]:
-    return {cfg["ticker"]: key for key, cfg in BENCHMARKS.items()}
+    return {cfg["ticker"]: key for key, cfg in BENCHMARKS.items() if cfg.get("ticker")}
 
 
 def download_benchmark_prices(start, end=None) -> pd.DataFrame:
     """Daily close prices for all benchmarks via the Yahoo bulk endpoint.
 
-    Returns a DataFrame indexed by (naive) date with one column per benchmark
-    KEY (VNGA60, VNGA40, ...). Empty DataFrame on failure — callers degrade
-    gracefully.
+    Returns a DataFrame indexed by (naive) date with one column per ETF
+    benchmark KEY (VNGA60, VNGA40, ...). Empty DataFrame on failure — callers
+    degrade gracefully.
     """
     import yfinance as yf
 
@@ -98,6 +107,23 @@ def download_benchmark_prices(start, end=None) -> pd.DataFrame:
     close = close.rename(columns=_ticker_to_key())
     cols = [k for k in BENCHMARKS if k in close.columns]
     return close[cols].sort_index()
+
+
+def add_official_benchmark(bench_aligned: pd.DataFrame, nav_df: pd.DataFrame,
+                           key: str = PRIMARY_BENCHMARK) -> pd.DataFrame:
+    """Add the official benchmark column (VNGA50/50 level stored in the NAV
+    history `benchmark` column) to a frame already aligned on the NAV dates."""
+    out = bench_aligned.copy()
+    if nav_df is None or nav_df.empty or "benchmark" not in nav_df.columns:
+        return out
+    dates = pd.DatetimeIndex(pd.to_datetime(nav_df["date"])).tz_localize(None).normalize()
+    official = pd.Series(pd.to_numeric(nav_df["benchmark"], errors="coerce").values, index=dates)
+    official = official[~official.index.duplicated(keep="last")].sort_index()
+    if official.dropna().empty:
+        return out
+    out[key] = official.reindex(out.index).ffill()
+    ordered = [k for k in BENCHMARKS if k in out.columns]
+    return out[ordered + [c for c in out.columns if c not in ordered]]
 
 
 def align_to_dates(prices: pd.DataFrame, dates) -> pd.DataFrame:
@@ -238,7 +264,7 @@ def benchmark_returns_series(bench_aligned: pd.DataFrame, key: str) -> pd.Series
 
 
 def macro_composition(equity_pct: float, bond_pct: float) -> pd.DataFrame:
-    """Exact macro-asset composition for a LifeStrategy benchmark."""
+    """Exact macro-asset composition for a LifeStrategy benchmark (or blend)."""
     return pd.DataFrame({
         "macro_class": ["Equity", "Fixed Income"],
         "weight_pct": [float(equity_pct), float(bond_pct)],

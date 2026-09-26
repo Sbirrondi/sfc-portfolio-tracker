@@ -1,8 +1,9 @@
 """
 Benchmark underlying contribution utilities.
 
-VNGA60 is held as a fund of ETF building blocks. This module converts those
-building blocks into period performance and contribution in percentage points.
+The benchmark (VNGA50/50 = 50% VNGA60 + 50% VNGA40) is held as a fund of ETF
+building blocks. This module converts those building blocks into period
+performance and contribution in percentage points.
 """
 
 from __future__ import annotations
@@ -128,7 +129,7 @@ def compute_benchmark_underlying_contributions(
     benchmark_return_pct: float,
     fund_contributions: pd.DataFrame | None = None,
 ) -> dict:
-    """Compute VNGA60 underlying return and contribution over a selected period."""
+    """Compute the benchmark's underlying return and contribution over a selected period."""
     if holdings is None or holdings.empty:
         return _empty_result(benchmark_return_pct)
 

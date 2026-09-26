@@ -43,8 +43,9 @@ class AppNavigationTests(unittest.TestCase):
         self.assertIn('elif page == "🏆 Contribuzione Performance":', source)
         self.assertNotIn('elif page == "🏆 Contribuzione P&L":', source)
         self.assertNotIn('elif page == "📊 Performance Contribution":', source)
-        for tab_label in ["Snapshot P&L", "Periodo", "Benchmark", "Driver VNGA60", "Lookthrough", "Dettaglio"]:
+        for tab_label in ["Snapshot P&L", "Periodo", "Benchmark", "Lookthrough", "Dettaglio"]:
             self.assertIn(f'"{tab_label}"', source)
+        self.assertIn('f"Driver {benchmark_label}"', source)
 
     def test_contribution_page_uses_percent_labels_instead_of_pp(self):
         source = APP_PATH.read_text()

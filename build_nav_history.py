@@ -21,6 +21,8 @@ import json
 from bisect import bisect_right
 from datetime import datetime, timedelta
 
+from fund_benchmark import apply_to_nav_history, benchmark_series
+
 DATA_DIR = Path(__file__).parent / "data"
 
 # Module-level constants for ticker/currency overrides
@@ -247,7 +249,6 @@ def build_daily_nav():
         return
 
     inception = pd.to_datetime(fund_info.get("inception_date", "2023-10-01"))
-    benchmark_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
 
     # Build position events from transactions
     events = build_daily_positions_and_cash(transactions)
@@ -290,8 +291,6 @@ def build_daily_nav():
 
     # Download all historical prices
     all_tickers = list(set(mapped_tickers.values()))
-    if benchmark_ticker:
-        all_tickers.append(benchmark_ticker)
 
     start_str = str(inception.date())
     prices = download_prices(all_tickers, start_str)
@@ -406,21 +405,14 @@ def build_daily_nav():
 
         total_nav = port_value + cash
 
-        # Benchmark value
-        bench_val = np.nan
-        if benchmark_ticker and benchmark_ticker in prices.columns:
-            if date in prices.index:
-                bv = prices.loc[date, benchmark_ticker]
-                if pd.notna(bv):
-                    bench_val = float(bv)
-
         nav_records.append({
             "date": date,
             "nav": round(total_nav, 2),
-            "benchmark": round(bench_val, 4) if pd.notna(bench_val) else np.nan,
+            "benchmark": np.nan,
         })
 
-    result = pd.DataFrame(nav_records)
+    # Benchmark VNGA50/50 (serie storica + estensione giornaliera 50/50)
+    result = apply_to_nav_history(pd.DataFrame(nav_records), benchmark_series())
     print(f"\nGenerated {len(result)} daily NAV points")
     print(f"Date range: {result['date'].iloc[0]} to {result['date'].iloc[-1]}")
     print(f"NAV range: {result['nav'].min():,.0f} to {result['nav'].max():,.0f}")
@@ -513,10 +505,7 @@ def fill_missing_nav_days(progress_callback=None):
             all_currencies.add(actual)
 
     # Download prices only for the missing range (with 5-day buffer for ffill)
-    benchmark_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
     all_tickers = list(set(mapped_tickers.values()))
-    if benchmark_ticker:
-        all_tickers.append(benchmark_ticker)
 
     dl_start = (range_start - timedelta(days=5)).strftime("%Y-%m-%d")
     dl_end = (range_end + timedelta(days=2)).strftime("%Y-%m-%d")
@@ -606,17 +595,11 @@ def fill_missing_nav_days(progress_callback=None):
                     port_value += cost_eur
 
         total_nav = port_value + cash
-        bench_val = np.nan
-        if benchmark_ticker and not prices.empty and benchmark_ticker in prices.columns:
-            if date in prices.index:
-                bv = prices.loc[date, benchmark_ticker]
-                if pd.notna(bv):
-                    bench_val = float(bv)
 
         new_records.append({
             "date": date,
             "nav": round(total_nav, 2),
-            "benchmark": round(bench_val, 4) if pd.notna(bench_val) else np.nan,
+            "benchmark": np.nan,
         })
 
     if not new_records:
@@ -627,9 +610,10 @@ def fill_missing_nav_days(progress_callback=None):
     merged = pd.concat([existing, new_df], ignore_index=True)
     merged = merged.sort_values("date").drop_duplicates(subset=["date"], keep="first").reset_index(drop=True)
 
-    # Forward-fill benchmark NaNs
-    merged["benchmark"] = pd.to_numeric(merged["benchmark"], errors="coerce")
-    merged["benchmark"] = merged["benchmark"].ffill()
+    # Benchmark VNGA50/50 sui nuovi giorni: il livello aggiornato con i prezzi
+    # degli ETF lo scrive fund_benchmark.refresh_nav_history_file() subito dopo;
+    # qui si allinea alla serie storica senza rete.
+    merged = apply_to_nav_history(merged)
 
     merged.to_csv(nav_file, index=False)
     if progress_callback:

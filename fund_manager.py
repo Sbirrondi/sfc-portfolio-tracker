@@ -591,10 +591,16 @@ def snapshot_nav(nav: float, benchmark_value: float = None):
 
 
 def load_nav_history() -> pd.DataFrame:
-    """Carica lo storico NAV."""
+    """Carica lo storico NAV (colonna benchmark = livello VNGA50/50)."""
     if NAV_HISTORY_FILE.exists():
         df = pd.read_csv(NAV_HISTORY_FILE, parse_dates=["date"])
-        return df.sort_values("date").reset_index(drop=True)
+        df = df.sort_values("date").reset_index(drop=True)
+        try:
+            from fund_benchmark import apply_to_nav_history
+            df = apply_to_nav_history(df)
+        except Exception:
+            pass
+        return df
     return pd.DataFrame(columns=["date", "nav", "benchmark"])
 
 
@@ -612,7 +618,7 @@ def load_fund_info() -> dict:
         "inception_date": "2023-10-01",
         "initial_nav": 10_000_000,
         "currency": "EUR",
-        "benchmark": "VNGA60",
+        "benchmark": "VNGA50/50",
     }
 
 

@@ -16,11 +16,13 @@ import base64
 from streamlit_lightweight_charts import renderLightweightCharts
 
 from benchmark_lookthrough import (
-    compare_group_exposures, fund_level1_holdings, load_vnga60_holdings
+    compare_group_exposures, fund_level1_holdings, load_benchmark_holdings
 )
 from benchmark_contribution import (
     benchmark_symbol_to_yahoo, compute_benchmark_underlying_contributions
 )
+import benchmark_compare as bcmp
+from fund_benchmark import BENCHMARK_NAME, refresh_nav_history_file as refresh_benchmark_history
 import fund_manager as _fm
 from fund_manager import (
     load_positions, save_positions, load_transactions, add_transaction,
@@ -638,8 +640,19 @@ def _estimate_values_on_date(transactions: pd.DataFrame, positions: pd.DataFrame
 
 
 @st.cache_data(ttl=86400, show_spinner=False)
-def _load_vnga60_lookthrough():
-    return load_vnga60_holdings()
+def _load_benchmark_lookthrough(key: str = bcmp.PRIMARY_BENCHMARK):
+    """ETF sottostanti del benchmark `key` (VNGA50/50 = 50% VNGA60 + 50% VNGA40)."""
+    cfg = bcmp.BENCHMARKS.get(key, bcmp.BENCHMARKS[bcmp.PRIMARY_BENCHMARK])
+    return load_benchmark_holdings(key, cfg["equity"], cfg["bond"])
+
+
+def _benchmark_source_text(label: str, source: str) -> str:
+    return {
+        "live": f"{label}: sottostanti aggiornati automaticamente dalla fonte online",
+        "cache": f"{label}: sottostanti letti dalla cache",
+        "fallback": f"{label}: sottostanti da fallback locale",
+        "mixed": f"{label}: sottostanti in parte online, in parte da fallback locale",
+    }.get(source, f"{label}: fonte {source}")
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -1057,7 +1070,8 @@ def _fund_contributions_with_region(contrib: pd.DataFrame, positions: pd.DataFra
     return result
 
 
-def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str):
+def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str,
+                               benchmark_label: str = BENCHMARK_NAME):
     st.markdown(f"**{title}**")
     if summary is None or summary.empty:
         st.info("Dati non disponibili.")
@@ -1078,7 +1092,7 @@ def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str
         x=plot_df["benchmark_contribution_pp"],
         y=plot_df[group_col],
         orientation="h",
-        name="VNGA60",
+        name=benchmark_label,
         marker_color="#22c55e",
         text=[f"{x:+.2f}%" for x in plot_df["benchmark_contribution_pp"]],
         textposition="outside",
@@ -1097,10 +1111,11 @@ def _plot_driver_group_summary(summary: pd.DataFrame, group_col: str, title: str
 
     show = summary[[group_col, "fund_contribution_pp", "benchmark_contribution_pp",
                     "active_contribution_pp", "benchmark_weight_pct"]].copy()
-    show.columns = [title, "Fondo %", "VNGA60 %", "Active %", "Peso VNGA60 %"]
-    for col in ["Fondo %", "VNGA60 %", "Active %"]:
+    bench_col, bench_weight_col = f"{benchmark_label} %", f"Peso {benchmark_label} %"
+    show.columns = [title, "Fondo %", bench_col, "Active %", bench_weight_col]
+    for col in ["Fondo %", bench_col, "Active %"]:
         show[col] = show[col].apply(lambda x: f"{x:+.2f}%")
-    show["Peso VNGA60 %"] = show["Peso VNGA60 %"].apply(lambda x: f"{x:.2f}%")
+    show[bench_weight_col] = show[bench_weight_col].apply(lambda x: f"{x:.2f}%")
     st.dataframe(show, use_container_width=True, hide_index=True)
 
 
@@ -1115,9 +1130,10 @@ def _render_benchmark_underlying_drivers(
         st.info(context.get("message", "Dati insufficienti per calcolare i driver del benchmark."))
         return
 
-    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
+    benchmark_key = benchmark_label if benchmark_label in bcmp.BENCHMARKS else bcmp.PRIMARY_BENCHMARK
+    benchmark_holdings, benchmark_source = _load_benchmark_lookthrough(benchmark_key)
     if benchmark_holdings.empty:
-        st.info("Sottostanti VNGA60 non disponibili.")
+        st.info(f"Sottostanti {benchmark_label} non disponibili.")
         return
 
     benchmark_cmp = context.get("benchmark_cmp") or {}
@@ -1125,7 +1141,7 @@ def _render_benchmark_underlying_drivers(
     if pd.isna(benchmark_return_pct):
         benchmark_return_pct = 0.0
 
-    with st.spinner("Calcolo performance sottostanti VNGA60..."):
+    with st.spinner(f"Calcolo performance sottostanti {benchmark_label}..."):
         price_data = _load_benchmark_underlying_prices(
             benchmark_holdings,
             context["start_date"],
@@ -1150,11 +1166,7 @@ def _render_benchmark_underlying_drivers(
     ok_count = int((detail["data_status"] == "OK").sum()) if not detail.empty else 0
     total_count = len(detail)
 
-    source_text = {
-        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
-        "cache": "VNGA60 holdings letti dalla cache",
-        "fallback": "VNGA60 holdings da fallback locale",
-    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
+    source_text = _benchmark_source_text(benchmark_label, benchmark_source)
     st.caption(f"{source_text} · Prezzi disponibili per {ok_count}/{total_count} sottostanti")
 
     active_return = benchmark_cmp.get("active_return_pp", context.get("fund_return_pp", 0) - benchmark_return_pct)
@@ -1167,10 +1179,10 @@ def _render_benchmark_underlying_drivers(
     if ok_count < total_count:
         st.warning("Alcuni sottostanti non hanno prezzi storici disponibili: restano in tabella ma non entrano nella ricostruzione.")
 
-    st.markdown('<div class="section-header">Top / Bottom Driver VNGA60</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-header">Top / Bottom Driver {benchmark_label}</div>', unsafe_allow_html=True)
     nonzero = detail[detail["contribution_pp"].abs() > 0.001].copy()
     if nonzero.empty:
-        st.info("Nessun contributo significativo calcolabile sui sottostanti VNGA60.")
+        st.info(f"Nessun contributo significativo calcolabile sui sottostanti {benchmark_label}.")
     else:
         top = nonzero.nlargest(8, "contribution_pp")
         bottom = nonzero.nsmallest(8, "contribution_pp")
@@ -1192,19 +1204,19 @@ def _render_benchmark_underlying_drivers(
             template="plotly_dark",
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Contributo VNGA60",
+            xaxis_title=f"Contributo {benchmark_label}",
             yaxis=dict(autorange="reversed"),
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown('<div class="section-header">Fondo vs VNGA60: Contributo per Gruppo</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-header">Fondo vs {benchmark_label}: Contributo per Gruppo</div>', unsafe_allow_html=True)
     tab_macro, tab_region = st.tabs(["Macro Classe", "Area"])
     with tab_macro:
-        _plot_driver_group_summary(drivers["macro_summary"], "macro_class", "Macro Classe")
+        _plot_driver_group_summary(drivers["macro_summary"], "macro_class", "Macro Classe", benchmark_label)
     with tab_region:
-        _plot_driver_group_summary(drivers["region_summary"], "region", "Area")
+        _plot_driver_group_summary(drivers["region_summary"], "region", "Area", benchmark_label)
 
-    st.markdown('<div class="section-header">Dettaglio Sottostanti VNGA60</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-header">Dettaglio Sottostanti {benchmark_label}</div>', unsafe_allow_html=True)
     show = detail[["yahoo_ticker", "name", "weight_pct", "period_return_pct", "contribution_pp",
                    "macro_class", "region", "data_status"]].copy()
     show.columns = ["Ticker", "Nome", "Peso", "Return %", "Contributo %", "Macro Classe", "Area", "Dato"]
@@ -1214,17 +1226,14 @@ def _render_benchmark_underlying_drivers(
     st.dataframe(show, use_container_width=True, hide_index=True, height=min(620, len(show) * 35 + 60))
 
 
-def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, liquidita: float):
-    st.markdown('<div class="section-header">Spaccato Sottostanti Fondo vs VNGA60</div>', unsafe_allow_html=True)
-    benchmark_holdings, benchmark_source = _load_vnga60_lookthrough()
+def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, liquidita: float,
+                                     benchmark_label: str = BENCHMARK_NAME):
+    st.markdown(f'<div class="section-header">Spaccato Sottostanti Fondo vs {benchmark_label}</div>', unsafe_allow_html=True)
+    benchmark_key = benchmark_label if benchmark_label in bcmp.BENCHMARKS else bcmp.PRIMARY_BENCHMARK
+    benchmark_holdings, benchmark_source = _load_benchmark_lookthrough(benchmark_key)
     fund_lookthrough = fund_level1_holdings(positions, nav_total=nav_total, cash=liquidita)
 
-    source_text = {
-        "live": "VNGA60 holdings aggiornati automaticamente dalla fonte online",
-        "cache": "VNGA60 holdings letti dalla cache",
-        "fallback": "VNGA60 holdings da fallback locale",
-    }.get(benchmark_source, f"Fonte VNGA60: {benchmark_source}")
-    st.caption(source_text)
+    st.caption(_benchmark_source_text(benchmark_label, benchmark_source))
 
     macro_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "macro_class")
     region_comp = compare_group_exposures(fund_lookthrough, benchmark_holdings, "region")
@@ -1241,7 +1250,7 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
         ))
         fig_macro_lt.add_trace(go.Bar(
             x=macro_plot["macro_class"], y=macro_plot["benchmark_weight_pct"],
-            name="VNGA60", marker_color="#22c55e",
+            name=benchmark_label, marker_color="#22c55e",
             text=[f"{x:.1f}%" for x in macro_plot["benchmark_weight_pct"]], textposition="outside",
         ))
         fig_macro_lt.update_layout(
@@ -1257,8 +1266,8 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
         st.plotly_chart(fig_macro_lt, use_container_width=True)
 
         macro_show = macro_comp.copy()
-        macro_show.columns = ["Macro Classe", "Fondo %", "VNGA60 %", "Active Weight"]
-        for col in ["Fondo %", "VNGA60 %"]:
+        macro_show.columns = ["Macro Classe", "Fondo %", f"{benchmark_label} %", "Active Weight"]
+        for col in ["Fondo %", f"{benchmark_label} %"]:
             macro_show[col] = macro_show[col].apply(lambda x: f"{x:.2f}%")
         macro_show["Active Weight"] = macro_show["Active Weight"].apply(lambda x: f"{x:+.2f}%")
         st.dataframe(macro_show, use_container_width=True, hide_index=True)
@@ -1274,7 +1283,7 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
             text=[f"{x:+.1f}%" for x in region_plot["active_weight_pct"]],
             textposition="outside",
             customdata=region_plot[["fund_weight_pct", "benchmark_weight_pct"]],
-            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>VNGA60: %{customdata[1]:.2f}%<br>Active: %{x:+.2f}%<extra></extra>",
+            hovertemplate="%{y}<br>Fondo: %{customdata[0]:.2f}%<br>" + benchmark_label + ": %{customdata[1]:.2f}%<br>Active: %{x:+.2f}%<extra></extra>",
         ))
         fig_region_lt.update_layout(
             height=max(420, len(region_plot) * 36),
@@ -1282,13 +1291,13 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
             template="plotly_dark",
             plot_bgcolor="rgba(0,0,0,0)",
             paper_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="Active weight vs VNGA60",
+            xaxis_title=f"Active weight vs {benchmark_label}",
         )
         st.plotly_chart(fig_region_lt, use_container_width=True)
 
         region_show = region_comp.copy()
-        region_show.columns = ["Area", "Fondo %", "VNGA60 %", "Active Weight"]
-        for col in ["Fondo %", "VNGA60 %"]:
+        region_show.columns = ["Area", "Fondo %", f"{benchmark_label} %", "Active Weight"]
+        for col in ["Fondo %", f"{benchmark_label} %"]:
             region_show[col] = region_show[col].apply(lambda x: f"{x:.2f}%")
         region_show["Active Weight"] = region_show["Active Weight"].apply(lambda x: f"{x:+.2f}%")
         st.dataframe(region_show, use_container_width=True, hide_index=True)
@@ -1302,7 +1311,7 @@ def _render_contribution_lookthrough(positions: pd.DataFrame, nav_total: float, 
             fund_show["Peso"] = fund_show["Peso"].apply(lambda x: f"{x:.2f}%")
             st.dataframe(fund_show.head(30), use_container_width=True, hide_index=True, height=520)
         with bh:
-            st.markdown("**VNGA60 - fondi sottostanti**")
+            st.markdown(f"**{benchmark_label} - fondi sottostanti**")
             bench_show = benchmark_holdings[["ticker", "name", "macro_class", "region", "weight_pct"]].copy()
             bench_show.columns = ["Ticker", "Nome", "Classe", "Area", "Peso"]
             bench_show["Peso"] = bench_show["Peso"].apply(lambda x: f"{x:.2f}%")
@@ -1466,7 +1475,7 @@ def _render_contribution_page(
         st.info("Nessun dato disponibile.")
         return
 
-    benchmark_label = fund_info.get("benchmark", "VNGA60") or "VNGA60"
+    benchmark_label = fund_info.get("benchmark", BENCHMARK_NAME) or BENCHMARK_NAME
     period_options = ["1M", "3M", "6M", "YTD", "1Y", "Dall'Inizio"]
     pc1, pc2 = st.columns([1, 3])
     with pc1:
@@ -1489,7 +1498,7 @@ def _render_contribution_page(
             st.caption(period_context.get("message", "Dati periodo non disponibili."))
 
     tab_snapshot, tab_period, tab_benchmark, tab_driver, tab_lookthrough, tab_detail = st.tabs([
-        "Snapshot P&L", "Periodo", "Benchmark", "Driver VNGA60", "Lookthrough", "Dettaglio"
+        "Snapshot P&L", "Periodo", "Benchmark", f"Driver {benchmark_label}", "Lookthrough", "Dettaglio"
     ])
 
     with tab_snapshot:
@@ -1507,7 +1516,7 @@ def _render_contribution_page(
         _render_benchmark_underlying_drivers(period_context, positions, nav_total, liquidita, benchmark_label)
 
     with tab_lookthrough:
-        _render_contribution_lookthrough(positions, nav_total, liquidita)
+        _render_contribution_lookthrough(positions, nav_total, liquidita, benchmark_label)
 
     with tab_detail:
         _render_contribution_detail(period_context)
@@ -1682,28 +1691,20 @@ with st.sidebar:
                     cash = compute_cash_from_transactions()
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
-                    # Fetch current benchmark value for fund_info update
-                    bench_val = None
-                    try:
-                        from data_fetcher import get_current_prices_bulk, get_historical_prices
-                        bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
-                        # Endpoint bulk/chart: affidabile sul cloud (a differenza di .info,
-                        # che viene throttato e faceva finire il benchmark a NaN).
-                        bench_bulk = get_current_prices_bulk([bench_ticker])
-                        if bench_bulk.get(bench_ticker, 0) and bench_bulk[bench_ticker] > 0:
-                            bench_val = float(bench_bulk[bench_ticker])
-                        else:
-                            bench_data = get_historical_prices([bench_ticker], period="5d")
-                            if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
-                                bench_val = float(bench_data[bench_ticker].iloc[-1])
-                    except Exception:
-                        pass
-                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
-                    snapshot_nav(nav, benchmark_value=bench_val)
+                    snapshot_nav(nav)
 
                     # Step 4: Fill missing NAV history days (incremental)
                     _status.info("Step 4/4 — Ricostruzione giorni NAV mancanti...")
                     fill_missing_nav_days(progress_callback=lambda msg: _status.info(f"Step 4/4 — {msg}"))
+
+                    # Benchmark VNGA50/50 aggiornato su tutto lo storico NAV
+                    _status.info(f"Step 4/4 — Aggiornamento benchmark {BENCHMARK_NAME}...")
+                    bench_val = None
+                    try:
+                        bench_val = refresh_benchmark_history()
+                    except Exception:
+                        pass
+                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
 
             except Exception as e:
                 _error_occurred = True
@@ -1898,7 +1899,7 @@ if page == "🏠 Dashboard":
             _series.append({"dates": nav_df_filtered["date"], "values": nav_df_filtered["bench_index"],
                             "color": "#22c55e", "type": "Line", "lineWidth": 2})
         # Chart legend
-        _bench_label = fund_info.get("benchmark", "VNGA60")
+        _bench_label = fund_info.get("benchmark", BENCHMARK_NAME)
         st.markdown(f"""<div style="display:flex;gap:1.5rem;justify-content:flex-end;margin-bottom:0.3rem;font-size:0.75rem;">
             <span><span style="display:inline-block;width:12px;height:3px;background:#6366f1;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">SFC Fund</span></span>
             <span><span style="display:inline-block;width:12px;height:3px;background:#22c55e;border-radius:2px;vertical-align:middle;margin-right:5px;"></span><span style="color:#94a3b8;">Benchmark ({_bench_label})</span></span>
@@ -2307,7 +2308,7 @@ elif page == "📈 Performance":
 
     # ── Sintesi Fondo vs Benchmark (card di confronto con vincitore) ──────
     if bench_series is not None and len(bench_series) > 1:
-        _bench_lbl = fund_info.get("benchmark", "VNGA60")
+        _bench_lbl = fund_info.get("benchmark", BENCHMARK_NAME)
         _br = calculate_returns(bench_series)
         f_tot = nav_series.iloc[-1] / _initial_nav_perf - 1
         b_tot = total_return(bench_series)
@@ -2369,7 +2370,7 @@ elif page == "📈 Performance":
 
     if bench_series is not None and len(bench_series) > 1:
         monthly_bench = monthly_returns_table(bench_series)
-        st.markdown('<div class="section-header">Performance Mensile — Benchmark (VNGA60)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-header">Performance Mensile — Benchmark ({fund_info.get("benchmark", BENCHMARK_NAME)})</div>', unsafe_allow_html=True)
         _monthly_heatmap(monthly_bench, key="perf_monthly_bench")
 
         # Extra-performance mensile = Fondo − Benchmark (differenza aritmetica dei rendimenti)
@@ -2424,14 +2425,13 @@ elif page == "📈 Performance":
 # ══════════════════════════════════════════════════════════════════════════════
 
 elif page == "📊 Fondo vs Benchmark":
-    import benchmark_compare as bcmp
     import sector_lookthrough as sl
     from analytics_plus import advanced_risk_metrics, generate_html_report
 
     st.markdown('<div class="section-header">Confronto Fondo vs Benchmark</div>', unsafe_allow_html=True)
-    st.caption("NAV ribasato, rendimenti per periodo, rischio e composizione del fondo a confronto con la scala "
-               "Vanguard LifeStrategy (20/40/60/80). **VNGA60** è il benchmark ufficiale; **VNGA40** è il rovescio "
-               "del nostro 60/40. Clicca le voci in legenda per accendere/spegnere le linee.")
+    st.caption(f"NAV ribasato, rendimenti per periodo, rischio e composizione del fondo a confronto con il "
+               f"benchmark ufficiale **{bcmp.PRIMARY_BENCHMARK}** (50% VNGA60 + 50% VNGA40) e con la scala "
+               "Vanguard LifeStrategy (20/40/60/80). Clicca le voci in legenda per accendere/spegnere le linee.")
 
     if not has_data:
         st.info("Nessun dato disponibile.")
@@ -2450,14 +2450,28 @@ elif page == "📊 Fondo vs Benchmark":
 
     @st.cache_data(ttl=6 * 3600, show_spinner="Scarico i benchmark da Yahoo...")
     def _load_benchmark_prices(start_str: str, end_str: str):
-        return bcmp.download_benchmark_prices(start=start_str)
+        prices = bcmp.download_benchmark_prices(start=start_str)
+        if prices is None or prices.empty:
+            # Non mettere in cache un download fallito: si riprova al prossimo rerun.
+            raise RuntimeError("download benchmark vuoto")
+        return prices
 
-    bench_prices = _load_benchmark_prices(str(daily_nav["date"].min().date()),
-                                          str(daily_nav["date"].max().date()))
-    if bench_prices is None or bench_prices.empty:
-        st.error("Impossibile scaricare i benchmark da Yahoo in questo momento. Riprova più tardi.")
-        st.stop()
+    try:
+        bench_prices = _load_benchmark_prices(str(daily_nav["date"].min().date()),
+                                              str(daily_nav["date"].max().date()))
+    except Exception:
+        bench_prices = pd.DataFrame()
+    # ETF LifeStrategy da Yahoo + benchmark ufficiale VNGA50/50 dallo storico NAV
     bench_aligned = bcmp.align_to_dates(bench_prices, daily_nav["date"])
+    bench_aligned = bcmp.add_official_benchmark(bench_aligned, daily_nav)
+    available = [k for k in bcmp.benchmark_keys()
+                 if k in bench_aligned.columns and bench_aligned[k].notna().sum() >= 2]
+    if not available:
+        st.error("Impossibile caricare i benchmark in questo momento. Riprova più tardi.")
+        st.stop()
+    if bench_prices.empty:
+        st.info("Scala Vanguard LifeStrategy non scaricabile da Yahoo in questo momento: "
+                f"confronto disponibile con il benchmark ufficiale {bcmp.PRIMARY_BENCHMARK}.")
 
     # ── Controls ────────────────────────────────────────────────────────────
     labels = {k: bcmp.BENCHMARKS[k]["label"] for k in bcmp.benchmark_keys()}
@@ -2465,12 +2479,12 @@ elif page == "📊 Fondo vs Benchmark":
     with ctrl1:
         selected = st.multiselect(
             "Benchmark sul grafico",
-            options=bcmp.benchmark_keys(),
-            default=["VNGA60", "VNGA40"],
+            options=available,
+            default=[k for k in (bcmp.PRIMARY_BENCHMARK, "VNGA60", "VNGA40") if k in available],
             format_func=lambda k: labels[k],
         )
     if not selected:
-        selected = [bcmp.PRIMARY_BENCHMARK]
+        selected = [bcmp.PRIMARY_BENCHMARK if bcmp.PRIMARY_BENCHMARK in available else available[0]]
     with ctrl2:
         period = st.selectbox("Periodo", bcmp.PERIODS, index=bcmp.PERIODS.index("Dall'Inizio"))
     with ctrl3:
@@ -2579,11 +2593,13 @@ elif page == "📊 Fondo vs Benchmark":
                     "il confronto è sulla performance pura, non sui valori assoluti.\n"
                     "- **Active (pt)**: differenza in punti percentuali tra il Fondo e il benchmark di riferimento "
                     "nel periodo; verde se il Fondo è avanti.\n"
-                    "- **Fondo = total return del NAV** (include la liquidità). I benchmark sono ETF ad "
+                    f"- **{bcmp.PRIMARY_BENCHMARK}** è il benchmark ufficiale del fondo: 50% VNGA60 + 50% VNGA40, "
+                    "cioè un profilo 50% azioni / 50% obbligazioni.\n"
+                    "- **Fondo = total return del NAV** (include la liquidità). I benchmark sono costruiti su ETF ad "
                     "accumulazione, **total return e pienamente investiti**: la differenza riflette anche il "
-                    "cash drag e l'asset allocation più difensiva del fondo.\n"
-                    "- Cambia il **benchmark di riferimento** in alto per confrontare il fondo con un profilo "
-                    "più simile (es. VNGA40 = 40/60).")
+                    "cash drag e l'asset allocation del fondo.\n"
+                    "- Cambia il **benchmark di riferimento** in alto per confrontare il fondo con un altro profilo "
+                    "della scala LifeStrategy (es. VNGA40 = 40/60, VNGA60 = 60/40).")
 
     # ── TAB: Rischio ────────────────────────────────────────────────────────
     with tab_risk:
@@ -2843,27 +2859,26 @@ elif page == "📊 Fondo vs Benchmark":
 
         fund_lt = fund_level1_holdings(positions, nav_total, cash=liquidita)
 
+        cfg = bcmp.BENCHMARKS[ref]
         if sector_mode:
-            cfg = bcmp.BENCHMARKS[ref]
-            bench_holdings, _src = _load_vnga60_lookthrough()
+            bench_holdings, _src = _load_benchmark_lookthrough(ref)
             fund_grp = sl.fund_sector_breakdown(positions, nav_total, cash=liquidita)
             bench_grp = sl.benchmark_sector_breakdown(bench_holdings, cfg["equity"], cfg["bond"])
             bench_title = f"{labels[ref]} (stima)"
         elif grouping == "Classe di Attivo":
             fund_grp = (fund_lt.groupby("macro_class")["weight_pct"].sum()
                         .sort_values(ascending=False)) if not fund_lt.empty else pd.Series(dtype=float)
-            cfg = bcmp.BENCHMARKS[ref]
             bench_grp = bcmp.macro_composition(cfg["equity"], cfg["bond"]).set_index("macro_class")["weight_pct"]
             bench_title = labels[ref]
         else:  # Area Geografica
             fund_grp = (fund_lt.groupby("region")["weight_pct"].sum()
                         .sort_values(ascending=False)) if not fund_lt.empty else pd.Series(dtype=float)
-            bench_holdings, _src = _load_vnga60_lookthrough()
+            bench_holdings, _src = _load_benchmark_lookthrough(ref)
             if bench_holdings is not None and not bench_holdings.empty:
                 bench_grp = bench_holdings.groupby("region")["weight_pct"].sum().sort_values(ascending=False)
             else:
                 bench_grp = pd.Series(dtype=float)
-            bench_title = "VNGA60 (look-through)"
+            bench_title = f"{labels[ref]} (look-through)"
 
         if not fund_grp.empty:
             fund_grp = fund_grp[fund_grp > 0]
@@ -2921,7 +2936,14 @@ elif page == "📊 Fondo vs Benchmark":
                        "indice standard (S&P 500, STOXX 600, MSCI EM, ecc.); i singoli titoli usano il settore "
                        "reale. Obbligazioni, materie prime, crypto e liquidità sono in bucket dedicati.")
         elif grouping == "Area Geografica":
-            st.caption("Il look-through per area è disponibile solo per VNGA60 (composizione degli ETF sottostanti).")
+            if ref == bcmp.PRIMARY_BENCHMARK:
+                st.caption(f"Look-through per area sugli ETF sottostanti del {ref}: 50% quelli del VNGA60 "
+                           "+ 50% quelli del VNGA40.")
+            elif ref in ("VNGA60", "VNGA40"):
+                st.caption(f"Look-through per area sugli ETF sottostanti del {ref}.")
+            else:
+                st.caption(f"Look-through per area stimato: sleeve azionaria e obbligazionaria del VNGA60 "
+                           f"riscalate al profilo {cfg['equity']}/{cfg['bond']} del {ref}.")
 
     # ── TAB: Report ─────────────────────────────────────────────────────────
     with tab_report:
@@ -4289,30 +4311,19 @@ elif page == "📝 Operazioni & Import":
                     cash = compute_cash_from_transactions()
                     save_cash({"balance": cash, "last_updated": pd.Timestamp.now().strftime("%Y-%m-%d %H:%M")})
                     nav = calculate_nav(updated, cash)
-
-                    # Fetch benchmark value
-                    bench_val = None
-                    try:
-                        from data_fetcher import get_current_prices_bulk, get_historical_prices
-                        bench_ticker = fund_info.get("benchmark_ticker", "V60A.DE")
-                        # Endpoint bulk/chart: affidabile sul cloud (a differenza di .info,
-                        # che viene throttato e faceva finire il benchmark a NaN).
-                        bench_bulk = get_current_prices_bulk([bench_ticker])
-                        if bench_bulk.get(bench_ticker, 0) and bench_bulk[bench_ticker] > 0:
-                            bench_val = float(bench_bulk[bench_ticker])
-                        else:
-                            bench_data = get_historical_prices([bench_ticker], period="5d")
-                            if bench_ticker in bench_data and not bench_data[bench_ticker].empty:
-                                bench_val = float(bench_data[bench_ticker].iloc[-1])
-                    except Exception:
-                        pass
-
-                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
-                    snapshot_nav(nav, benchmark_value=bench_val)
+                    snapshot_nav(nav)
 
                     # Fill missing NAV history days
                     from build_nav_history import fill_missing_nav_days
                     fill_missing_nav_days()
+
+                    # Benchmark VNGA50/50 aggiornato su tutto lo storico NAV
+                    bench_val = None
+                    try:
+                        bench_val = refresh_benchmark_history()
+                    except Exception:
+                        pass
+                    update_fund_info(nav, len(updated), benchmark_value=bench_val)
 
                     st.success(f"✅ Prezzi aggiornati! NAV: {fmt_eur_full(nav)}")
                     st.cache_data.clear()

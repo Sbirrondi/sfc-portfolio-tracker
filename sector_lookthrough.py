@@ -1,6 +1,6 @@
 """
-Approximate ("a spanne") sector look-through for the fund and for the VNGA60
-benchmark.
+Approximate ("a spanne") sector look-through for the fund and for its
+benchmark (VNGA50/50) or any Vanguard LifeStrategy profile.
 
 Broad equity ETFs don't carry a single GICS sector, so we approximate each one
 with a *typical* sector profile for the index it tracks (e.g. an S&P 500 ETF ~31%
@@ -212,9 +212,10 @@ def benchmark_sector_breakdown(holdings: pd.DataFrame, equity_pct: float = 60.0,
                                bond_pct: float = 40.0) -> pd.Series:
     """Indicative sector weights for a LifeStrategy benchmark.
 
-    `holdings` is the VNGA60 underlying-ETF look-through. Equity ETFs are
-    rescaled so they sum to `equity_pct` and bond ETFs to `bond_pct`, so the same
-    function serves VNGA20/40/60/80.
+    `holdings` is the benchmark's underlying-ETF look-through (for VNGA50/50 the
+    50/50 blend of VNGA60 and VNGA40). Equity ETFs are rescaled so they sum to
+    `equity_pct` and bond ETFs to `bond_pct`, so the same function serves
+    VNGA50/50 and VNGA20/40/60/80.
     """
     acc: dict[str, float] = {}
     if holdings is None or holdings.empty:
