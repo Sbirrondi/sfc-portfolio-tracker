@@ -534,5 +534,13 @@
     "asset_type": "ETF",
     "macro_class": "Equity",
     "classification": "Consumer Staples"
+  },
+  "DE0007030009": {
+    "name": "Rheinmetall",
+    "sector": "Industrials",
+    "industry": "Difesa",
+    "country": "Germania",
+    "asset_type": "Stock",
+    "macro_class": "Equity"
   }
 }
