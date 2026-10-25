@@ -3,15 +3,15 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2023-10-16,BUY,IT0004176001,Azioni Prysmian,Equity,6299.0,35.72,EUR,1.0,0.0,,Industrials,Stock
 2023-10-17,BUY,IE00B579F325,Oro,Alternative,849.0,176.78,EUR,1.0,0.0,,Precious Metals,Commodity
 2023-10-24,BUY,GB00BJYDH287,Bitcoin,Alternative,39002.0,7.692,EUR,1.0,0.0,,Crypto,Crypto
-2023-11-03,BUY,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,95.84,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
+2023-11-03,BUY,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.156,EUR,1.0,0.0,,HY EU,ETF
 2023-11-03,BUY,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,96.07,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
 2023-11-03,BUY,NO0010732555,"Norway Tf 1,75% Mz25 Nok",Fixed Income,55000.0,97.13,NOK,11.876485,0.0,,"Norway Tf 1,75% Mz25 Nok",Bond
-2023-11-03,BUY,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.156,EUR,1.0,0.0,,HY EU,ETF
-2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
+2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
+2023-11-03,BUY,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,95.84,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
 2023-11-03,BUY,IT0005433690,"Btp Tf 0,25% Mz28 Eur",Fixed Income,5200.0,86.14,EUR,1.0,0.0,,Gov. Italia,Bond
 2023-11-03,BUY,AT0000A2HLC4,"Austria Tf 0,85% Gn2120 Eur",Fixed Income,11300.0,39.8,EUR,1.0,0.0,,Gov. Europa,Bond
-2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
 2023-11-03,BUY,IT0005419848,"Btp Tf 0,50% Fb26 Eur",Fixed Income,9620.0,93.37,EUR,1.0,0.0,,"Btp Tf 0,50% Fb26 Eur",Bond
+2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
 2023-11-09,BUY,IT0004176001,Azioni Prysmian,Equity,6484.0,34.7,EUR,1.0,0.0,,Industrials,Stock
 2023-11-30,BUY,GB00BJYDH287,Bitcoin,Alternative,17999.0,8.334,EUR,1.0,0.0,,Crypto,Crypto
 2023-12-01,BUY,IE00BNGJJT35,S&P Equal Weight,Equity,11122.0,44.955,EUR,1.0,0.0,,US Equity,Stock
@@ -96,10 +96,10 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-09-16,BUY,IE00B4YBJ215,SPY400,Equity,1000.0,85.82,EUR,1.0,0.0,,US Equity,Stock
 2025-09-16,SELL,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,97.25,NOK,11.591515,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
 2025-10-08,SELL,GB00B082RF11,Rentokil,Equity,9524.0,4.1204,GBP,0.8661,0.0,,Business Services,Stock
-2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
-2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
-2025-10-08,BUY,LU1437017350,Emerging Markets,Equity,1250.0,79.35,EUR,1.0,0.0,,Emerging Markets,Stock
 2025-10-08,BUY,FR0000121014,LVMH,Equity,39.0,563.0,EUR,1.0,0.0,,Consumer Discretionary,Stock
+2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
+2025-10-08,BUY,LU1437017350,Emerging Markets,Equity,1250.0,79.35,EUR,1.0,0.0,,Emerging Markets,Stock
+2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
 2025-10-13,BUY,IE00BQQP9F84,GDX,Alternative,453.0,75.25,EUR,1.0,0.0,,Precious Metals,Commodity
 2025-10-14,BUY,NL0011585146,Ferrari,Equity,270.0,327.4,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-10-20,BUY,IT0003856405,Leonardo,Equity,700.0,50.6,EUR,1.0,0.0,,Leonardo,Stock
@@ -146,10 +146,10 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-03-13,BUY,US58733R1023,MercadoLibre,Equity,60.0,1663.91,USD,1.14774,0.0,,Technology,Stock
 2026-03-13,SELL,IT0003856405,Leonardo,Equity,700.0,63.82,EUR,1.0,0.0,,Leonardo,Stock
 2026-03-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,,Corporate Bond,Bond
-2026-03-19,BUY,GB00BSQNRC93,UK Bond 4.375% 24/28,Fixed Income,1550.0,99.85,GBP,0.863,0.0,,Gov. Internazionali,Bond
 2026-03-19,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,1150.0,90.5,EUR,1.0,0.0,,Gov. Europa,Bond
-2026-03-19,BUY,IE00B4L60045,iShares Euro Corp Bond 1-5yr UCITS ETF,Fixed Income,2000.0,106.03,EUR,1.0,0.0,,Corporate Bond,ETF
+2026-03-19,BUY,GB00BSQNRC93,UK Bond 4.375% 24/28,Fixed Income,1550.0,99.85,GBP,0.863,0.0,,Gov. Internazionali,Bond
 2026-03-19,BUY,US91282CMN82,US Treasury 4.25% Feb 2028,Fixed Income,3000.0,100.66,USD,1.1485,0.0,,Gov. Internazionali,Bond
+2026-03-19,BUY,IE00B4L60045,iShares Euro Corp Bond 1-5yr UCITS ETF,Fixed Income,2000.0,106.03,EUR,1.0,0.0,,Corporate Bond,ETF
 2026-03-20,BUY,US912810PV44,US TIPS 1.75% Jan 2028,Fixed Income,1850.0,101.485,USD,1.1555,0.0,,Gov. Internazionali,Bond
 2026-03-20,BUY,LU1681041114,Amundi EUR FRN Corporate Bond ESG ETF,Fixed Income,900.0,111.71,EUR,1.0,0.0,,Corporate Bond,ETF
 2026-03-24,BUY,IT0000072170,Fineco,Equity,4500.0,18.88,EUR,1.0,0.0,,Financials,Stock
@@ -193,7 +193,7 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-09-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,"Cedola automatica (Romania 1.375% Dec 2029 - rateo mensile 1,375%/12 su 615.000 nominali)",Gov. Europa,Bond
 2026-09-07,DIVIDEND,GB00BSQNRC93,Cedola semestrale Gilt UK,Fixed Income,3947.7,1.0,EUR,1.0,0.0,"Cedola automatica (UK Treasury Gilt 4.375% 7-mar-2028 - 4,375%/2 su 155.000 GBP nominali) - 3,390.62 GBP @ 1.1643",Gov. Internazionali,Bond
 2026-09-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,"Cedola automatica (Iliad holding 5.375% 2030 - rateo mensile 5,375%/12 su 400.000 nominali)",Corporate Bond,Bond
-2026-09-29,BUY,US77926X3200,Roundhill Memory ETF (DRAM),Equity,3300.0,61.07,USD,1.1204,0.0,,Technology,ETF
+2026-09-29,BUY,US77926X3200,Roundhill Memory ETF (DRAM),Equity,3300.0,61.07,USD,1.13433,0.0,nan,Technology,ETF
 2026-10-01,BUY,DE0007030009,Rheinmetall,Equity,90.0,946.0,EUR,1.0,0.0,,Industrials,Stock
 2026-10-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,"Cedola automatica (Romania 1.375% Dec 2029 - rateo mensile 1,375%/12 su 615.000 nominali)",Gov. Europa,Bond
 2026-10-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,"Cedola automatica (Iliad holding 5.375% 2030 - rateo mensile 5,375%/12 su 400.000 nominali)",Corporate Bond,Bond
