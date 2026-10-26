@@ -4,9 +4,9 @@
   "initial_nav": 10000000,
   "currency": "EUR",
   "benchmark": "VNGA50/50",
-  "current_nav": 13046046.94,
-  "performance_since_inception": 0.30460469399999995,
-  "benchmark_performance": 0.306102,
+  "current_nav": 13071507.95,
+  "performance_since_inception": 0.3071507949999999,
+  "benchmark_performance": 0.30972,
   "positions_count": 47,
-  "last_updated": "2026-10-26 14:15:11"
+  "last_updated": "2026-10-26 15:06:43"
 }
