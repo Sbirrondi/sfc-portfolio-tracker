@@ -6,12 +6,12 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2023-11-03,BUY,IE00BJK55C48,HY EU,Fixed Income,43972.0,5.156,EUR,1.0,0.0,,HY EU,ETF
 2023-11-03,BUY,AT0000A2HLC4,"Austria Tf 0,85% Gn2120 Eur",Fixed Income,11300.0,39.8,EUR,1.0,0.0,,Gov. Europa,Bond
 2023-11-03,BUY,IT0005433690,"Btp Tf 0,25% Mz28 Eur",Fixed Income,5200.0,86.14,EUR,1.0,0.0,,Gov. Italia,Bond
+2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
 2023-11-03,BUY,FR0014007TY9,Oat Tf 0% Fb25 Eur,Fixed Income,4690.0,95.84,EUR,1.0,0.0,,Oat Tf 0% Fb25 Eur,Bond
-2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
 2023-11-03,BUY,NO0010732555,"Norway Tf 1,75% Mz25 Nok",Fixed Income,55000.0,97.13,NOK,11.876485,0.0,,"Norway Tf 1,75% Mz25 Nok",Bond
 2023-11-03,BUY,IT0005474330,Btp Tf 0% Dc24 Eur,Fixed Income,4690.0,96.07,EUR,1.0,0.0,,Btp Tf 0% Dc24 Eur,Bond
 2023-11-03,BUY,IT0005419848,"Btp Tf 0,50% Fb26 Eur",Fixed Income,9620.0,93.37,EUR,1.0,0.0,,"Btp Tf 0,50% Fb26 Eur",Bond
-2023-11-03,BUY,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,93.67,NOK,11.876485,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
+2023-11-03,BUY,DE0001141802,Bobl Tf 0% Ot24 Eur,Fixed Income,4650.0,96.8,EUR,1.0,0.0,,Bobl Tf 0% Ot24 Eur,Bond
 2023-11-09,BUY,IT0004176001,Azioni Prysmian,Equity,6484.0,34.7,EUR,1.0,0.0,,Industrials,Stock
 2023-11-30,BUY,GB00BJYDH287,Bitcoin,Alternative,17999.0,8.334,EUR,1.0,0.0,,Crypto,Crypto
 2023-12-01,BUY,IE00BNGJJT35,S&P Equal Weight,Equity,11122.0,44.955,EUR,1.0,0.0,,US Equity,Stock
@@ -23,9 +23,9 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2024-02-01,BUY,LU0489337690,Real Estate EU,Equity,21844.0,22.89,EUR,1.0,0.0,,European Equity,Stock
 2024-02-06,BUY,FR0000121485,Kering,Equity,387.0,387.15,EUR,1.0,0.0,,Kering,Stock
 2024-02-12,BUY,US3364331070,First Solar,Equity,1298.0,154.25,USD,1.08,0.0,,First Solar,Stock
-2024-02-14,BUY,IE00B53SZB19,Nasdaq,Equity,106.0,943.88,EUR,1.0,0.0,,US Equity,Stock
 2024-02-14,SELL,IT0003007728,Tod's,Equity,3601.0,43.08,EUR,1.0,0.0,,Tod's,Stock
 2024-02-14,BUY,IE00BLNMYC90,S&P500 Equal Weight,Equity,6300.0,79.36,EUR,1.0,0.0,,US Equity,Stock
+2024-02-14,BUY,IE00B53SZB19,Nasdaq,Equity,106.0,943.88,EUR,1.0,0.0,,US Equity,Stock
 2024-02-19,BUY,GB00BLD4ZM24,Ethereum,Alternative,655.0,76.34,EUR,1.0,0.0,,Crypto,Crypto
 2024-02-20,BUY,GB00B082RF11,Rentokil,Equity,30524.0,4.209,GBP,0.8565,0.0,,Business Services,Stock
 2024-02-21,BUY,IE00B53SZB19,Nasdaq,Equity,110.0,919.04,EUR,1.0,0.0,,US Equity,Stock
@@ -82,10 +82,10 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-07-11,BUY,US8716071076,Synopsys,Equity,135.0,563.59,USD,1.16956,0.0,,Synopsys,Stock
 2025-07-11,SELL,IE00BLNMYC90,SP Equal Weight,Equity,1840.0,86.57,EUR,1.0,0.0,,US Equity,Stock
 2025-07-11,SELL,IE00B53SZB19,Nasdaq,Equity,90.0,1116.82,EUR,1.0,0.0,,US Equity,Stock
-2025-07-23,BUY,SE0012673267,Evolution AB,Equity,765.0,847.0,SEK,11.16,0.0,,Evolution AB,Stock
-2025-07-23,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-07-23,BUY,IT0005282865,Reply,Equity,420.0,138.9,EUR,1.0,0.0,,Technology,Stock
 2025-07-23,SELL,IT0004176001,Prysmian,Equity,926.0,64.34,EUR,1.0,0.0,,Industrials,Stock
+2025-07-23,BUY,SE0012673267,Evolution AB,Equity,765.0,847.0,SEK,11.16,0.0,,Evolution AB,Stock
+2025-07-23,BUY,IT0004965148,Moncler,Equity,1164.0,50.14,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-07-23,SELL,US8716071076,Synopsys,Equity,135.0,617.61,USD,1.17,0.0,,Synopsys,Stock
 2025-07-25,SELL,IE00B1TXK627,Water,Equity,1577.0,62.53,EUR,1.0,0.0,,Water,Stock
 2025-07-25,BUY,NL0010273215,ASML,Equity,132.0,604.0,EUR,1.0,0.0,,Technology,Stock
@@ -96,10 +96,10 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2025-09-16,BUY,IE00B4YBJ215,SPY400,Equity,1000.0,85.82,EUR,1.0,0.0,,US Equity,Stock
 2025-09-16,SELL,NO0010786288,"Norway Tf 1,75% Fb27 Nok",Fixed Income,85000.0,97.25,NOK,11.591515,0.0,,"Norway Tf 1,75% Fb27 Nok",Bond
 2025-10-08,SELL,GB00B082RF11,Rentokil,Equity,9524.0,4.1204,GBP,0.8661,0.0,,Business Services,Stock
-2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
-2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
-2025-10-08,BUY,LU1437017350,Emerging Markets,Equity,1250.0,79.35,EUR,1.0,0.0,,Emerging Markets,Stock
 2025-10-08,BUY,FR0000121014,LVMH,Equity,39.0,563.0,EUR,1.0,0.0,,Consumer Discretionary,Stock
+2025-10-08,BUY,XS2262211076,Romania Tf 1.375% Dec.29,Fixed Income,5000.0,89.65,EUR,1.0,0.0,,Gov. Europa,Bond
+2025-10-08,BUY,LU1437017350,Emerging Markets,Equity,1250.0,79.35,EUR,1.0,0.0,,Emerging Markets,Stock
+2025-10-08,SELL,GB00BM8Q5M07,JD Sport,Equity,71000.0,1.0265,GBP,0.8669,0.0,,JD Sport,Stock
 2025-10-13,BUY,IE00BQQP9F84,GDX,Alternative,453.0,75.25,EUR,1.0,0.0,,Precious Metals,Commodity
 2025-10-14,BUY,NL0011585146,Ferrari,Equity,270.0,327.4,EUR,1.0,0.0,,Consumer Discretionary,Stock
 2025-10-20,BUY,IT0003856405,Leonardo,Equity,700.0,50.6,EUR,1.0,0.0,,Leonardo,Stock
@@ -202,6 +202,6 @@ date,transaction_type,isin,name,macro_class,quantity,price,currency,fx_rate,fees
 2026-10-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,"Cedola automatica (Romania 1.375% Dec 2029 - rateo mensile 1,375%/12 su 615.000 nominali)",Gov. Europa,Bond
 2026-10-15,DIVIDEND,XS2943818059,Cedola mensile ILIAD,Fixed Income,1791.67,1.0,EUR,1.0,0.0,"Cedola automatica (Iliad holding 5.375% 2030 - rateo mensile 5,375%/12 su 400.000 nominali)",Corporate Bond,Bond
 2026-11-02,DIVIDEND,XS2262211076,Cedola mensile Romania,Fixed Income,704.69,1.0,EUR,1.0,0.0,"Cedola automatica (Romania 1.375% Dec 2029 - rateo mensile 1,375%/12 su 615.000 nominali)",Gov. Europa,Bond
-2026-11-04,BUY,VGG794831062,Sealsq Corp,Equity,29198.0,1.39,USD,1.1259,0.0,nan,Technology,Stock
-2026-11-04,BUY,US02079K1079,Alphabet Inc,Equity,284.0,282.39,USD,1.1259,0.0,,Technology,Stock
+2026-11-04,BUY,VGG794831062,Sealsq Corp,Equity,29198.0,1.39,USD,1.1259,0.0,,Technology,Stock
+2026-11-04,BUY,US02079K1079,Alphabet Inc,Equity,284.0,282.39,USD,0.89,0.0,nan,Technology,Stock
 2026-11-04,BUY,LU1900066207,Amundi MSCI Brazil UCITS ETF Acc,Equity,2142.0,23.325,EUR,1.0,0.0,,,ETF
